@@ -225,3 +225,6 @@ data/raw/
 data/cache/
 .torch-backend
 slurm-*.out
+
+# Built demo pages (regenerate with demo/synthetic_demo.py)
+demo/out/
