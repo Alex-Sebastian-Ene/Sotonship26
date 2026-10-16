@@ -1,0 +1,21 @@
+# Add to ~/.ssh/config (Windows: C:\Users\<you>\.ssh\config) and replace YOUR_USERNAME with your
+# University of Southampton username. Then `ssh iridis` works, and so does VS Code Remote-SSH.
+# Off campus you may need the university VPN first.
+
+Host iridis
+    HostName loginx001.iridis.soton.ac.uk
+    User YOUR_USERNAME
+    IdentityFile ~/.ssh/id_ed25519
+    ServerAliveInterval 60
+    ServerAliveCountMax 5
+
+# Other login nodes, if loginx001 is busy or down.
+Host iridis2
+    HostName loginx002.iridis.soton.ac.uk
+    User YOUR_USERNAME
+    IdentityFile ~/.ssh/id_ed25519
+
+Host iridis3
+    HostName loginx003.iridis.soton.ac.uk
+    User YOUR_USERNAME
+    IdentityFile ~/.ssh/id_ed25519

@@ -1,0 +1,62 @@
+# Sotonship26 model settings.
+# Anything marked "calibrate" is a starting guess, not a measured figure.
+
+time:
+  bin_minutes: 15
+  day_start: "05:00"
+  day_end: "20:00"
+
+streets:
+  centre: "Town Quay, Southampton, UK"  # walking network pulled from OSM within radius_m of here
+  radius_m: 2500
+  crs: "EPSG:27700"  # British National Grid, metres
+  walk_speed_mps: 1.2
+  ped_per_m_per_min: 40  # level-of-service flow per metre of footway width; calibrate
+  default_width_m:  # used when OSM has no width tag; calibrate
+    footway: 2.0
+    pedestrian: 6.0
+    path: 1.5
+    steps: 1.5
+    default: 2.5
+  terminals:  # geocoded through OSM; check each resolves to the right building
+    - "Ocean Cruise Terminal, Southampton"
+    - "Mayflower Cruise Terminal, Southampton"
+    - "City Cruise Terminal, Southampton"
+    - "QEII Cruise Terminal, Southampton"
+    - "Horizon Cruise Terminal, Southampton"
+  destinations:  # where walking passengers head, with shares; calibrate
+    "Southampton Central railway station": 0.45
+    "Bargate, Southampton": 0.35
+    "Town Quay, Southampton": 0.20
+  walk_share: 0.3  # passengers who walk rather than coach, car or taxi; calibrate
+
+waterway:
+  bounds_bng: [438000, 99000, 452000, 114000]  # rough box over Southampton Water; refine
+  cell_m: 100
+  leisure_speed_mps: 3.0
+  ferry_speed_mps: 8.0
+  vessels_per_edge_per_bin: 6  # calibrate
+  tide_station_id: "0065"  # UKHO station for Southampton; confirm with the Stations endpoint
+  clear_channel:  # check against current ABP Southampton harbour notices
+    ahead_m: 1000
+    beside_m: 100
+    astern_m: 0
+
+routing:  # PathFinder negotiated congestion
+  max_iters: 30
+  pres_fac: 0.5
+  pres_growth: 1.5
+  hist_fac: 0.2
+
+forecast:
+  n_scenarios: 200
+  seed: 26
+  overload_threshold: 1.0  # utilisation above which an edge counts as overloaded
+
+rl:
+  timesteps: 200000
+  n_envs: 4
+  n_steps: 512
+  seed: 26
+  device: cpu  # PPO with an MLP policy is faster on CPU; use cuda for bigger models
+  routing_max_iters: 8  # fewer PathFinder iterations per step keeps episodes fast
