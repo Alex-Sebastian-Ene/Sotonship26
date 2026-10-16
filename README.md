@@ -103,7 +103,7 @@ Fill in the date collected and the licence for every source before submission.
 | --- | --- | --- | --- |
 | Southampton VTS cruise schedule (public pages, no API) | Ship calls → `data/raw/cruise_schedule.csv`, not committed | TODO | TODO: check reuse terms |
 | UKHO ADMIRALTY UK Tidal API (Discovery tier, key in `UKHO_API_KEY`) | High/low water predictions | TODO | TODO |
-| OpenStreetMap via osmnx | Walking network around the terminals | TODO | ODbL |
+| OpenStreetMap via osmnx | Walking network around the terminals; directed road network and dock gate locations (`data/roads.py`) | Roads: 16 Oct 2026 (OSM base 21:45 UTC) | ODbL |
 | Bathymetry + water polygon for Southampton Water | Replace the synthetic lattice | TODO | TODO |
 | Footway widths, pedestrian counts on turnaround days | Calibrate capacities | TODO | TODO |
 | Red Funnel / Hythe ferry timetables, leisure-craft activity | Waterway demand | TODO | TODO |
@@ -113,5 +113,8 @@ Fill in the date collected and the licence for every source before submission.
 - **AI-generated:** the project scaffold (`pyproject.toml` backend extras, `src/`, `tests/`,
   `scripts/`, `cluster/`, `configs/`, this README) was generated with Claude Code on
   Fri 16 Oct 2026.
+- **AI-generated:** the road network, corridors and candidate paths (`src/sotonship26/data/roads.py`,
+  `src/sotonship26/corridors.py`, their tests, the `roads:` block in `configs/default.yaml`) were
+  written with Claude Code in Seb's session on Sat 17 Oct 2026 (SOT-9).
 - **Existed before the event:** TODO, confirm with the organisers.
 - **Who helped:** TODO.
