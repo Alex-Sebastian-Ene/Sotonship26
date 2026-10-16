@@ -48,8 +48,11 @@ def load_roads(
     ox.settings.use_cache = True
     ox.settings.requests_timeout = 180  # part of the Overpass query, so it must match the demo's
     ox.settings.log_console = False
-    if os.environ.get("OVERPASS_URL"):  # e.g. a mirror when overpass-api.de is unreachable
+    # A mirror when overpass-api.de is unreachable, e.g. https://maps.mail.ru/osm/tools/overpass/api
+    # (the venue network was blocked on 16 Oct). Mirrors' /status can hang, so skip the check.
+    if os.environ.get("OVERPASS_URL"):
         ox.settings.overpass_url = os.environ["OVERPASS_URL"]
+        ox.settings.overpass_rate_limit = False
 
     multi = ox.project_graph(
         ox.graph_from_bbox(tuple(bbox), network_type="drive", simplify=True), to_crs=crs
