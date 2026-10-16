@@ -138,12 +138,26 @@ def backtest_site(site: int, dates: np.ndarray, y: np.ndarray, cutoff: date,
                          "n_test_days": len(common), "first_test_day": str(common[0]),
                          "last_test_day": str(common[-1]),
                          "mae_veh_per_15min": float(err.mean()),
-                         "mape_pct": float(100 * (err / np.maximum(yt, 1)).mean()),
+                         "wape_pct": float(100 * err.sum() / max(yt.sum(), 1)),
                          "coverage80": float((err <= h).mean()),
                          "width80_veh": float(2 * h.mean())})
         rows[-1]["skill_vs_baseline"] = float(1 - scores["ridge"] / scores[base])
     table = pd.DataFrame(rows)
     return table
+
+
+def forecast(dates: np.ndarray, y: np.ndarray, targets: list[date]) -> pd.DataFrame:
+    """Fit ridge on every published day and forecast ``targets`` with 80% intervals."""
+    n_cal = max(20, int(len(dates) * 0.2))
+    feats = calendar_features(dates)
+    model = Ridge(features=CAL_FEATURES).fit(feats.iloc[:-n_cal], y[:-n_cal])
+    half = conformal_halfwidth(y[-n_cal:] - model.predict(feats.iloc[-n_cal:]))
+    final = Ridge(lam=model.lam, features=CAL_FEATURES).fit(feats, y)
+    pred = final.predict(calendar_features(targets))
+    rows = [pd.DataFrame({"date": d, "tod_bin": np.arange(96), "flow_veh": p,
+                          "lo80": np.maximum(p - half, 0), "hi80": p + half})
+            for d, p in zip(targets, pred, strict=True)]
+    return pd.concat(rows, ignore_index=True)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -156,8 +170,19 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--cutoff", type=date.fromisoformat, default=date(2025, 7, 1))
     p.add_argument("--lag", type=int, default=LAG_DAYS)
     p.add_argument("--sites", type=int, nargs="*", default=list(observed.SITES))
+    p.add_argument("--forecast", type=date.fromisoformat, nargs=2, metavar=("FROM", "TO"),
+                   help="also write runs/flow_forecast/<site>.csv for these dates")
     args = p.parse_args(argv)
     flows = observed.load_flows(args.sites, args.start, args.end)
+    if args.forecast:
+        out = ROOT / "runs" / "flow_forecast"
+        out.mkdir(parents=True, exist_ok=True)
+        targets = list(pd.date_range(*args.forecast, freq="D").date)
+        for site in args.sites:
+            dates, y = site_days(flows, site)
+            if len(dates) >= 200:
+                forecast(dates, y, targets).to_csv(out / f"{site}.csv", index=False)
+                print(f"forecast written: {out / f'{site}.csv'}")
     tables = []
     for site in args.sites:
         dates, y = site_days(flows, site)
@@ -169,7 +194,7 @@ def main(argv: list[str] | None = None) -> int:
     out_dir = ROOT / "notes"
     table.to_csv(out_dir / "flow_forecast_table.csv", index=False)
     cols = ["site_id", "versus", "model", "n_test_days", "mae_veh_per_15min",
-            "skill_vs_baseline", "mape_pct", "coverage80", "width80_veh"]
+            "skill_vs_baseline", "wape_pct", "coverage80", "width80_veh"]
     text = "\n".join([
         "# Everyday traffic forecast on the dock approaches: learned model vs baselines",
         "",
@@ -185,8 +210,16 @@ def main(argv: list[str] | None = None) -> int:
         "",
         md_table(table[cols]),
         "",
+        "![One test week at M3 J14](figures/flow_forecast_20025.png)",
+        "",
+        "Reading it: sites with a long, continuous record (20025 M3 J14, 19974 M271 NB) are the "
+        "trustworthy results. 20313/20605 have under 30 comparable test days and patchy sensor "
+        "data, so their scores are noise. 7588 and 19796 have no test days after the cutoff.",
+        "",
         "Cruise days are not removed (no historic cruise list yet, see SOT-21), so these "
-        "forecasts are 'typical traffic including the average cruise effect'.",
+        "forecasts are 'typical traffic including the average cruise effect'. Forward "
+        "forecasts for any date range: `--forecast FROM TO` writes runs/flow_forecast/<site>.csv "
+        "(date, tod_bin, flow_veh, lo80, hi80).",
     ])
     (out_dir / "flow-forecast.md").write_text(text + "\n")
     print(text)

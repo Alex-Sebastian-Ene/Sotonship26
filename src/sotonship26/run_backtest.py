@@ -142,6 +142,11 @@ def main(argv: list[str] | None = None) -> int:
     flows = observed.load_flows(args.sites, args.start, args.end)
     calls = cruise_history.load_calls(args.start, args.end)
     days = cruise_history.cruise_days(calls, args.start, args.end)
+    if not ((days["n_calls"] > 0) & days["covered"]).any():
+        print("No covered cruise days in range, so there is nothing to learn the cruise effect "
+              "from. Add a permitted historic call list (data/raw/cruise_history/"
+              "manual_calls.csv + manual_coverage.csv, see notes/cruise-history.md and SOT-21).")
+        return 1
     up = observed_uplift(flows, days)
     up.to_csv(RUNS / "uplift.csv.gz", index=False)
     det = detectability(up)
