@@ -1,18 +1,14 @@
-"""Synthetic demo of the cruise-day traffic forecast described in docs/design.md.
+"""Cruise-day traffic forecast demo on the real Southampton road network.
 
-Everything this script produces is invented: the cruise schedule, ship names, road capacities,
-background traffic, roadworks permits and match days. Road names follow the Southampton dock area so
-the demo reads naturally, but the network is a schematic (not to scale) and no number in it was
-observed. It runs the designed pipeline end to end so the product can be shown before real data is
-wired in:
+The map and road network are real (OpenStreetMap, built by osm_base.py). The traffic model
+(traffic_model.py) builds zones, county gateways and routes from that geography and allocates
+traffic dynamically every 15 minutes. What is invented: the cruise schedule and ship names, the trip
+totals behind general traffic, capacities per lane, roadworks permits and match fixtures. Nothing
+here is observed traffic.
 
-    vehicles per dock gate per 15 min -> background load -> route choice over candidate paths
-    (PathFinder negotiation) -> Monte Carlo over sampled days -> P(V/C > 0.85) per road per bin
-
-Run it without the torch-heavy project environment:
-
-    uv run --no-project --python 3.12 --with numpy --with networkx --with pandas \
-        python demo/synthetic_demo.py --out demo/out/cruise-day-demo.html
+    uv run --no-project --python 3.12 --with osmnx --with scipy python demo/osm_base.py   # once
+    uv run --no-project --python 3.12 --with numpy --with scipy --with networkx --with pandas \
+        --with shapely --with pyproj python demo/synthetic_demo.py
 """
 
 from __future__ import annotations
@@ -20,137 +16,80 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
+import pickle
 import sys
 import time as clock
-from dataclasses import dataclass
+from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor
+from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
-from itertools import islice
 from pathlib import Path
 
-import networkx as nx
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent / "src"))
+sys.path.insert(0, str(HERE))
+import traffic_model as tm  # noqa: E402
 from sotonship26.demand.passengers import TurnaroundParams  # noqa: E402
 
+CACHE = HERE.parent / "data" / "cache" / "southampton"
 BIN_MIN = 15
-N_BINS = 60  # 05:00-20:00
-DAY_START_MIN = 5 * 60
+N_BINS = tm.N_BINS
 ISSUED = datetime(2026, 10, 16, 22, 30)
 FIRST_DAY = date(2026, 10, 17)
-HORIZON = date(2026, 11, 29)  # last day the synthetic schedule covers
-CAL_END = date(2026, 12, 6)  # the calendar runs a week past it to show the refusal
-AT_RISK = 0.85  # UK ratio-of-flow-to-capacity design threshold
-PACKET_PCU = 20.0
+HORIZON = date(2026, 11, 29)
+CAL_END = date(2026, 12, 6)
 SEED = 26
+LANE_CLOSED = 0.75  # capacity left with one lane coned off under traffic management
+CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
+BBOX = (-1.53, 50.855, -1.29, 50.975)
 
-# Schematic positions, not to scale: id -> (label, x, y, kind)
-NODES = {
-    "W": ("M271 / A35 (west)", 2, 50, "approach"),
-    "RB": ("Redbridge", 16, 50, "junction"),
-    "MB": ("Millbrook roundabout", 34, 52, "junction"),
-    "G20": ("Western Docks west gate", 34, 68, "gate"),
-    "MW": ("Mountbatten Way junction", 52, 46, "junction"),
-    "CS": ("Central station", 58, 32, "station"),
-    "WE": ("Western Esplanade junction", 66, 56, "junction"),
-    "G10": ("Western Docks east gate", 64, 70, "gate"),
-    "TQ": ("Town Quay", 80, 64, "junction"),
-    "PR": ("Platform Road junction", 94, 62, "junction"),
-    "G4": ("Eastern Docks gate", 98, 76, "gate"),
-    "CR": ("Canute Road", 106, 48, "junction"),
-    "N": ("A33 The Avenue (north)", 72, 2, "approach"),
-    "CP": ("Charlotte Place", 74, 18, "junction"),
-    "CC": ("City centre", 78, 36, "centre"),
-    "SD": ("Six Dials / St Mary's", 98, 24, "junction"),
-    "E": ("A3024 Northam Bridge (east)", 120, 16, "approach"),
-}
-
-
-@dataclass(frozen=True)
-class Corridor:
-    id: str
-    name: str
-    a: str
-    b: str
-    km: float
-    lanes: int
-    lane_cap: float  # vehicles per hour per lane
-    bg: float  # background V/C at the weekday peak
-    kind: str  # approach, retail, urban or gate
-
-
+# Named corridors for the heatmap: (id, label, group, names, refs)
 CORRIDORS = [
-    Corridor("a35", "A35 Redbridge Road / M271", "W", "RB", 1.5, 2, 1700, 0.62, "approach"),
-    Corridor("a33w", "A33 Millbrook Road West", "RB", "MB", 2.0, 2, 1500, 0.62, "approach"),
-    Corridor("g20", "Western Docks west gate access", "MB", "G20", 0.5, 1, 1000, 0.25, "gate"),
-    Corridor("mountbatten", "Mountbatten Way", "MB", "MW", 1.6, 2, 1300, 0.62, "retail"),
-    Corridor("wqr", "West Quay Road", "MW", "WE", 0.9, 2, 950, 0.55, "retail"),
-    Corridor("g10", "Western Docks east gate access", "WE", "G10", 0.4, 1, 1000, 0.25, "gate"),
-    Corridor("station", "Central station approach", "MW", "CS", 0.5, 1, 800, 0.50, "urban"),
-    Corridor("esplanade", "Western Esplanade", "WE", "TQ", 0.8, 1, 1000, 0.50, "urban"),
-    Corridor("platform", "Platform Road", "TQ", "PR", 0.8, 2, 900, 0.52, "urban"),
-    Corridor("g4", "Eastern Docks gate access", "PR", "G4", 0.4, 1, 1000, 0.25, "gate"),
-    Corridor("canute", "Canute Road", "PR", "CR", 0.6, 1, 850, 0.45, "urban"),
-    Corridor("terminus", "Terminus Terrace", "CR", "SD", 1.1, 1, 900, 0.50, "urban"),
-    Corridor("queensway", "Queensway", "CC", "TQ", 0.9, 2, 850, 0.50, "urban"),
-    Corridor("civic", "Civic Centre Road", "CC", "CS", 0.9, 2, 900, 0.58, "retail"),
-    Corridor("kingsway", "Kingsway", "CP", "CC", 0.8, 2, 900, 0.60, "retail"),
-    Corridor("avenue", "A33 The Avenue", "N", "CP", 3.0, 2, 1300, 0.60, "approach"),
-    Corridor("stmarys", "St Mary's Road", "SD", "CP", 1.0, 2, 900, 0.58, "urban"),
-    Corridor("northam", "A3024 Northam Bridge", "E", "SD", 2.0, 2, 1300, 0.65, "approach"),
+    ("m271", "M271", "Western approach", [], ["M271"]),
+    ("redbridge", "A35 Redbridge Road", "Western approach", ["Redbridge Road"], []),
+    ("millbrook", "A33 Millbrook Road", "Western approach", ["Millbrook Road West", "Millbrook Road East"], []),
+    ("mountbatten", "Mountbatten Way", "Western approach", ["Mountbatten Way"], []),
+    ("wqr", "West Quay Road", "Western approach", ["West Quay Road"], []),
+    ("esplanade", "Western Esplanade", "Western approach", ["Western Esplanade"], []),
+    ("platform", "Platform Road", "Town Quay and Eastern Docks", ["Platform Road"], []),
+    ("canute", "Canute Road", "Town Quay and Eastern Docks", ["Canute Road"], []),
+    ("terminus", "Terminus Terrace", "Town Quay and Eastern Docks", ["Terminus Terrace"], []),
+    ("queensway", "Queensway", "Town Quay and Eastern Docks", ["Queensway"], []),
+    ("civic", "Civic Centre Road", "City centre", ["Civic Centre Road"], []),
+    ("dorset", "Dorset Street / Charlotte Place", "City centre", ["Dorset Street", "Charlotte Place"], []),
+    ("kingsway", "Kingsway", "City centre", ["Kingsway"], []),
+    ("avenue", "A33 The Avenue", "North and east", ["The Avenue"], []),
+    ("northam", "Northam Road / Bridge", "North and east", ["Northam Road", "Northam Bridge"], []),
+    ("britannia", "Britannia Road", "North and east", ["Britannia Road"], []),
+    ("itchen", "Itchen Bridge", "North and east", ["Itchen Bridge"], []),
+    ("shirley", "Shirley Road", "North and east", ["Shirley Road"], []),
+    ("portswood", "Portswood Road", "Portswood", ["Portswood Road"], []),
+    ("bevois", "Bevois Hill / Bevois Valley Road", "Portswood", ["Bevois Hill", "Bevois Valley Road"], []),
+    ("stdenys", "St Denys Road", "Portswood", ["St Denys Road"], []),
+    ("highfield", "Highfield Lane", "Portswood", ["Highfield Lane"], []),
+    ("burgess", "Burgess Road", "Portswood", ["Burgess Road"], []),
+    ("m27", "M27", "Motorway", [], ["M27"]),
 ]
-NC = len(CORRIDORS)
-CORR_INDEX = {c.id: i for i, c in enumerate(CORRIDORS)}
-SPEED_KMH = {"approach": 50, "retail": 30, "urban": 30, "gate": 15}
-WEEKEND = {"approach": (0.85, 0.8), "retail": (1.08, 1.0), "urban": (0.9, 0.82), "gate": (0.8, 0.8)}
-SENSOR = {"a35": "Sensor planned: National Highways WebTRIS on the M271"}
-
-# Hourly traffic profiles for 05:00..19:00, peak = 1
-PROFILES = {
-    "weekday": [0.22, 0.48, 0.85, 1.0, 0.86, 0.72, 0.72, 0.76, 0.76, 0.76, 0.84, 0.95, 1.0, 0.84, 0.6],
-    "saturday": [0.14, 0.24, 0.4, 0.56, 0.72, 0.86, 0.96, 1.0, 1.0, 0.95, 0.9, 0.84, 0.74, 0.6, 0.46],
-    "sunday": [0.1, 0.17, 0.28, 0.4, 0.55, 0.7, 0.82, 0.9, 0.92, 0.9, 0.85, 0.8, 0.7, 0.55, 0.4],
-}
-
-GATES = ["G20", "G10", "G4"]
-GATE_NAMES = {g: NODES[g][0] for g in GATES}
+SENSOR = {"m271": "Sensor planned: National Highways WebTRIS on the M271",
+          "m27": "Sensor planned: National Highways WebTRIS on the M27"}
+WATER_LABELS = [("Southampton Water", 50.872, -1.372), ("River Test", 50.906, -1.462),
+                ("River Itchen", 50.913, -1.384)]
 TERMINALS = ["Ocean", "QEII", "Mayflower", "City", "Horizon"]
-TERMINAL_GATE = {  # assumed for the demo; verify against ABP's directions to each terminal
-    "Ocean": "G4",
-    "QEII": "G4",
-    "Mayflower": "G10",
-    "City": "G10",
-    "Horizon": "G20",
-}
-ORIGINS = ["W", "N", "E", "CS", "CC"]
 
-# Mode split (invented, to be learned from observed traffic): car drop-off/pick-up, park & cruise,
-# taxi, coach, other (walk, shuttle)
 MODE_MEAN = np.array([0.22, 0.28, 0.20, 0.25, 0.05])
 MODE_CONC = 60.0
 PEOPLE_PER = {"car": 2.4, "park": 2.4, "taxi": 2.0, "coach": 40.0}
 COACH_PCU = 2.0
-CAR_FROM = (["W", "N", "E", "CC"], np.array([0.45, 0.25, 0.20, 0.10]))
-TAXI_RANK = (["CS", "CC"], np.array([0.6, 0.4]))
-TAXI_FAR = (["CS", "CC", "W", "N"], np.array([0.55, 0.15, 0.2, 0.1]))
-COACH_FROM = (["W", "N"], np.array([0.6, 0.4]))
-
-SHIPS = [
-    ("Synthetic Seas", 3600),
-    ("Demo Meridian", 2100),
-    ("Sample Serenade", 4900),
-    ("Mock Mariner", 2600),
-    ("Trial Tern", 1900),
-    ("Proxy Pearl", 3100),
-    ("Model Majesty", 5200),
-    ("Test Tide", 2400),
-    ("Placeholder Spirit", 4200),
-    ("Stub Starlight", 3000),
-    ("Draft Dawn", 2800),
-    ("Example Explorer", 3900),
-]
 UNKNOWN_PAX_RANGE = (1800, 4500)
-
+SHIPS = [
+    ("Synthetic Seas", 3600), ("Demo Meridian", 2100), ("Sample Serenade", 4900),
+    ("Mock Mariner", 2600), ("Trial Tern", 1900), ("Proxy Pearl", 3100), ("Model Majesty", 5200),
+    ("Test Tide", 2400), ("Placeholder Spirit", 4200), ("Stub Starlight", 3000),
+    ("Draft Dawn", 2800), ("Example Explorer", 3900),
+]
 PERMITS = [
     {"id": "P1", "corridor": "wqr", "from": "2026-10-23", "to": "2026-10-25",
      "what": "Lane closure for utility works"},
@@ -159,14 +98,38 @@ PERMITS = [
     {"id": "P3", "corridor": "avenue", "from": "2026-11-03", "to": "2026-11-05",
      "what": "Lane closure for a gas main repair"},
 ]
-MATCHES = [  # home matches at St Mary's (invented fixtures)
-    {"date": "2026-10-24", "kickoff": "15:00"},
-    {"date": "2026-11-03", "kickoff": "19:45"},
-    {"date": "2026-11-21", "kickoff": "12:30"},
+MATCHES = [{"date": "2026-10-24", "kickoff": "15:00"}, {"date": "2026-11-03", "kickoff": "19:45"},
+           {"date": "2026-11-21", "kickoff": "12:30"}]
+WHATIF_ROADS = ["wqr", "mountbatten", "platform", "millbrook"]
+HALF_TERM = (date(2026, 10, 26), date(2026, 10, 30))  # assumed; check SCC 2026/27 term dates
+TERM_ENDS = date(2026, 12, 18)
+DIS_OPTS = [-30, 45, 90, 150]  # minutes to move the start of disembarkation
+EMB_OPTS = [-90, -45, 30]  # minutes to move the check-in window
+
+# Observed two-direction counts (NB, SB) used to calibrate everyday traffic. Source: Southampton
+# City Council / WSP, "Portswood Project Baseline Data Report", January 2025, Tables 3-8 and 3-9:
+# automatic traffic counts 1-14 July 2024, totals for 07:00-10:00, 16:00-19:00 and the whole day.
+# Portswood Road averages its four sites (ATC 4, 9, 10, 11).
+COUNT_SOURCE = ("Southampton City Council / WSP, Portswood Project Baseline Data Report (Jan 2025), "
+                "Tables 3-8 and 3-9: automatic traffic counts, 1-14 July 2024")
+COUNT_SITES = [
+    {"label": "Portswood Road (ATC 4, 9, 10, 11)", "names": ["Portswood Road"],
+     "weekday": {"am": (738.5, 945.75), "pm": (1111.5, 1085.75), "day": (5206.0, 5498.25)},
+     "speed": {"am": (21.1, 21.0), "pm": (18.6, 18.5)},
+     "saturday": {"am": (539.0, 554.25), "pm": (950.5, 866.0), "day": (5006.25, 5175.25)}},
+    {"label": "Highfield Lane (ATC 3)", "names": ["Highfield Lane"],
+     "weekday": {"am": (727, 706), "pm": (858, 644), "day": (4253, 3600)},
+     "speed": {"am": (24.5, 24.9), "pm": (21.0, 24.5)},
+     "saturday": {"am": (500, 470), "pm": (663, 551), "day": (3820, 3139)}},
+    {"label": "St Denys Road (ATC 14)", "names": ["St Denys Road"],
+     "weekday": {"am": (750, 644), "pm": (692, 832), "day": (4105, 4339)},
+     "speed": {"am": (18.4, 21.4), "pm": (18.1, 19.1)},
+     "saturday": {"am": (589, 474), "pm": (647, 801), "day": (3834, 4296)}},
+    {"label": "Bevois Hill (ATC 15)", "names": ["Bevois Hill"],
+     "weekday": {"am": (444, 579), "pm": (623, 703), "day": (3233, 3584)},
+     "speed": {"am": (15.8, 17.2), "pm": (14.6, 17.0)},
+     "saturday": {"am": (314, 340), "pm": (563, 583), "day": (3059, 3417)}},
 ]
-MATCH_ROADS = {"northam", "stmarys", "terminus", "kingsway"}
-WHATIF_ROADS = ["wqr", "mountbatten", "platform", "a33w"]
-LANE_CLOSED = 0.75  # capacity left with one lane coned off under traffic management
 
 
 @dataclass(frozen=True)
@@ -178,258 +141,408 @@ class Call:
     pax: int | None
 
 
-# --- network -------------------------------------------------------------------------------------
-
-def build_network():
-    graph = nx.DiGraph()
-    t0 = np.empty(2 * NC)
-    cap = np.empty(2 * NC)
-    for i, c in enumerate(CORRIDORS):
-        secs = c.km / SPEED_KMH[c.kind] * 3600
-        for k, (u, v) in enumerate(((c.a, c.b), (c.b, c.a))):
-            graph.add_edge(u, v, idx=2 * i + k, t0=secs)
-            t0[2 * i + k] = secs
-            cap[2 * i + k] = c.lanes * c.lane_cap
-    return graph, t0, cap
-
-
-GRAPH, T0, BASE_CAP = build_network()
-ODS = [(o, g, d) for o in ORIGINS for g in GATES for d in ("in", "out")]
-OD_INDEX = {od: j for j, od in enumerate(ODS)}
-GATE_MATRIX = np.array([[1.0 if od[1] == g else 0.0 for g in GATES] for od in ODS])
+@dataclass
+class Ctx:
+    m: tm.Model
+    corr: list  # (id, label, group, edge indices)
+    corr_idx: np.ndarray
+    corr_ptr: np.ndarray
+    seg_idx: np.ndarray
+    seg_ptr: np.ndarray
+    gates: list  # gate centroid indices
+    terminal_gate: dict
+    luts: dict  # set -> gate centroid -> direction -> OD index per origin
+    gate_mask: np.ndarray  # n_od x n_gates (cruise OD ends at/starts from gate)
+    gw_in: np.ndarray  # n_od x n_gateways (OD starts at gateway)
+    cruise_ods: np.ndarray
+    extra: dict = field(default_factory=dict)
 
 
-def candidate_paths(src: str, dst: str, k: int = 4, slack: float = 1.6) -> list[list[int]]:
-    """Up to ``k`` sensible routes: the fastest and alternatives within ``slack`` of it."""
-    out: list[list[int]] = []
-    best = None
-    for path in islice(nx.shortest_simple_paths(GRAPH, src, dst, weight="t0"), 12):
-        edges = list(zip(path, path[1:], strict=False))
-        cost = sum(GRAPH[u][v]["t0"] for u, v in edges)
-        best = best if best is not None else cost
-        if cost > slack * best:
-            break
-        out.append([GRAPH[u][v]["idx"] for u, v in edges])
-        if len(out) == k:
-            break
-    return out
+# --- model context -----------------------------------------------------------------------------
+
+def frame_origin():
+    from pyproj import Transformer
+
+    t = Transformer.from_crs("EPSG:4326", "EPSG:27700", always_xy=True)
+    w, s, e, n = BBOX
+    xs, ys = zip(*[t.transform(x, y) for x, y in [(w, s), (e, s), (e, n), (w, n)]])
+    return min(xs), max(ys), t
 
 
-CANDIDATES = [candidate_paths(o, g) if d == "in" else candidate_paths(g, o) for o, g, d in ODS]
+def segments_of(m: tm.Model):
+    """Merge directed edges into display segments: both directions, chained through plain bends."""
+    links: dict[tuple[int, int], list[int]] = defaultdict(list)
+    for k, (u, v) in enumerate(zip(m.eu, m.ev, strict=True)):
+        links[(min(u, v), max(u, v))].append(k)
+    keys = list(links)
+    parent = list(range(len(keys)))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    by_node = defaultdict(list)
+    for i, (a, b) in enumerate(keys):
+        by_node[a].append(i)
+        by_node[b].append(i)
+    label = [(m.name[links[k][0]], m.cls[links[k][0]].replace("_link", "")) for k in keys]
+    for ids in by_node.values():
+        if len(ids) == 2 and label[ids[0]] == label[ids[1]]:
+            parent[find(ids[0])] = find(ids[1])
+    groups = defaultdict(list)
+    for i in range(len(keys)):
+        groups[find(i)].append(i)
+    segs = []
+    for members in groups.values():
+        edges = [e for i in members for e in links[keys[i]]]
+        segs.append({"edges": edges, "links": [links[keys[i]][0] for i in members],
+                     "name": label[members[0]][0], "cls": label[members[0]][1]})
+    return segs
 
 
-def capacity(closed: set[str]) -> np.ndarray:
-    """Capacity per directed edge with a lane coned off on each corridor in ``closed``."""
-    cap = BASE_CAP.copy()
-    for cid in closed:
-        i = CORR_INDEX[cid]
-        cap[2 * i : 2 * i + 2] *= LANE_CLOSED
-    return cap
+def build_ctx(log=print) -> tuple[Ctx, dict]:
+    base = json.loads((CACHE / "base.json").read_text(encoding="utf-8"))
+    gates = dict(base.get("gates") or {})
+    lm = base["landmarks"]
+    if "QEII" not in lm and "Ocean" in lm:  # Nominatim misses it; it sits beside Ocean Terminal
+        lm["QEII"] = [lm["Ocean"][0] + 250, lm["Ocean"][1] + 350]
+    if gates:  # route only to the gates a terminal uses (its nearest)
+        used = {min(gates, key=lambda g: math.dist(lm[t], gates[g])) for t in TERMINALS if t in lm}
+        gates = {g: p for g, p in gates.items() if g in used}
+    if len(gates) < 2:  # fall back to points beside the terminals' road access
+        log("dock gates not in OSM; placing one gate per dock beside its terminals")
+        west = [lm[t] for t in ("Mayflower", "City", "Horizon") if t in lm]
+        east = [lm[t] for t in ("Ocean", "QEII") if t in lm]
+        if west:
+            gates["Western Docks gate"] = tuple(np.mean(west, axis=0).round().astype(int))
+        if east:
+            gates["Eastern Docks gate"] = tuple(np.mean(east, axis=0).round().astype(int))
+    m = tm.build(CACHE / "network.pkl", gates, log=log)
+    tm.calibrate_external(m, log=log)
+    calibration = tm.calibrate_to_counts(m, COUNT_SITES, log=log)
+    tm.calibrate_external(m, log=log)
+    capacity_notes = tm.anchor_counts(m, COUNT_SITES, calibration, log=log)
+    for row in calibration:
+        if row["period"] != "day" or row["day"] == "weekday":
+            log(f"  {row['road']:36s} {row['day']:8s} {row['period']:3s} observed {row['observed']:6d}"
+                f"  modelled {row['modelled']:6d}{'  (fitted)' if row['fitted'] else ''}")
+
+    gate_ids = [i for i, c in enumerate(m.centroids) if c.kind == "gate"]
+    terminal_gate = {}
+    for t in TERMINALS:
+        p = lm.get(t)
+        if p is None:
+            continue
+        terminal_gate[t] = min(gate_ids, key=lambda g: math.dist(p, m.centroids[g].xy))
+
+    corr = []
+    for cid, label, group, names, refs in CORRIDORS:
+        if refs:
+            idx = [k for k in range(len(m.t0))
+                   if any(r in m.ref[k].split(";") for r in refs) and m.length[k] >= 60
+                   and not m.cls[k].endswith("_link")]
+        else:
+            idx = tm.road_edges(m, names, min_length=60.0)
+        if idx:
+            corr.append((cid, label, group, idx))
+    for g in gate_ids:
+        node = m.centroids[g].node
+        idx = [k for k in range(len(m.t0)) if m.eu[k] == node or m.ev[k] == node]
+        if idx:
+            corr.append((f"gate{g}", f"{m.centroids[g].name} access", "Dock gates", idx))
+    log("corridors: " + ", ".join(c[1] for c in corr))
+    corr_idx = np.concatenate([c[3] for c in corr])
+    corr_ptr = np.concatenate([[0], np.cumsum([len(c[3]) for c in corr])])[:-1]
+
+    segs = segments_of(m)
+    seg_idx = np.concatenate([s["edges"] for s in segs])
+    seg_ptr = np.concatenate([[0], np.cumsum([len(s["edges"]) for s in segs])])[:-1]
+    log(f"display segments: {len(segs)}")
+
+    luts = {}
+    for key in ("car_from", "taxi_rank", "taxi_far", "coach_from"):
+        ids, _ = m.sets[key]
+        luts[key] = {g: {"in": np.array([m.od_index.get((o, g), -1) for o in ids]),
+                         "out": np.array([m.od_index.get((g, o), -1) for o in ids])}
+                     for g in gate_ids}
+    gate_mask = np.zeros((m.n_od, len(gate_ids)))
+    for (o, d), j in m.od_index.items():
+        for gi, g in enumerate(gate_ids):
+            if o == g or d == g:
+                gate_mask[j, gi] = 1.0
+    gws = [i for i, c in enumerate(m.centroids) if c.kind == "gateway"]
+    gw_in = np.zeros((m.n_od, len(gws)))
+    for (o, _), j in m.od_index.items():
+        if o in gws:
+            gw_in[j, gws.index(o)] = 1.0
+    cruise_ods = np.flatnonzero(gate_mask.sum(axis=1) > 0)
+    ctx = Ctx(m=m, corr=corr, corr_idx=corr_idx, corr_ptr=corr_ptr, seg_idx=seg_idx,
+              seg_ptr=seg_ptr, gates=gate_ids, terminal_gate=terminal_gate, luts=luts,
+              gate_mask=gate_mask, gw_in=gw_in, cruise_ods=cruise_ods,
+              extra={"segs": segs, "gateways": gws, "calibration": calibration,
+                     "capacity": capacity_notes})
+    return ctx, base
 
 
-# --- background traffic --------------------------------------------------------------------------
-
-BIN_HOURS = 5 + (np.arange(N_BINS) + 0.5) / 4
-
-
-def background(d: date, rng: np.random.Generator) -> np.ndarray:
-    """Vehicles per hour on each directed edge per bin, before any cruise traffic."""
-    wd = d.weekday()
-    kind = "saturday" if wd == 5 else "sunday" if wd == 6 else "weekday"
-    profile = np.interp(BIN_HOURS, np.arange(5, 20) + 0.5, PROFILES[kind])
-    day_noise = rng.lognormal(0.0, 0.05)
-    match = next((m for m in MATCHES if m["date"] == d.isoformat()), None)
-    bump = np.ones(N_BINS)
-    if match:
-        hh, mm = map(int, match["kickoff"].split(":"))
-        ko = hh + mm / 60
-        bump[(BIN_HOURS > ko - 2.5) & (BIN_HOURS < ko)] = 1.35
-        bump[(BIN_HOURS > ko + 1.75) & (BIN_HOURS < ko + 3)] = 1.35
-    out = np.empty((N_BINS, 2 * NC))
-    for i, c in enumerate(CORRIDORS):
-        weekend = WEEKEND[c.kind][wd - 5] if wd >= 5 else 1.0
-        shape = profile * (bump if c.id in MATCH_ROADS else 1.0)
-        for k in range(2):
-            noise = rng.lognormal(0.0, 0.04, N_BINS)
-            out[:, 2 * i + k] = c.lanes * c.lane_cap * c.bg * weekend * shape * day_noise * noise
-    return out
-
-
-# --- cruise vehicles -----------------------------------------------------------------------------
+# --- cruise demand -----------------------------------------------------------------------------
 
 def minutes(t: datetime) -> float:
     return t.hour * 60 + t.minute
 
 
-def _add(D, t, org_idx, origins, gate, direction, pcu):
-    b = np.floor((np.asarray(t) - DAY_START_MIN) / BIN_MIN).astype(int)
-    ok = (b >= 0) & (b < N_BINS)
-    for i, org in enumerate(origins):
-        m = ok & (org_idx == i)
-        if m.any():
-            np.add.at(D[:, OD_INDEX[(org, gate, direction)]], b[m], pcu)
+def sample_cruise(ctx: Ctx, calls, rng, p: TurnaroundParams, shifts=None) -> np.ndarray:
+    m = ctx.m
+    D = np.zeros((N_BINS, m.n_od))
 
+    def add(t, key, gate, direction, pcu):
+        n = len(t)
+        if n == 0:
+            return None
+        ids, probs = m.sets[key]
+        o = rng.choice(len(ids), size=n, p=probs)
+        put(t, o, key, gate, direction, pcu)
+        return o
 
-def sample_demand(calls: list[Call], rng: np.random.Generator, p: TurnaroundParams) -> np.ndarray:
-    """PCU per bin for each (origin, gate, direction) on one sampled day."""
-    D = np.zeros((N_BINS, len(ODS)))
+    def put(t, o, key, gate, direction, pcu):
+        b = np.floor((np.asarray(t) - 300) / BIN_MIN).astype(int)
+        j = ctx.luts[key][gate][direction][o]
+        ok = (b >= 0) & (b < N_BINS) & (j >= 0)
+        np.add.at(D, (b[ok], j[ok]), pcu)
 
-    def pick(n, choice):
-        names, mean = choice
-        return names, rng.choice(len(names), size=n, p=rng.dirichlet(mean * 40))
-
-    for call in calls:
-        gate = TERMINAL_GATE[call.terminal]
-        berths = call.pax if call.pax else rng.uniform(*UNKNOWN_PAX_RANGE)
-        arr, dep = minutes(call.arrival), minutes(call.departure)
-        start = arr + rng.normal(0.0, p.arrival_delay_sd_min) + p.disembark_start_min
-        lo = dep - p.embark_open_before_dep_min
-        hi = dep - p.embark_close_before_dep_min
+    for ci, c in enumerate(calls):
+        gate = ctx.terminal_gate[c.terminal]
+        berths = c.pax if c.pax else rng.uniform(*UNKNOWN_PAX_RANGE)
+        arr, dep = minutes(c.arrival), minutes(c.departure)
+        dis_shift, emb_shift = shifts[ci] if shifts else (0, 0)
+        start = arr + rng.normal(0.0, p.arrival_delay_sd_min) + p.disembark_start_min + dis_shift
+        lo = dep - p.embark_open_before_dep_min + emb_shift
+        hi = dep - p.embark_close_before_dep_min + emb_shift
         for leg in ("dis", "emb"):
             people = int(round(berths * rng.beta(*p.load_factor_beta)))
-            n_car, n_park, n_taxi, n_coach, _ = rng.multinomial(
-                people, rng.dirichlet(MODE_MEAN * MODE_CONC)
-            )
-            cars = int(round(n_car / PEOPLE_PER["car"]))
-            parks = int(round(n_park / PEOPLE_PER["park"]))
-            taxis = int(round(n_taxi / PEOPLE_PER["taxi"]))
-            coaches = math.ceil(n_coach / PEOPLE_PER["coach"])
-            if leg == "dis":  # passengers come off the ship and leave the port
-
+            n_car, n_park, n_taxi, n_coach, _ = rng.multinomial(people, rng.dirichlet(MODE_MEAN * MODE_CONC))
+            cars, parks = round(n_car / PEOPLE_PER["car"]), round(n_park / PEOPLE_PER["park"])
+            taxis, coaches = round(n_taxi / PEOPLE_PER["taxi"]), math.ceil(n_coach / PEOPLE_PER["coach"])
+            if leg == "dis":
                 def when(n):
                     return start + p.disembark_duration_min * rng.beta(2.0, 3.0, n)
-
                 t = when(cars)
-                names, o = pick(cars, CAR_FROM)
-                _add(D, t - 20, o, names, gate, "in", 1.0)  # pick-up drives in empty
-                _add(D, t + 5, o, names, gate, "out", 1.0)
-                names, o = pick(parks, CAR_FROM)
-                _add(D, when(parks) + 10, o, names, gate, "out", 1.0)
+                o = add(t - 20, "car_from", gate, "in", 1.0)
+                if o is not None:
+                    put(t + 5, o, "car_from", gate, "out", 1.0)
+                add(when(parks) + 10, "car_from", gate, "out", 1.0)
                 t = when(taxis)
-                names, o = pick(taxis, TAXI_RANK)
-                _add(D, t - 15, o, names, gate, "in", 1.0)
-                names, o = pick(taxis, TAXI_FAR)
-                _add(D, t, o, names, gate, "out", 1.0)
-                names, o = pick(coaches, COACH_FROM)
-                _add(D, start - 30 + 120 * rng.random(coaches), o, names, gate, "in", COACH_PCU)
-                _add(D, when(coaches) + 20, o, names, gate, "out", COACH_PCU)
-            else:  # the next sailing's passengers arrive and board
-
+                add(t - 15, "taxi_rank", gate, "in", 1.0)
+                add(t, "taxi_far", gate, "out", 1.0)
+                o = add(start - 30 + 120 * rng.random(coaches), "coach_from", gate, "in", COACH_PCU)
+                if o is not None:
+                    put(when(coaches) + 20, o, "coach_from", gate, "out", COACH_PCU)
+            else:
                 def when(n):
                     return lo + (hi - lo) * rng.beta(2.0, 2.0, n)
-
                 t = when(cars)
-                names, o = pick(cars, CAR_FROM)
-                _add(D, t, o, names, gate, "in", 1.0)
-                _add(D, t + 15, o, names, gate, "out", 1.0)  # drop-off leaves empty
-                names, o = pick(parks, CAR_FROM)
-                _add(D, when(parks) - 10, o, names, gate, "in", 1.0)
+                o = add(t, "car_from", gate, "in", 1.0)
+                if o is not None:
+                    put(t + 15, o, "car_from", gate, "out", 1.0)
+                add(when(parks) - 10, "car_from", gate, "in", 1.0)
                 t = when(taxis)
-                names, o = pick(taxis, TAXI_FAR)
-                _add(D, t, o, names, gate, "in", 1.0)
-                names, o = pick(taxis, TAXI_RANK)
-                _add(D, t + 10, o, names, gate, "out", 1.0)
+                add(t, "taxi_far", gate, "in", 1.0)
+                add(t + 10, "taxi_rank", gate, "out", 1.0)
                 t = when(coaches)
-                names, o = pick(coaches, COACH_FROM)
-                _add(D, t, o, names, gate, "in", COACH_PCU)
-                _add(D, t + 20, o, names, gate, "out", COACH_PCU)
+                o = add(t, "coach_from", gate, "in", COACH_PCU)
+                if o is not None:
+                    put(t + 20, o, "coach_from", gate, "out", COACH_PCU)
     return D
 
 
-# --- route choice (PathFinder negotiation over candidate paths) ---------------------------------
+# --- forecasting (runs in worker processes) ----------------------------------------------------
 
-def assign(dem: np.ndarray, bg: list[float], cap: list[float], t0: list[float]) -> list[float]:
-    """Load (vehicles/hour) per directed edge after cruise packets negotiate their routes."""
-    load = list(bg)
-    packets = []
-    for j in np.flatnonzero(dem > 1e-9):
-        k = max(1, math.ceil(dem[j] / PACKET_PCU))
-        packets += [(int(j), float(dem[j]) * 4.0 / k)] * k  # PCU per bin -> per hour
-    choice = [-1] * len(packets)
-    hist = [0.0] * len(load)
-    pres = 0.5
-    for _ in range(8):
-        for i, (j, size) in enumerate(packets):
-            paths = CANDIDATES[j]
-            if choice[i] >= 0:
-                for e in paths[choice[i]]:
-                    load[e] -= size
-            best, best_cost = 0, math.inf
-            for pi, path in enumerate(paths):
-                cost = 0.0
-                for e in path:
-                    vc = (load[e] + size) / cap[e]
-                    over = vc - 1.0 if vc > 1.0 else 0.0
-                    cost += (t0[e] * (1.0 + 0.15 * vc**4) + hist[e]) * (1.0 + pres * over)
-                if cost < best_cost:
-                    best, best_cost = pi, cost
-            choice[i] = best
-            for e in paths[best]:
-                load[e] += size
-        over = [e for e in range(len(load)) if load[e] > cap[e]]
-        if not over:
-            break
-        for e in over:
-            hist[e] += 0.2 * t0[e] * (load[e] - cap[e]) / cap[e]
-        pres *= 1.5
-    return load
+CTX: Ctx | None = None
+_SHARES: dict = {}
 
 
-# --- forecast ------------------------------------------------------------------------------------
+def _init(path: str) -> None:
+    global CTX
+    with open(path, "rb") as f:
+        CTX = pickle.load(f)
 
-def corridor_max(vc: np.ndarray) -> np.ndarray:
-    return np.maximum(vc[:, 0::2], vc[:, 1::2])
+
+def capacity(ctx: Ctx, closed) -> np.ndarray:
+    cap = ctx.m.cap.copy()
+    for cid, _, _, idx in ctx.corr:
+        if cid in closed:
+            cap[idx] *= LANE_CLOSED
+    return cap
 
 
-def forecast_day(d: date, calls: list[Call], n: int, closed: set[str]) -> dict:
-    rng = np.random.default_rng([SEED, d.toordinal()])  # same draws for every what-if on this day
+def kickoff_hours(k):
+    if not k:
+        return None
+    hh, mm = map(int, k.split(":"))
+    return hh + mm / 60
+
+
+def base_shares(ctx: Ctx, dtype: int, closed, kick, term=True):
+    key = (dtype, tuple(sorted(closed)), kick, term)
+    if key not in _SHARES:
+        D, _ = tm.background(ctx.m, dtype, term=term)
+        if kick:
+            D = D + tm.match_demand(ctx.m, kickoff_hours(kick))
+        _, sh = tm.run_day(ctx.m, D, capacity(ctx, closed), tm.initial_shares(ctx.m), 10, want=(),
+                           pre=ctx.m.pre.get(dtype))
+        _SHARES[key] = sh
+    return _SHARES[key]
+
+
+def forecast(task: dict) -> dict:
+    ctx = CTX
+    m = ctx.m
+    d = date.fromisoformat(task["date"])
+    dtype = tm.daytype(d.weekday())
+    calls = [Call(c["ship"], c["terminal"], datetime.fromisoformat(c["arrival"]),
+                  datetime.fromisoformat(c["departure"]), c["pax"]) for c in task["calls"]]
+    closed, kick, full = set(task["closed"]), task["match"], task["full"]
+    term, shifts, pre = task.get("term", True), task.get("shifts"), m.pre.get(dtype)
+    cap = capacity(ctx, closed)
+    sh0 = base_shares(ctx, dtype, closed, kick, term)
+    run_c = m.t0 * 0.15 / 60.0
     params = TurnaroundParams()
-    cap = capacity(closed)
-    cap_l, t0_l = cap.tolist(), T0.tolist()
-    p85 = np.zeros((N_BINS, NC))
-    p100 = np.zeros((N_BINS, NC))
-    vc_sum = np.zeros((N_BINS, NC))
-    bg85 = np.zeros((N_BINS, NC))
-    gates = np.zeros((n, N_BINS, len(GATES)))
-    for s in range(n):
-        bg = background(d, rng)
-        vc = bg / cap
-        bg85 += corridor_max(vc) > AT_RISK
+    n_corr, n_seg = len(ctx.corr), len(ctx.seg_ptr)
+    acc = defaultdict(lambda: 0.0)
+    gates_s = []
+    rng = np.random.default_rng([SEED, d.toordinal()])
+    for s in range(task["n"]):
+        Dbg, groups = tm.background(m, dtype, rng, term=term)
+        Dm = tm.match_demand(m, kickoff_hours(kick), rng) if kick else np.zeros_like(Dbg)
+        Dc = sample_cruise(ctx, calls, rng, params, shifts) if calls else np.zeros_like(Dbg)
+        want = ("x",)
+        if full:
+            want += ("queue", "held")
+            if calls:
+                want += ("cruise_edge", "cruise_path", "path", "time")
+        res, _ = tm.run_day(m, Dbg + Dm + Dc, cap, sh0, 3, cruise=Dc if calls else None, want=want,
+                            pre=pre)
+        x = res["x"]
+        cx = np.maximum.reduceat(x[:, ctx.corr_idx], ctx.corr_ptr, axis=1)
+        xc = x[:, ctx.corr_idx]
+        slow = np.add.reduceat(run_c[ctx.corr_idx] * np.minimum(xc, 1.5) ** 4, ctx.corr_ptr, axis=1) / 2
+        wait = 15.0 * np.maximum(cx - 1.0, 0.0)
+        acc["delay"] = acc["delay"] + slow + wait
+        acc["p85"] = acc["p85"] + (cx > tm.AT_RISK)
+        acc["p100"] = acc["p100"] + (cx > 1.0)
+        acc["vc"] = acc["vc"] + cx
+        if not full:
+            continue
+        acc["seg_x"] = acc["seg_x"] + np.maximum.reduceat(x[:, ctx.seg_idx], ctx.seg_ptr, axis=1)
+        acc["seg_q"] = acc["seg_q"] + np.add.reduceat(res["queue"][:, ctx.seg_idx], ctx.seg_ptr, axis=1)
+        acc["held"] = acc["held"] + res["held"]
+        for g, v in groups.items():
+            acc["mix_" + g] = acc["mix_" + g] + v * 4
+        acc["mix_match"] = acc["mix_match"] + Dm.sum(axis=1) * 4
+        acc["mix_cruise"] = acc["mix_cruise"] + Dc.sum(axis=1) * 4
+        acc["gw_in"] = acc["gw_in"] + ((Dbg + Dm + Dc) @ ctx.gw_in) * 4
         if calls:
-            D = sample_demand(calls, rng, params)
-            for b in np.flatnonzero(D.sum(axis=1) > 0):
-                vc[b] = np.asarray(assign(D[b], bg[b].tolist(), cap_l, t0_l)) / cap
-            gates[s] = D @ GATE_MATRIX * 4.0
-        c = corridor_max(vc)
-        p85 += c > AT_RISK
-        p100 += c > 1.0
-        vc_sum += c
-    return {
-        "p85": p85 / n,
-        "p100": p100 / n,
-        "vc": vc_sum / n,
-        "bg85": bg85 / n,
-        "gates": gates,
-    }
+            acc["seg_c"] = acc["seg_c"] + np.maximum.reduceat(res["cruise_edge"][:, ctx.seg_idx], ctx.seg_ptr, axis=1)
+            acc["path_c"] = acc["path_c"] + res["cruise_path"]
+            acc["share"] = acc["share"] + res["path"][:, ctx.cruise_ods, :]
+            acc["time"] = acc["time"] + res["time"][:, ctx.cruise_ods, :]
+            gates_s.append((Dc @ ctx.gate_mask) * 4)
+    n = task["n"]
+    out = {k: (v / n if k != "gates" else v) for k, v in acc.items()}
+    if full:
+        bg85 = 0.0
+        for _ in range(task["n_bg"]):
+            Dbg, _ = tm.background(m, dtype, rng, term=term)
+            Dm = tm.match_demand(m, kickoff_hours(kick), rng) if kick else 0.0
+            res, _ = tm.run_day(m, Dbg + Dm, cap, sh0, 3, want=("x",), pre=pre)
+            cx = np.maximum.reduceat(res["x"][:, ctx.corr_idx], ctx.corr_ptr, axis=1)
+            bg85 = bg85 + (cx > tm.AT_RISK)
+        out["bg85"] = bg85 / task["n_bg"]
+        if gates_s:
+            gs = np.asarray(gates_s)
+            out["gates"] = {"mean": gs.mean(0), "p10": np.percentile(gs, 10, axis=0),
+                            "p90": np.percentile(gs, 90, axis=0)}
+    out["date"], out["key"] = task["date"], task["key"]
+    return out
 
 
-def score(p85: np.ndarray) -> float:
-    """Expected corridor-hours above 85% of capacity."""
-    return float(p85.sum() * BIN_MIN / 60)
+def advise(task: dict) -> dict:
+    """Try moving each ship's disembarkation start and check-in window; keep moves that cut risk.
+
+    Coordinate descent, one pass, the same sampled days for every option (so differences come from
+    the timing, not the sampling). A move is kept only if it lowers corridor-hours at risk by more
+    than 0.15.
+    """
+    calls = task["calls"]
+    shifts = [[0, 0] for _ in calls]
+
+    def run(sh):
+        return score(forecast({**task, "full": False, "shifts": sh})["p85"])
+
+    base = best = run(shifts)
+    options = []
+    for i, c in enumerate(calls):
+        opts = {"dis": {0: round(best, 2)}, "emb": {}}
+        for kind, values in (("dis", DIS_OPTS), ("emb", EMB_OPTS)):
+            j = 0 if kind == "dis" else 1
+            opts[kind][0] = round(best, 2)
+            for o in values:
+                trial = [list(x) for x in shifts]
+                trial[i][j] = o
+                sc = run(trial)
+                opts[kind][o] = round(sc, 2)
+                if sc < best - 0.15:
+                    best, shifts = sc, trial
+        options.append(opts)
+    return {"date": task["date"], "base": round(base, 2), "best": round(best, 2), "shifts": shifts,
+            "options": options}
 
 
-def pct(a: np.ndarray) -> list:
+# --- output helpers ----------------------------------------------------------------------------
+
+def pct(a) -> list:
     return np.rint(np.asarray(a) * 100).astype(int).tolist()
 
 
-def by_corridor(arr: np.ndarray) -> dict:
-    return {c.id: pct(arr[:, i]) for i, c in enumerate(CORRIDORS)}
+def half_hour(a: np.ndarray) -> np.ndarray:
+    return a.reshape(N_BINS // 2, 2, *a.shape[1:]).mean(axis=1)
 
 
-# --- synthetic schedule --------------------------------------------------------------------------
+def code(levels: np.ndarray) -> str:
+    return "".join(CHARS[int(v)] for v in np.clip(levels, 0, 35))
 
-def make_schedule(rng: np.random.Generator) -> dict[date, list[Call]]:
-    sched: dict[date, list[Call]] = {}
+
+def score(p85: np.ndarray) -> float:
+    return float(np.asarray(p85).sum() * BIN_MIN / 60)
+
+
+def path_d(points, tol: float) -> str:
+    from shapely.geometry import LineString
+
+    pts = []
+    for p in points:
+        if not pts or tuple(p) != pts[-1]:
+            pts.append(tuple(p))
+    if len(pts) < 2:
+        return ""
+    line = LineString(pts).simplify(tol)
+    c = [(round(x), round(y)) for x, y in line.coords]
+    rel = " ".join(f"{b[0] - a[0]} {b[1] - a[1]}" for a, b in zip(c, c[1:], strict=False))
+    return f"M{c[0][0]} {c[0][1]}l{rel}"
+
+
+def edge_chain(m: tm.Model, edges) -> list:
+    pts = []
+    for e in edges:
+        pts += [tuple(p) for p in m.coords[e]]
+    return pts
+
+
+# --- synthetic schedule (unchanged from v0.1) -------------------------------------------------
+
+def make_schedule(rng):
+    sched = {}
     d = FIRST_DAY
     while d <= HORIZON:
         wd = d.weekday()
@@ -442,7 +555,7 @@ def make_schedule(rng: np.random.Generator) -> dict[date, list[Call]]:
         else:
             n = rng.choice([0, 1, 2], p=[0.35, 0.45, 0.2])
         if d >= date(2026, 11, 9) and n > 0 and rng.random() < 0.35:
-            n -= 1  # the season tails off
+            n -= 1
         terminals = rng.choice(TERMINALS, size=n, replace=False)
         ships = rng.choice(len(SHIPS), size=n, replace=False)
         calls = []
@@ -452,154 +565,241 @@ def make_schedule(rng: np.random.Generator) -> dict[date, list[Call]]:
             calls.append(Call(SHIPS[s][0], str(term), arr, dep, SHIPS[s][1]))
         sched[d] = sorted(calls, key=lambda c: (c.arrival, c.ship))
         d += timedelta(days=1)
-    # One call with no published passenger figure, to show the fallback and its wider range.
     d = date(2026, 11, 4)
     used = {c.terminal for c in sched[d]}
     term = next(t for t in TERMINALS if t not in used)
-    sched[d].append(
-        Call("Unlisted Voyager", term, datetime.combine(d, time(6, 0)),
-             datetime.combine(d, time(17, 0)), None)
-    )
+    sched[d].append(Call("Unlisted Voyager", term, datetime.combine(d, time(6, 0)),
+                         datetime.combine(d, time(17, 0)), None))
     return sched
 
 
-def permits_on(d: date) -> list[dict]:
+def in_term(d: date) -> bool:
+    return d.weekday() < 5 and not (HALF_TERM[0] <= d <= HALF_TERM[1]) and d <= TERM_ENDS
+
+
+def permits_on(d: date):
     iso = d.isoformat()
     return [p for p in PERMITS if p["from"] <= iso <= p["to"]]
 
 
-def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--n", type=int, default=100, help="sampled days per date")
-    parser.add_argument("--whatif-days", type=int, default=6, help="busiest days given what-ifs")
-    parser.add_argument("--template", type=Path, default=Path(__file__).with_name("page.html"))
-    parser.add_argument("--out", type=Path, default=Path(__file__).with_name("out") / "demo.html")
-    parser.add_argument("--json", type=Path, help="also write the raw data here")
-    args = parser.parse_args(argv)
+def match_on(d: date):
+    return next((x["kickoff"] for x in MATCHES if x["date"] == d.isoformat()), None)
 
+
+# --- main --------------------------------------------------------------------------------------
+
+def main(argv=None) -> None:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--n", type=int, default=60, help="sampled days per date")
+    parser.add_argument("--n-bg", type=int, default=15, help="sampled days without cruise traffic")
+    parser.add_argument("--whatif-days", type=int, default=6)
+    parser.add_argument("--advise-days", type=int, default=10)
+    parser.add_argument("--n-advise", type=int, default=16)
+    parser.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1))
+    parser.add_argument("--days", type=int, help="only the first N days (for testing)")
+    parser.add_argument("--template", type=Path, default=HERE / "page.html")
+    parser.add_argument("--out", type=Path, default=HERE / "out" / "demo.html")
+    args = parser.parse_args(argv)
     started = clock.perf_counter()
+
+    def log(msg):
+        print(f"[{clock.perf_counter() - started:6.0f}s] {msg}", flush=True)
+
+    ctx, base = build_ctx(log)
+    m = ctx.m
+    ctx_path = CACHE / "ctx.pkl"
+    with open(ctx_path, "wb") as f:
+        pickle.dump(ctx, f)
+
     sched = make_schedule(np.random.default_rng(SEED))
-    days, results = [], {}
+    tasks = []
     d = FIRST_DAY
+    while d <= HORIZON and (args.days is None or len(tasks) < args.days):
+        calls = [{"ship": c.ship, "terminal": c.terminal, "arrival": c.arrival.isoformat(),
+                  "departure": c.departure.isoformat(), "pax": c.pax} for c in sched[d]]
+        tasks.append({"date": d.isoformat(), "key": "base", "calls": calls, "full": True,
+                      "closed": [p["corridor"] for p in permits_on(d)], "match": match_on(d),
+                      "n": args.n, "n_bg": args.n_bg, "term": in_term(d)})
+        d += timedelta(days=1)
+    log(f"forecasting {len(tasks)} days on {args.workers} workers")
+    with ProcessPoolExecutor(args.workers, initializer=_init, initargs=(str(ctx_path),)) as pool:
+        results = {}
+        for r in pool.map(forecast, tasks):
+            results[r["date"]] = r
+            log(f"{r['date']} score {score(r['p85']):.2f}")
+        busiest = sorted((t for t in tasks if t["calls"]), key=lambda t: -score(results[t["date"]]["p85"]))
+        chosen = {t["date"] for t in busiest[: args.whatif_days]}
+        chosen |= {t["date"] for t in tasks if t["calls"] and t["closed"]}
+        wtasks = []
+        for t in tasks:
+            if t["date"] not in chosen:
+                continue
+            if t["closed"]:
+                wtasks.append({**t, "key": "move_permit", "closed": [], "full": False})
+            for road in WHATIF_ROADS:
+                if road not in t["closed"] and any(c[0] == road for c in ctx.corr):
+                    wtasks.append({**t, "key": f"close_{road}", "closed": t["closed"] + [road],
+                                   "full": False, "seg": True})
+        log(f"what-ifs: {len(wtasks)}")
+        wres = defaultdict(dict)
+        for r in pool.map(forecast, [{**w, "full": True, "n_bg": 1} for w in wtasks]):
+            wres[r["date"]][r["key"]] = r
+            log(f"  what-if {r['date']} {r['key']}: {score(results[r['date']]['p85']):.2f} -> {score(r['p85']):.2f}")
+        uplift = {t["date"]: score(results[t["date"]]["p85"]) - score(results[t["date"]]["bg85"]) for t in tasks}
+        atasks = sorted((t for t in tasks if t["calls"] and uplift[t["date"]] >= 1.0),
+                        key=lambda t: -uplift[t["date"]])[: args.advise_days]
+        log(f"ship-timing advice for {len(atasks)} days")
+        advice = {}
+        for r in pool.map(advise, [{**t, "n": args.n_advise} for t in atasks]):
+            advice[r["date"]] = r
+            log(f"  advice {r['date']}: {r['base']:.2f} -> {r['best']:.2f} with shifts {r['shifts']}")
+
+    # --- assemble page data --------------------------------------------------------------------
+    segs = ctx.extra["segs"]
+    seg_out = []
+    for s in segs:
+        dpath = "".join(path_d(m.coords[k], 2.0) for k in s["links"])
+        seg_out.append({"n": s["name"], "c": s["cls"], "d": dpath})
+    corr_segs = {}
+    edge_seg = np.empty(len(m.t0), int)
+    for i, s in enumerate(segs):
+        edge_seg[s["edges"]] = i
+    for cid, label, group, idx in ctx.corr:
+        corr_segs[cid] = sorted({int(edge_seg[k]) for k in idx})
+    gws = ctx.extra["gateways"]
+    paths_out: dict[int, str] = {}
+
+    def day_json(task, r):
+        day = {"date": task["date"], "calls": [
+            {"ship": c["ship"], "terminal": c["terminal"],
+             "gate": m.centroids[ctx.terminal_gate[c["terminal"]]].name,
+             "arr": c["arrival"][11:16], "dep": c["departure"][11:16], "pax": c["pax"]}
+            for c in task["calls"]],
+            "score": round(score(r["p85"]), 2), "bg_score": round(score(r["bg85"]), 2),
+            "permits": [p["id"] for p in permits_on(date.fromisoformat(task["date"]))],
+            "match": task["match"], "term": task["term"],
+            "delay": {c[0]: np.rint(r["delay"][:, i]).astype(int).tolist() for i, c in enumerate(ctx.corr)},
+            "timing": advice.get(task["date"]),
+            "p85": {c[0]: pct(r["p85"][:, i]) for i, c in enumerate(ctx.corr)},
+            "p100": {c[0]: pct(r["p100"][:, i]) for i, c in enumerate(ctx.corr)},
+            "vc": {c[0]: pct(r["vc"][:, i]) for i, c in enumerate(ctx.corr)},
+            "bg85": {c[0]: pct(r["bg85"][:, i]) for i, c in enumerate(ctx.corr)},
+            "seg": code(np.rint(half_hour(r["seg_x"]) / 0.05).T.ravel()),
+            "queue": {}, "cruise": {}, "routes": [], "whatif": {},
+            "mix": {g: np.rint(r.get("mix_" + g, np.zeros(N_BINS))).astype(int).tolist()
+                    for g in tm.GROUPS},
+            "held": np.rint(r["held"]).astype(int).tolist(),
+            "gw_in": {m.centroids[g].name: np.rint(r["gw_in"][:, i]).astype(int).tolist()
+                      for i, g in enumerate(gws)},
+            "gates": {}}
+        q = half_hour(r["seg_q"])
+        for i in np.flatnonzero(q.max(axis=0) >= 5):
+            day["queue"][int(i)] = code(np.rint(q[:, i] / 10))
+        if task["calls"]:
+            c = half_hour(r["seg_c"])
+            for i in np.flatnonzero(c.max(axis=0) >= 10):
+                day["cruise"][int(i)] = code(np.rint(c[:, i] / 20))
+            for gi, g in enumerate(ctx.gates):
+                gname = m.centroids[g].name
+                if r["gates"]["mean"][:, gi].max() > 0:
+                    day["gates"][gname] = {k: np.rint(r["gates"][k][:, gi]).astype(int).tolist()
+                                           for k in ("mean", "p10", "p90")}
+            # route choice for the busiest cruise origin-destination pairs
+            veh = r["path_c"].reshape(N_BINS, m.n_od, tm.ROUTES).sum(axis=(0, 2)) / 4
+            picks = []
+            for gi, g in enumerate(ctx.gates):
+                for direction in ("in", "out"):
+                    js = [j for j in ctx.cruise_ods
+                          if (m.ods[j][1] == g if direction == "in" else m.ods[j][0] == g)]
+                    js = sorted(js, key=lambda j: -veh[j])[: (3 if direction == "in" else 2)]
+                    picks += [j for j in js if veh[j] >= 15]
+            pos = {int(j): k for k, j in enumerate(ctx.cruise_ods)}
+            for j in picks:
+                o, dd = m.ods[j]
+                routes, seen = [], []
+                for rr in range(tm.ROUTES):
+                    pid = j * tm.ROUTES + rr
+                    if m.paths[pid] in seen:
+                        continue
+                    seen.append(m.paths[pid])
+                    if pid not in paths_out:
+                        paths_out[pid] = path_d(edge_chain(m, m.paths[pid]), 6.0)
+                    names = []
+                    for e in m.paths[pid]:
+                        nm = m.ref[e] or m.name[e]
+                        if nm and nm not in names and m.length[e] > 150:
+                            names.append(nm)
+                    routes.append({"pid": pid, "via": names[:4],
+                                   "share": pct(r["share"][:, pos[j], rr]),
+                                   "min": np.rint(r["time"][:, pos[j], rr] / 6).astype(int).tolist(),
+                                   "veh": int(round(r["path_c"][:, pid].sum() / 4))})
+                day["routes"].append({"from": m.centroids[o].name, "to": m.centroids[dd].name,
+                                      "fromKind": m.centroids[o].kind, "toKind": m.centroids[dd].kind,
+                                      "hint": m.centroids[o].hint or m.centroids[dd].hint,
+                                      "veh": int(round(veh[j])), "routes": routes})
+        base_lv = np.rint(half_hour(r["seg_x"]) / 0.05)
+        for key, w in wres.get(task["date"], {}).items():
+            entry = {"score": round(score(w["p85"]), 2),
+                     "p85": {c[0]: pct(w["p85"][:, i]) for i, c in enumerate(ctx.corr)}, "seg": {}}
+            lv = np.rint(half_hour(w["seg_x"]) / 0.05)
+            for i in np.flatnonzero(np.abs(lv - base_lv).max(axis=0) >= 1):
+                entry["seg"][int(i)] = code(lv[:, i])
+            day["whatif"][key] = entry
+        return day
+
+    days = [day_json(t, results[t["date"]]) for t in tasks]
+    d = HORIZON + timedelta(days=1)
     while d <= CAL_END:
-        if d > HORIZON:
-            days.append({"date": d.isoformat(), "beyond": True})
-            d += timedelta(days=1)
-            continue
-        calls = sched[d]
-        closed = {p["corridor"] for p in permits_on(d)}
-        r = forecast_day(d, calls, args.n, closed)
-        results[d] = r
-        g = r["gates"]
-        day = {
-            "date": d.isoformat(),
-            "calls": [
-                {
-                    "ship": c.ship,
-                    "terminal": c.terminal,
-                    "gate": TERMINAL_GATE[c.terminal],
-                    "arr": c.arrival.strftime("%H:%M"),
-                    "dep": c.departure.strftime("%H:%M"),
-                    "pax": c.pax,
-                }
-                for c in calls
-            ],
-            "score": round(score(r["p85"]), 2),
-            "bg_score": round(score(r["bg85"]), 2),
-            "permits": [p["id"] for p in permits_on(d)],
-            "match": next((m["kickoff"] for m in MATCHES if m["date"] == d.isoformat()), None),
-            "p85": by_corridor(r["p85"]),
-            "p100": by_corridor(r["p100"]),
-            "vc": by_corridor(r["vc"]),
-            "bg85": by_corridor(r["bg85"]),
-            "gates": {
-                gate: {
-                    "mean": np.rint(g[:, :, k].mean(axis=0)).astype(int).tolist(),
-                    "p10": np.rint(np.percentile(g[:, :, k], 10, axis=0)).astype(int).tolist(),
-                    "p90": np.rint(np.percentile(g[:, :, k], 90, axis=0)).astype(int).tolist(),
-                }
-                for k, gate in enumerate(GATES)
-            }
-            if calls
-            else {},
-            "whatif": {},
-        }
-        days.append(day)
-        print(f"{d} {d.strftime('%a')} calls={len(calls)} score={day['score']:.2f} "
-              f"bg={day['bg_score']:.2f} ({clock.perf_counter() - started:.0f}s)", flush=True)
+        days.append({"date": d.isoformat(), "beyond": True})
         d += timedelta(days=1)
 
-    # What-ifs for the busiest days and every day a roadworks permit overlaps a turnaround.
-    by_date = {x["date"]: x for x in days if not x.get("beyond")}
-    busiest = sorted((x for x in by_date.values() if x["calls"]), key=lambda x: -x["score"])
-    chosen = {x["date"] for x in busiest[: args.whatif_days]}
-    chosen |= {x["date"] for x in by_date.values() if x["calls"] and x["permits"]}
-    for iso in sorted(chosen):
-        d = date.fromisoformat(iso)
-        day = by_date[iso]
-        permit_roads = {p["corridor"] for p in permits_on(d)}
-        variants = {}
-        if permit_roads:
-            variants["move_permit"] = set()
-        for road in WHATIF_ROADS:
-            if road not in permit_roads:
-                variants[f"close_{road}"] = permit_roads | {road}
-        for key, closed in variants.items():
-            r = forecast_day(d, sched[d], args.n, closed)
-            day["whatif"][key] = {"score": round(score(r["p85"]), 2), "p85": by_corridor(r["p85"])}
-            print(f"  what-if {iso} {key}: {day['score']:.2f} -> {score(r['p85']):.2f}", flush=True)
-
+    x0, y1, to_bng = frame_origin()
+    water_labels = []
+    for name, lat, lon in WATER_LABELS:
+        x, y = to_bng.transform(lon, lat)
+        water_labels.append({"name": name, "x": round(x - x0), "y": round(y1 - y)})
     data = {
-        "meta": {
-            "synthetic": True,
-            "issued": ISSUED.strftime("%Y-%m-%dT%H:%M"),
-            "first_day": FIRST_DAY.isoformat(),
-            "horizon": HORIZON.isoformat(),
-            "n": args.n,
-            "seed": SEED,
-            "bin_minutes": BIN_MIN,
-            "day_start": "05:00",
-            "at_risk": AT_RISK,
-            "unknown_pax_range": UNKNOWN_PAX_RANGE,
-            "model": "v0.1-demo",
-            "assumptions": {
-                "mode_share": dict(zip(["car", "park", "taxi", "coach", "other"],
-                                       MODE_MEAN.tolist(), strict=True)),
-                "people_per_vehicle": PEOPLE_PER,
-                "coach_pcu": COACH_PCU,
-                "packet_pcu": PACKET_PCU,
-            },
-        },
-        "nodes": [
-            {"id": k, "name": v[0], "x": v[1], "y": v[2], "kind": v[3]} for k, v in NODES.items()
-        ],
-        "corridors": [
-            {
-                "id": c.id,
-                "name": c.name,
-                "a": c.a,
-                "b": c.b,
-                "lanes": c.lanes,
-                "cap": int(c.lanes * c.lane_cap),
-                "kind": c.kind,
-                "sensor": SENSOR.get(c.id),
-            }
-            for c in CORRIDORS
-        ],
-        "gates": [{"id": g, "name": GATE_NAMES[g]} for g in GATES],
-        "terminal_gate": TERMINAL_GATE,
-        "permits": PERMITS,
-        "matches": MATCHES,
-        "days": days,
+        "meta": {"synthetic": True, "issued": ISSUED.strftime("%Y-%m-%dT%H:%M"),
+                 "horizon": HORIZON.isoformat(), "n": args.n, "seed": SEED, "bin_minutes": BIN_MIN,
+                 "at_risk": tm.AT_RISK, "unknown_pax_range": UNKNOWN_PAX_RANGE, "model": "v0.2-demo",
+                 "scale": round(m.scale, 3), "scale_ext": round(m.scale_ext, 3),
+                 "capacity_notes": ctx.extra["capacity"], "uni_term": tm.UNI_TERM, "half_term": [x.isoformat() for x in HALF_TERM],
+                 "turnaround": {"disembark_start": TurnaroundParams().disembark_start_min,
+                                "disembark_minutes": TurnaroundParams().disembark_duration_min,
+                                "embark_open": TurnaroundParams().embark_open_before_dep_min,
+                                "embark_close": TurnaroundParams().embark_close_before_dep_min},
+                 "lane_closed": LANE_CLOSED,
+                 "calibration": {"source": COUNT_SOURCE, "rows": ctx.extra["calibration"],
+                                 "day_window_share": tm.DAY_WINDOW_SHARE},
+                 "counts": {"zones": sum(c.kind == "zone" for c in m.centroids),
+                            "gateways": len(gws), "ods": m.n_od, "routes": len(m.paths),
+                            "edges": len(m.t0), "segments": len(segs)},
+                 "purposes": [{"key": k, "group": g, "totals": t} for k, g, _, _, t, _ in tm.PURPOSES],
+                 "groups": tm.GROUPS,
+                 "assumptions": {"mode_share": dict(zip(["car", "park", "taxi", "coach", "other"],
+                                                        MODE_MEAN.tolist(), strict=True)),
+                                 "people_per_vehicle": PEOPLE_PER, "coach_pcu": COACH_PCU}},
+        "map": {"size": base["size"], "attribution": base["attribution"], "layers": base["layers"],
+                "places": base["places"], "landmarks": base["landmarks"], "water": water_labels},
+        "segments": seg_out,
+        "corridors": [{"id": c[0], "name": c[1], "group": c[2], "segs": corr_segs[c[0]],
+                       "sensor": SENSOR.get(c[0])} for c in ctx.corr],
+        "gateways": [{"name": m.centroids[g].name, "hint": m.centroids[g].hint,
+                      "x": m.centroids[g].xy[0], "y": m.centroids[g].xy[1]} for g in gws],
+        "gates": [{"name": m.centroids[g].name, "x": m.centroids[g].xy[0], "y": m.centroids[g].xy[1]}
+                  for g in ctx.gates],
+        "zones": [{"name": c.name, "x": c.xy[0], "y": c.xy[1]} for c in m.centroids if c.kind == "zone"],
+        "terminal_gate": {t: m.centroids[g].name for t, g in ctx.terminal_gate.items()},
+        "paths": {str(k): v for k, v in paths_out.items()},
+        "permits": PERMITS, "matches": MATCHES, "days": days,
     }
-    payload = json.dumps(data, separators=(",", ":")).replace("</", "<\\/")
-    if args.json:
-        args.json.parent.mkdir(parents=True, exist_ok=True)
-        args.json.write_text(payload, encoding="utf-8")
+    payload = json.dumps(data, separators=(",", ":"),
+                         default=lambda o: o.item() if hasattr(o, "item") else str(o))
+    payload = payload.replace("</", "<\\/")
     page = args.template.read_text(encoding="utf-8").replace("__DEMO_DATA__", payload)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(page, encoding="utf-8")
-    print(f"Wrote {args.out} ({len(page) / 1e6:.2f} MB) in {clock.perf_counter() - started:.0f}s")
+    log(f"wrote {args.out} ({len(page) / 1e6:.1f} MB)")
 
 
 if __name__ == "__main__":
