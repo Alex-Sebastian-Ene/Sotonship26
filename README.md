@@ -101,7 +101,8 @@ Fill in the date collected and the licence for every source before submission.
 
 | Source | Used for | Collected | Licence |
 | --- | --- | --- | --- |
-| Southampton VTS cruise schedule (public pages, no API) | Ship calls → `data/raw/cruise_schedule.csv`, not committed | TODO | TODO: check reuse terms |
+| Southampton VTS cruise schedule: the XML feed behind the [cruise ship schedule page](https://www.southamptonvts.co.uk/live_information/shipping_movements_and_cruise_ship_schedule/cruise_ship_schedule/) | Ship calls, fetched live by `data/vts.py` and cached in `data/raw/vts/`, not committed | At run time; `collected_at` on every row (first pull 16 Oct 2026) | © ABP, all rights reserved; we don't redistribute it |
+| Ship lower-berth capacity, 22 ships (Wikipedia, cruise line and cruisemapper pages; URL per row) | `passengers` per call, `src/sotonship26/data/ship_capacity.csv` | 16 Oct 2026 | Facts with the source cited on each row |
 | UKHO ADMIRALTY UK Tidal API (Discovery tier, key in `UKHO_API_KEY`) | High/low water predictions | TODO | TODO |
 | OpenStreetMap via osmnx | Walking network around the terminals | TODO | ODbL |
 | Bathymetry + water polygon for Southampton Water | Replace the synthetic lattice | TODO | TODO |
@@ -113,5 +114,8 @@ Fill in the date collected and the licence for every source before submission.
 - **AI-generated:** the project scaffold (`pyproject.toml` backend extras, `src/`, `tests/`,
   `scripts/`, `cluster/`, `configs/`, this README) was generated with Claude Code on
   Fri 16 Oct 2026.
+- **AI-generated:** the VTS schedule loader (`src/sotonship26/data/vts.py`, `tests/test_vts.py`)
+  was written by Claude Code (Edward's session) on Fri 16 Oct 2026. Keanu's Claude Code research
+  desk compiled `ship_capacity.csv` from the public sources cited on each row.
 - **Existed before the event:** TODO, confirm with the organisers.
 - **Who helped:** TODO.
