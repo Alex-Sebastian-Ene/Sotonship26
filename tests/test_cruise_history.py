@@ -108,3 +108,14 @@ def test_manual_import_and_vts_precedence(tmp_path):
     days = ch.cruise_days(calls).set_index("date")
     assert days.loc[date(2024, 5, 20), "covered"] and days.loc[date(2024, 5, 20), "n_calls"] == 1
     assert not days.loc[date(2024, 5, 10), "covered"]
+
+
+def test_call_of_unknown_size_makes_day_passengers_unknown():
+    calls = ch.union_snapshots([parsed(EARLY, "2024-06-01T08:00Z")])
+    calls.loc[calls["arrival"].dt.date == date(2024, 6, 5), "passengers"] = pd.NA
+    days = ch.cruise_days(calls, date(2024, 6, 1), date(2024, 6, 7),
+                          windows=[(date(2024, 6, 1), date(2024, 6, 7))])
+    d = days.set_index("date")
+    assert d.loc[date(2024, 6, 5), "n_calls"] == 1
+    assert pd.isna(d.loc[date(2024, 6, 5), "pax_total"])  # unknown, not zero
+    assert d.loc[date(2024, 6, 7), "pax_western"] == 2000

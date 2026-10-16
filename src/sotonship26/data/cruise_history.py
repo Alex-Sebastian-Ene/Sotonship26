@@ -303,8 +303,13 @@ def cruise_days(
         for col in DAY_COLUMNS[1:-1]:
             out[col] = pd.NA
     out["n_calls"] = out["n_calls"].fillna(0).astype(int)
-    for col in ("pax_total", "pax_western", "pax_eastern", "pax_unknown"):
+    pax_cols = ["pax_total", "pax_western", "pax_eastern", "pax_unknown"]
+    for col in pax_cols:
         out[col] = out[col].astype("Float64").fillna(0)
+    # a day with any call of unknown size has unknown passengers, not fewer passengers
+    if len(calls):
+        unsized = set(calls.loc[calls["passengers"].isna(), "arrival"].dt.date)
+        out.loc[out["date"].isin(unsized), pax_cols] = pd.NA
     out["covered"] = [any(a <= d <= b for a, b in windows) for d in out["date"]]
     return out[DAY_COLUMNS]
 

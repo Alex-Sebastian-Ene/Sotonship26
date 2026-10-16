@@ -5,12 +5,14 @@ M271 / M3 approaches carry on that day before any cruise effect? WebTRIS publish
 months late, so a forecast for day D may only use counts from before D - ``lag_days``.
 
 Models, all scored on days after ``cutoff`` with the same lag rule:
-  last_year     the same weekday 52 weeks earlier (the planner's usual rule of thumb)
+  last_year     the same weekday 52 weeks earlier (one day, so noisy)
+  year_median   median of the same weekday over the five weeks centred on 52 weeks earlier
   recent_median median of the same weekday over the 4 newest weeks that are published by then
-  planner_rule  last_year when published, else recent_median
+  planner_rule  year_median when available, else recent_median
   ridge         learned: per-bin ridge regression on calendar features (weekday x season,
                 bank holidays, Christmas week, trend), refit at each test month on published data
-Intervals: split conformal on the newest published 20% of days before each refit.
+Intervals: split conformal on the newest published 20% of days before each refit, with the
+model for those errors fitted ``lag_days`` earlier so the interval matches the forecast horizon.
 """
 
 from __future__ import annotations
@@ -69,6 +71,13 @@ def last_year(target: date, by_date: dict, lag: int) -> np.ndarray | None:
     return by_date.get(ref)
 
 
+def year_median(target: date, by_date: dict, lag: int) -> np.ndarray | None:
+    """Median of the same weekday over the five weeks centred on 52 weeks earlier."""
+    refs = [target - timedelta(days=364 + 7 * k) for k in range(-2, 3)]
+    rows = [by_date[d] for d in refs if (target - d).days >= lag and d in by_date]
+    return np.median(np.stack(rows), axis=0) if len(rows) >= 3 else None
+
+
 def recent_median(target: date, by_date: dict, lag: int) -> np.ndarray | None:
     newest = target - timedelta(days=lag)
     rows = [by_date[d] for d in (newest - timedelta(days=i) for i in range(28))
@@ -77,13 +86,28 @@ def recent_median(target: date, by_date: dict, lag: int) -> np.ndarray | None:
 
 
 def planner_rule(target: date, by_date: dict, lag: int) -> np.ndarray | None:
-    """What a planner would do: same weekday last year if published, else the recent median."""
-    p = last_year(target, by_date, lag)
+    """What a careful planner would do: the year-ago five-week median, else the recent median."""
+    p = year_median(target, by_date, lag)
     return p if p is not None else recent_median(target, by_date, lag)
 
 
-BASELINES = (("last_year", last_year), ("recent_median", recent_median),
-             ("planner_rule", planner_rule))
+BASELINES = (("last_year", last_year), ("year_median", year_median),
+             ("recent_median", recent_median), ("planner_rule", planner_rule))
+
+
+def lagged_split(dates: np.ndarray, idx: np.ndarray, lag: int,
+                 frac: float = 0.2) -> tuple[np.ndarray, np.ndarray]:
+    """Calibration = newest ``frac`` of ``idx``; proper = days published before the first of them.
+
+    The gap means calibration errors are made at the same lag as real forecasts, so the
+    conformal interval is sized for forecasting months ahead rather than the next day.
+    """
+    n_cal = max(20, int(len(idx) * frac))
+    cal = idx[-n_cal:]
+    first_cal = dates[cal[0]]
+    proper = np.array([i for i in idx[:-n_cal] if dates[i] <= first_cal - timedelta(days=lag)],
+                      dtype=int)
+    return proper, cal
 
 
 def backtest_site(site: int, dates: np.ndarray, y: np.ndarray, cutoff: date,
@@ -101,8 +125,10 @@ def backtest_site(site: int, dates: np.ndarray, y: np.ndarray, cutoff: date,
         if published.sum() < 120:
             continue
         pub_idx = np.flatnonzero(published)
-        n_cal = max(20, int(len(pub_idx) * 0.2))
-        proper, cal = pub_idx[:-n_cal], pub_idx[-n_cal:]
+        proper, cal = lagged_split(dates, pub_idx, lag)
+        if len(proper) < 60:
+            continue
+        n_cal = len(cal)
         model = Ridge(features=CAL_FEATURES).fit(feats.iloc[proper], y[proper])
         half_ridge = conformal_halfwidth(y[cal] - model.predict(feats.iloc[cal]))
         final = Ridge(lam=model.lam, features=CAL_FEATURES).fit(feats.iloc[pub_idx], y[pub_idx])
@@ -146,12 +172,13 @@ def backtest_site(site: int, dates: np.ndarray, y: np.ndarray, cutoff: date,
     return table
 
 
-def forecast(dates: np.ndarray, y: np.ndarray, targets: list[date]) -> pd.DataFrame:
+def forecast(dates: np.ndarray, y: np.ndarray, targets: list[date],
+             lag: int = LAG_DAYS) -> pd.DataFrame:
     """Fit ridge on every published day and forecast ``targets`` with 80% intervals."""
-    n_cal = max(20, int(len(dates) * 0.2))
+    proper, cal = lagged_split(dates, np.arange(len(dates)), lag)
     feats = calendar_features(dates)
-    model = Ridge(features=CAL_FEATURES).fit(feats.iloc[:-n_cal], y[:-n_cal])
-    half = conformal_halfwidth(y[-n_cal:] - model.predict(feats.iloc[-n_cal:]))
+    model = Ridge(features=CAL_FEATURES).fit(feats.iloc[proper], y[proper])
+    half = conformal_halfwidth(y[cal] - model.predict(feats.iloc[cal]))
     final = Ridge(lam=model.lam, features=CAL_FEATURES).fit(feats, y)
     pred = final.predict(calendar_features(targets))
     rows = [pd.DataFrame({"date": d, "tod_bin": np.arange(96), "flow_veh": p,
@@ -198,6 +225,11 @@ def main(argv: list[str] | None = None) -> int:
     table.to_csv(out_dir / "flow_forecast_table.csv", index=False)
     cols = ["site_id", "versus", "model", "n_test_days", "mae_veh_per_15min",
             "skill_vs_baseline", "wape_pct", "coverage80", "width80_veh"]
+    worst = (table.dropna(subset=["skill_vs_baseline"])
+             .sort_values("skill_vs_baseline").groupby("site_id").head(1)
+             [["site_id", "versus", "n_test_days", "skill_vs_baseline"]]
+             .rename(columns={"versus": "strongest_baseline",
+                              "skill_vs_baseline": "ridge_skill_vs_strongest"}))
     text = "\n".join([
         "# Everyday traffic forecast on the dock approaches: learned model vs baselines",
         "",
@@ -211,13 +243,24 @@ def main(argv: list[str] | None = None) -> int:
         "(sensor gaps differ). `skill` = 1 - MAE(ridge) / MAE(baseline): above 0 means the "
         "learned model wins. `coverage80` should be near 0.80.",
         "",
+        "## Headline: ridge against the strongest baseline at each site",
+        "",
+        md_table(worst),
+        "",
+        "## All comparisons",
+        "",
         md_table(table[cols]),
         "",
         "![One test week at M3 J14](figures/flow_forecast_20025.png)",
         "",
-        "Reading it: sites with a long, continuous record (20025 M3 J14, 19974 M271 NB) are the "
-        "trustworthy results. 20313/20605 have under 30 comparable test days and patchy sensor "
-        "data, so their scores are noise. 7588 and 19796 have no test days after the cutoff.",
+        "Reading it: only 20025 (M3 J14) has a long enough record to compare with every "
+        "baseline over a full test year. There the learned model is a small but real "
+        "improvement on a careful planner (median of five same weekdays a year earlier). It is "
+        "a large improvement on the one-day year-ago lookup and the recent median. At 19974 "
+        "(M271 NB) the year-ago baselines only exist for a handful of test days, so its "
+        "reliable comparison is against the recent median. 20313/20605 have under 30 comparable "
+        "test days and patchy sensor data, so their scores are noise. 7588 and 19796 have no "
+        "test days after the cutoff.",
         "",
         "Cruise days are not removed (no historic cruise list yet, see SOT-21), so these "
         "forecasts are 'typical traffic including the average cruise effect'. Forward "

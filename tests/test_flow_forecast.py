@@ -8,9 +8,11 @@ import pandas as pd
 from sotonship26.flow_forecast import (
     backtest_site,
     calendar_features,
+    lagged_split,
     last_year,
     recent_median,
     site_days,
+    year_median,
 )
 
 SHAPE = 150 + 120 * np.sin(np.linspace(0, np.pi, 96))
@@ -56,3 +58,18 @@ def test_ridge_beats_baselines_on_seasonal_synthetic():
     assert vs.loc["ridge", "mae_veh_per_15min"] < vs.loc["recent_median", "mae_veh_per_15min"]
     assert vs.loc["ridge", "skill_vs_baseline"] > 0
     assert 0.6 < vs.loc["ridge", "coverage80"] < 0.97
+
+
+def test_year_median_needs_three_published_weeks():
+    target = date(2025, 6, 4)
+    by_date = {target - timedelta(days=364 + 7 * k): np.full(96, float(k)) for k in range(-2, 3)}
+    assert np.allclose(year_median(target, by_date, 105), 0.0)
+    two = {d: v for d, v in list(by_date.items())[:2]}
+    assert year_median(target, two, 105) is None
+
+
+def test_lagged_split_leaves_a_publication_gap():
+    dates = np.array([date(2024, 1, 1) + timedelta(days=i) for i in range(500)])
+    proper, cal = lagged_split(dates, np.arange(500), 105)
+    assert len(cal) == 100
+    assert (dates[cal[0]] - dates[proper[-1]]).days >= 105

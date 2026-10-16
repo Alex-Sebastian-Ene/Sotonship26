@@ -111,3 +111,18 @@ def test_production_model_round_trip(tmp_path):
     assert busy["lo80"] < busy["uplift_veh"] < busy["hi80"]
     assert busy["p_event"] > 0.9 and quiet["p_event"] < 0.2
     assert meta == {"note": "synthetic"}
+
+
+def test_clock_change_days_are_not_complete():
+    from sotonship26.uplift import day_matrix
+
+    def day(d: str) -> pd.DataFrame:
+        t = pd.date_range(pd.Timestamp(d, tz="Europe/London"),
+                          pd.Timestamp(d, tz="Europe/London") + pd.Timedelta(days=1),
+                          freq="15min", inclusive="left")
+        return pd.DataFrame({"site_id": 1, "bin_start": t, "flow_veh": 10.0, "good_day": True})
+
+    # 26 Oct has 96 bins; 27 Oct (clocks go back) has 100 and must not count as complete
+    index, _ = day_matrix(pd.concat([day("2024-10-26"), day("2024-10-27")]))
+    complete = dict(zip(index["date"], index["complete"], strict=True))
+    assert complete[date(2024, 10, 26)] and not complete[date(2024, 10, 27)]
