@@ -28,12 +28,16 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 API_URL = "https://api.linear.app/graphql"
 STATE_DIR = Path(__file__).resolve().parent.parent / ".coord"
 ENV_FILE = STATE_DIR / "linear.env"
+# Linear can take a few seconds to make a new comment queryable, so each poll looks back this far
+# and drops events it has already printed (SOT-20).
+OVERLAP = timedelta(seconds=120)
+SEEN_LIMIT = 500
 AGENTS = ("keanu", "edward", "seb")
 LABELS = {
     "agent:keanu": "#4EA7FC",
@@ -47,15 +51,15 @@ LABELS = {
 WATCH_QUERY = """
 query Watch($team: String!, $since: DateTimeOrDuration!) {
   comments(first: 50, filter: {createdAt: {gt: $since}, issue: {team: {key: {eq: $team}}}}) {
-    nodes { createdAt body user { name } issue { identifier title url } }
+    nodes { id createdAt body user { name } issue { identifier title url } }
   }
   newIssues: issues(first: 50, filter: {team: {key: {eq: $team}}, createdAt: {gt: $since}}) {
-    nodes { createdAt identifier title url description creator { name }
+    nodes { id createdAt identifier title url description creator { name }
             assignee { name } labels { nodes { name } } }
   }
   moved: issues(first: 50, filter: {team: {key: {eq: $team}}, updatedAt: {gt: $since}}) {
     nodes { identifier title
-            history(first: 10) { nodes { createdAt actor { name }
+            history(first: 10) { nodes { id createdAt actor { name }
                                          fromState { name } toState { name }
                                          fromAssignee { name } toAssignee { name } } } }
   }
@@ -120,8 +124,9 @@ def collect_events(data: dict, agent: str) -> list[dict]:
         if unescape(c["body"]).lstrip().startswith(mine):
             continue
         events.append({
-            "at": c["createdAt"], "kind": "comment", "issue": c["issue"]["identifier"],
-            "title": c["issue"]["title"], "who": (c.get("user") or {}).get("name", "?"),
+            "id": c["id"], "at": c["createdAt"], "kind": "comment",
+            "issue": c["issue"]["identifier"], "title": c["issue"]["title"],
+            "who": name_of(c.get("user"), "?"),
             "text": c["body"], "url": c["issue"]["url"],
         })
     for i in data["newIssues"]["nodes"]:
@@ -129,7 +134,7 @@ def collect_events(data: dict, agent: str) -> list[dict]:
             continue
         labels = ", ".join(n["name"] for n in i["labels"]["nodes"])
         events.append({
-            "at": i["createdAt"], "kind": "new-issue", "issue": i["identifier"],
+            "id": i["id"], "at": i["createdAt"], "kind": "new-issue", "issue": i["identifier"],
             "title": i["title"], "who": (i.get("creator") or {}).get("name", "?"),
             "text": f"labels: {labels or '-'} | assignee: {name_of(i.get('assignee'), '-')}"
                     f"\n{(i.get('description') or '').strip()}",
@@ -151,7 +156,7 @@ def collect_moves(data: dict, since: str, viewer: str) -> list[dict]:
                 parts.append(f"assignee -> {name_of(h.get('toAssignee'), 'nobody')}")
             if parts:
                 events.append({
-                    "at": h["createdAt"], "kind": "moved", "issue": i["identifier"],
+                    "id": h["id"], "at": h["createdAt"], "kind": "moved", "issue": i["identifier"],
                     "title": i["title"], "who": (h.get("actor") or {}).get("name", "?"),
                     "text": "; ".join(parts), "url": "",
                 })
@@ -188,31 +193,57 @@ def save_since(agent: str, value: str) -> None:
     since_path(agent).write_text(value)
 
 
+def seen_path(agent: str) -> Path:
+    return STATE_DIR / f"{agent}.seen"
+
+
+def load_seen(agent: str) -> list[str]:
+    path = seen_path(agent)
+    return path.read_text().split() if path.exists() else []
+
+
+def save_seen(agent: str, seen: list[str]) -> None:
+    STATE_DIR.mkdir(exist_ok=True)
+    seen_path(agent).write_text("\n".join(seen[-SEEN_LIMIT:]))
+
+
+def look_back(since: str) -> str:
+    start = datetime.fromisoformat(since.replace("Z", "+00:00")) - OVERLAP
+    return start.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def unseen(events: list[dict], seen: list[str]) -> list[dict]:
+    known = set(seen)
+    return [e for e in events if e["id"] not in known]
+
+
 def cmd_watch(args: argparse.Namespace) -> int:
     viewer = gql("{ viewer { name } }")["viewer"]["name"]
     since = load_since(args.agent)
     save_since(args.agent, since)
+    seen = load_seen(args.agent)
     for _ in range(args.max_checks):
         polled_at = now_iso()
+        window = look_back(since)
         try:
-            data = gql(WATCH_QUERY, {"team": args.team, "since": since})
-        except (LinearError, urllib.error.URLError, TimeoutError) as err:
+            data = gql(WATCH_QUERY, {"team": args.team, "since": window})
+        except (LinearError, OSError) as err:  # OSError covers resets and timeouts
             print(f"poll failed, retrying: {err}", file=sys.stderr)
             time.sleep(args.interval)
             continue
-        events = collect_events(data, args.agent) + collect_moves(data, since, viewer)
+        events = collect_events(data, args.agent) + collect_moves(data, window, viewer)
+        events = unseen(events, seen)
+        since = polled_at
+        save_since(args.agent, since)
         if events:
             events.sort(key=lambda e: e["at"])
-            print(f"LINEAR ACTIVITY ({len(events)}) since {since}")
+            print(f"LINEAR ACTIVITY ({len(events)}) since {window}")
             for e in events:
                 print(format_event(e, args.agent))
-            save_since(args.agent, max(polled_at, events[-1]["at"]))
+            seen += [e["id"] for e in events]
+            save_seen(args.agent, seen)
             if not args.stream:
                 return 0
-            since = load_since(args.agent)
-        else:
-            since = polled_at
-            save_since(args.agent, since)
         time.sleep(args.interval)
     print(f"NO LINEAR ACTIVITY after {args.max_checks} checks; re-run watch to keep listening")
     return 0
