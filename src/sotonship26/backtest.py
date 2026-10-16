@@ -143,7 +143,8 @@ class Ridge:
     def _solve(self, feats: pd.DataFrame, y: np.ndarray, lam: float) -> np.ndarray:
         raw = feats[list(self.features)].to_numpy(dtype=float)
         self.mu = raw.mean(axis=0)
-        self.sd = raw.std(axis=0) + 1e-9
+        sd = raw.std(axis=0)
+        self.sd = np.where(sd > 1e-9, sd, 1.0)  # constant in training: leave unscaled, not x1e9
         x = self._design(feats)
         penalty = lam * np.eye(x.shape[1])
         penalty[0, 0] = 0  # never shrink the intercept
