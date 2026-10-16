@@ -81,13 +81,17 @@ def load_schedule() -> pd.DataFrame
 
 ## Listening for messages (pull-based)
 
-Option A, the watcher (recommended, wakes Claude when something happens):
+Option A, the watcher (recommended, wakes Claude when something happens). Settings go in the
+untracked file `.coord/linear.env` (or real environment variables, which win):
+
+```
+LINEAR_API_KEY=lin_api_...   # linear.app > Settings > Security & access > Personal API keys
+COORD_AGENT=keanu            # or seb / edward
+```
 
 ```bash
-export LINEAR_API_KEY=lin_api_...     # linear.app > Settings > Security & access > Personal API keys
-export COORD_AGENT=keanu              # or seb / edward
-python coord/linear_bus.py whoami     # check the key works
-python coord/linear_bus.py watch      # blocks; prints new comments, issues and status moves; exits
+uv run --no-project python coord/linear_bus.py whoami   # check the key works (Windows too)
+uv run --no-project python coord/linear_bus.py watch    # blocks; prints new activity; exits
 ```
 
 Claude runs `watch` with `run_in_background: true`. When it exits Claude is woken, reads the
