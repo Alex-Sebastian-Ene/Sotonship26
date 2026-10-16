@@ -107,11 +107,14 @@ Fill in the date collected and the licence for every source before submission.
 | Bathymetry + water polygon for Southampton Water | Replace the synthetic lattice | TODO | TODO |
 | Footway widths, pedestrian counts on turnaround days | Calibrate capacities | TODO | TODO |
 | Red Funnel / Hythe ferry timetables, leisure-craft activity | Waterway demand | TODO | TODO |
+| DfT road traffic statistics, AADF by direction (API, Southampton LA 137) | Background traffic on counted roads, fetched by `data/dft.py`, cached in `data/raw/dft/`, not committed | At run time (first pull 16 Oct 2026) | Open Government Licence v3.0 |
 
 ## Provenance
 
 - **AI-generated:** the project scaffold (`pyproject.toml` backend extras, `src/`, `tests/`,
   `scripts/`, `cluster/`, `configs/`, this README) was generated with Claude Code on
   Fri 16 Oct 2026.
+- **AI-generated:** `src/sotonship26/data/dft.py` and `tests/test_dft.py` were written by Claude
+  Code (Edward's session) on Fri 16 Oct 2026.
 - **Existed before the event:** TODO, confirm with the organisers.
 - **Who helped:** TODO.
