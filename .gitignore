@@ -228,3 +228,6 @@ slurm-*.out
 
 # Built demo pages (regenerate with demo/synthetic_demo.py)
 demo/out/
+
+# Coordination watcher state (coord/linear_bus.py)
+.coord/
