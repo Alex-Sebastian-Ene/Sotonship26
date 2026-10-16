@@ -5,10 +5,12 @@ others can tell agents apart even though Linear credits the human's account. ``w
 team's Linear activity and exits as soon as something new arrives, so a Claude can run it in the
 background and get woken up (pull-based notifications, no webhooks or servers).
 
-Stdlib only, so it runs on any laptop without ``uv sync``:
+Stdlib only, so it runs on any laptop without ``uv sync`` (``uv run --no-project`` works too).
+Settings come from the environment, or from the untracked file ``.coord/linear.env``:
 
-    export LINEAR_API_KEY=lin_api_...   # linear.app > Settings > Security & access > API keys
-    export COORD_AGENT=keanu            # keanu | edward | seb
+    LINEAR_API_KEY=lin_api_...   # linear.app > Settings > Security & access > Personal API keys
+    COORD_AGENT=keanu            # keanu | edward | seb
+
     python coord/linear_bus.py whoami
     python coord/linear_bus.py watch                 # blocks until new activity, prints it, exits
     python coord/linear_bus.py inbox                 # open issues for this agent + recent chatter
@@ -31,6 +33,7 @@ from pathlib import Path
 
 API_URL = "https://api.linear.app/graphql"
 STATE_DIR = Path(__file__).resolve().parent.parent / ".coord"
+ENV_FILE = STATE_DIR / "linear.env"
 AGENTS = ("keanu", "edward", "seb")
 LABELS = {
     "agent:keanu": "#4EA7FC",
@@ -64,10 +67,20 @@ class LinearError(RuntimeError):
     pass
 
 
+def load_env_file(path: Path = ENV_FILE) -> None:
+    """Fill unset variables from KEY=VALUE lines; real environment variables win."""
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        key, sep, value = line.strip().partition("=")
+        if sep and key and not key.startswith("#"):
+            os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
 def gql(query: str, variables: dict | None = None) -> dict:
     key = os.environ.get("LINEAR_API_KEY")
     if not key:
-        raise LinearError("LINEAR_API_KEY is not set (linear.app > Settings > Security & access)")
+        raise LinearError(f"LINEAR_API_KEY is not set: export it or put it in {ENV_FILE}")
     payload = json.dumps({"query": query, "variables": variables or {}}).encode()
     req = urllib.request.Request(
         API_URL, data=payload, headers={"Content-Type": "application/json", "Authorization": key}
@@ -289,6 +302,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Windows consoles and pipes default to cp1252, which cannot print arrows or em dashes.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    load_env_file()
     args = build_parser().parse_args(argv)
     if not args.agent:
         print("Set COORD_AGENT (keanu | edward | seb) or pass --agent", file=sys.stderr)
