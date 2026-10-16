@@ -167,6 +167,9 @@ def main(argv: list[str] | None = None) -> int:
         models.append(uplift_model.fit_site(site, dates, y, feats, res.threshold))
         print(f"site {site}: train {res.n_train} days, test {res.n_test} days, "
               f"ridge lambda {res.ridge.lam if res.ridge else '-'}")
+    if not tables:
+        print("No site had enough usable days on both sides of the cutoff.")
+        return 1
     table = skill(pd.concat(tables, ignore_index=True))
     table.to_csv(RUNS / "table.csv", index=False)
     table.to_csv(NOTES / "backtest_table.csv", index=False)

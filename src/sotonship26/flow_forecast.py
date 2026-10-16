@@ -190,6 +190,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"site {site}: {len(dates)} usable days, {len(t)} model rows")
         if len(t):
             tables.append(t)
+    if not tables:
+        print("No site had enough published days to score.")
+        return 1
     table = pd.concat(tables, ignore_index=True)
     out_dir = ROOT / "notes"
     table.to_csv(out_dir / "flow_forecast_table.csv", index=False)

@@ -39,6 +39,8 @@ class SiteModel:
 def fit_site(site_id: int, dates: np.ndarray, y: np.ndarray, feats: pd.DataFrame,
              threshold: float, calib_frac: float = 0.2) -> SiteModel:
     f = feats.reindex(dates)
+    keep = f["pax_total"].notna().to_numpy()  # same filter as backtest.backtest_site
+    dates, y, f = dates[keep], y[keep], f[keep]
     n_cal = max(10, int(len(dates) * calib_frac))
     proper = Ridge().fit(f.iloc[:-n_cal], y[:-n_cal])
     resid = y[-n_cal:] - proper.predict(f.iloc[-n_cal:])
