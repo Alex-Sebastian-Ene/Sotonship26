@@ -22,7 +22,7 @@ import sys
 import time as clock
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
@@ -395,7 +395,39 @@ def base_shares(ctx: Ctx, dtype: int, closed, kick, term=True):
     return _SHARES[key]
 
 
+P_WET = {10: 0.50, 11: 0.55, 12: 0.55}  # share of days with real rain (assumed climatology)
+WET_CAPACITY = 0.93  # roads carry a little less in the wet
+WET_DEMAND = 1.03  # and a few more people drive
+INCIDENT_P = 0.15  # chance a day has a breakdown or crash on a main road
+PERCEPTION_SD = 0.12  # how far drivers misjudge a road's travel time, shared by all its users
+MAJOR_CLASSES = {"motorway", "trunk", "primary"}
+
+
+def lead_spread(d: date) -> float:
+    """Uncertainty grows with how far ahead the date is: x1 tomorrow, x1.6 six weeks out."""
+    return 1.0 + 0.6 * min(1.0, max(0, (d - ISSUED.date()).days) / 42)
+
+
+def day_multipliers(d: date, wet: bool) -> dict:
+    """Weekday pattern, Christmas shopping season and weather, per kind of trip."""
+    wd = d.weekday()
+    commute = {0: 0.97, 1: 1.02, 2: 1.03, 3: 1.02, 4: 0.93}.get(wd, 1.0)
+    visitors = {4: 1.06}.get(wd, 1.0)
+    if d >= date(2026, 11, 14):  # Christmas shopping builds week by week
+        visitors *= 1.10 + 0.05 * ((d - date(2026, 11, 14)).days // 7)
+    w = WET_DEMAND if wet else 1.0
+    return {"county": commute * w, "outbound": commute * w, "internal": w, "through": 1.0,
+            "visitors": visitors * w, "school": w}
+
+
 def forecast(task: dict) -> dict:
+    """Monte Carlo forecast for one day.
+
+    Each sampled day draws correlated everyday-traffic noise, weather, maybe an incident, how
+    drivers misjudge road speeds, and the cruise traffic. With ``paired`` the same draws are also
+    run without the ships, so the cruise effect is measured day by day rather than between two
+    unrelated sets of samples.
+    """
     ctx = CTX
     m = ctx.m
     d = date.fromisoformat(task["date"])
@@ -403,17 +435,39 @@ def forecast(task: dict) -> dict:
     calls = [Call(c["ship"], c["terminal"], datetime.fromisoformat(c["arrival"]),
                   datetime.fromisoformat(c["departure"]), c["pax"]) for c in task["calls"]]
     closed, kick, full = set(task["closed"]), task["match"], task["full"]
+    paired = task.get("paired", False)
     term, shifts, pre = task.get("term", True), task.get("shifts"), m.pre.get(dtype)
-    cap = capacity(ctx, closed)
+    cap0 = capacity(ctx, closed)
     sh0 = base_shares(ctx, dtype, closed, kick, term)
     run_c = m.t0 * 0.15 / 60.0
-    params = TurnaroundParams()
-    n_corr, n_seg = len(ctx.corr), len(ctx.seg_ptr)
+    spread = lead_spread(d)
+    params = replace(TurnaroundParams(),
+                     arrival_delay_sd_min=TurnaroundParams().arrival_delay_sd_min * spread)
+    segs = ctx.extra["segs"]
+    major = [i for i, sg in enumerate(segs) if sg["cls"] in MAJOR_CLASSES]
+    major_w = np.array([sum(m.length[e] for e in segs[i]["edges"]) for i in major], float)
+    major_w /= major_w.sum()
     acc = defaultdict(lambda: 0.0)
-    gates_s = []
+    gates_s, delays, scores = [], [], []
     rng = np.random.default_rng([SEED, d.toordinal()])
-    for s in range(task["n"]):
-        Dbg, groups = tm.background(m, dtype, rng, term=term)
+
+    def corridor_stats(x):
+        cx = np.maximum.reduceat(x[:, ctx.corr_idx], ctx.corr_ptr, axis=1)
+        xc = x[:, ctx.corr_idx]
+        slow = np.add.reduceat(run_c[ctx.corr_idx] * np.minimum(xc, 1.5) ** 4, ctx.corr_ptr, axis=1) / 2
+        return cx, slow + 15.0 * np.maximum(cx - 1.0, 0.0)
+
+    for _ in range(task["n"]):
+        wet = rng.random() < P_WET.get(d.month, 0.5)
+        cap = cap0 * (WET_CAPACITY if wet else 1.0)
+        events = []
+        if rng.random() < INCIDENT_P:
+            seg = segs[major[rng.choice(len(major), p=major_w)]]
+            b0 = int(rng.integers(0, N_BINS - 4))
+            events.append((np.asarray(seg["edges"]), b0, b0 + int(rng.integers(4, 9)), 0.55))
+        noise = rng.lognormal(-PERCEPTION_SD**2 / 2, PERCEPTION_SD, len(m.t0))
+        Dbg, groups = tm.background(m, dtype, rng, term=term, spread=spread,
+                                    mult=day_multipliers(d, wet))
         Dm = tm.match_demand(m, kickoff_hours(kick), rng) if kick else np.zeros_like(Dbg)
         Dc = sample_cruise(ctx, calls, rng, params, shifts) if calls else np.zeros_like(Dbg)
         want = ("x",)
@@ -422,16 +476,24 @@ def forecast(task: dict) -> dict:
             if calls:
                 want += ("cruise_edge", "cruise_path", "path", "time")
         res, _ = tm.run_day(m, Dbg + Dm + Dc, cap, sh0, 3, cruise=Dc if calls else None, want=want,
-                            pre=pre)
+                            pre=pre, noise=noise, events=events)
         x = res["x"]
-        cx = np.maximum.reduceat(x[:, ctx.corr_idx], ctx.corr_ptr, axis=1)
-        xc = x[:, ctx.corr_idx]
-        slow = np.add.reduceat(run_c[ctx.corr_idx] * np.minimum(xc, 1.5) ** 4, ctx.corr_ptr, axis=1) / 2
-        wait = 15.0 * np.maximum(cx - 1.0, 0.0)
-        acc["delay"] = acc["delay"] + slow + wait
+        cx, delay = corridor_stats(x)
         acc["p85"] = acc["p85"] + (cx > tm.AT_RISK)
         acc["p100"] = acc["p100"] + (cx > 1.0)
         acc["vc"] = acc["vc"] + cx
+        acc["delay"] = acc["delay"] + delay
+        delays.append(delay.astype(np.float32))
+        sc = float((cx > tm.AT_RISK).sum() * BIN_MIN / 60)
+        if paired:
+            if calls:
+                rb, _ = tm.run_day(m, Dbg + Dm, cap, sh0, 3, want=("x",), pre=pre, noise=noise,
+                                   events=events)
+                cxb, _ = corridor_stats(rb["x"])
+            else:
+                cxb = cx
+            acc["bg85"] = acc["bg85"] + (cxb > tm.AT_RISK)
+            scores.append((sc, float((cxb > tm.AT_RISK).sum() * BIN_MIN / 60), wet, bool(events)))
         if not full:
             continue
         acc["seg_x"] = acc["seg_x"] + np.maximum.reduceat(x[:, ctx.seg_idx], ctx.seg_ptr, axis=1)
@@ -449,20 +511,16 @@ def forecast(task: dict) -> dict:
             acc["time"] = acc["time"] + res["time"][:, ctx.cruise_ods, :]
             gates_s.append((Dc @ ctx.gate_mask) * 4)
     n = task["n"]
-    out = {k: (v / n if k != "gates" else v) for k, v in acc.items()}
-    if full:
-        bg85 = 0.0
-        for _ in range(task["n_bg"]):
-            Dbg, _ = tm.background(m, dtype, rng, term=term)
-            Dm = tm.match_demand(m, kickoff_hours(kick), rng) if kick else 0.0
-            res, _ = tm.run_day(m, Dbg + Dm, cap, sh0, 3, want=("x",), pre=pre)
-            cx = np.maximum.reduceat(res["x"][:, ctx.corr_idx], ctx.corr_ptr, axis=1)
-            bg85 = bg85 + (cx > tm.AT_RISK)
-        out["bg85"] = bg85 / task["n_bg"]
-        if gates_s:
-            gs = np.asarray(gates_s)
-            out["gates"] = {"mean": gs.mean(0), "p10": np.percentile(gs, 10, axis=0),
-                            "p90": np.percentile(gs, 90, axis=0)}
+    out = {k: v / n for k, v in acc.items()}
+    dl = np.asarray(delays)
+    out["delay50"] = np.percentile(dl, 50, axis=0)
+    out["delay90"] = np.percentile(dl, 90, axis=0)
+    out["scores"] = scores
+    out["spread"] = spread
+    if gates_s:
+        gs = np.asarray(gates_s)
+        out["gates"] = {"mean": gs.mean(0), "p10": np.percentile(gs, 10, axis=0),
+                        "p90": np.percentile(gs, 90, axis=0)}
     out["date"], out["key"] = task["date"], task["key"]
     return out
 
@@ -500,6 +558,17 @@ def advise(task: dict) -> dict:
 
 
 # --- output helpers ----------------------------------------------------------------------------
+
+def ranges(scores) -> dict:
+    """10th, 50th and 90th percentiles of the day's samples, plus the paired cruise effect."""
+    a = np.asarray([[s[0], s[1]] for s in scores], float)
+    up = a[:, 0] - a[:, 1]
+    q = lambda v: [round(float(x), 1) for x in np.percentile(v, [10, 50, 90])]  # noqa: E731
+    return {"score": q(a[:, 0]), "bg": q(a[:, 1]), "uplift": q(up),
+            "samples": sorted(round(float(x), 1) for x in up),
+            "wet": [bool(s[2]) for s in scores], "incident": [bool(s[3]) for s in scores],
+            "pairs": [[round(float(s[0]), 1), round(float(s[1]), 1)] for s in scores]}
+
 
 def pct(a) -> list:
     return np.rint(np.asarray(a) * 100).astype(int).tolist()
@@ -590,7 +659,7 @@ def match_on(d: date):
 
 def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--n", type=int, default=60, help="sampled days per date")
+    parser.add_argument("--n", type=int, default=30, help="sampled days per date (each run with and without ships)")
     parser.add_argument("--n-bg", type=int, default=15, help="sampled days without cruise traffic")
     parser.add_argument("--whatif-days", type=int, default=6)
     parser.add_argument("--advise-days", type=int, default=10)
@@ -619,7 +688,7 @@ def main(argv=None) -> None:
                   "departure": c.departure.isoformat(), "pax": c.pax} for c in sched[d]]
         tasks.append({"date": d.isoformat(), "key": "base", "calls": calls, "full": True,
                       "closed": [p["corridor"] for p in permits_on(d)], "match": match_on(d),
-                      "n": args.n, "n_bg": args.n_bg, "term": in_term(d)})
+                      "n": args.n, "term": in_term(d), "paired": True})
         d += timedelta(days=1)
     log(f"forecasting {len(tasks)} days on {args.workers} workers")
     with ProcessPoolExecutor(args.workers, initializer=_init, initargs=(str(ctx_path),)) as pool:
@@ -642,7 +711,7 @@ def main(argv=None) -> None:
                                    "full": False, "seg": True})
         log(f"what-ifs: {len(wtasks)}")
         wres = defaultdict(dict)
-        for r in pool.map(forecast, [{**w, "full": True, "n_bg": 1} for w in wtasks]):
+        for r in pool.map(forecast, [{**w, "full": True, "paired": False} for w in wtasks]):
             wres[r["date"]][r["key"]] = r
             log(f"  what-if {r['date']} {r['key']}: {score(results[r['date']]['p85']):.2f} -> {score(r['p85']):.2f}")
         uplift = {t["date"]: score(results[t["date"]]["p85"]) - score(results[t["date"]]["bg85"]) for t in tasks}
@@ -650,7 +719,7 @@ def main(argv=None) -> None:
                         key=lambda t: -uplift[t["date"]])[: args.advise_days]
         log(f"ship-timing advice for {len(atasks)} days")
         advice = {}
-        for r in pool.map(advise, [{**t, "n": args.n_advise} for t in atasks]):
+        for r in pool.map(advise, [{**t, "n": args.n_advise, "paired": False} for t in atasks]):
             advice[r["date"]] = r
             log(f"  advice {r['date']}: {r['base']:.2f} -> {r['best']:.2f} with shifts {r['shifts']}")
 
@@ -678,7 +747,11 @@ def main(argv=None) -> None:
             "score": round(score(r["p85"]), 2), "bg_score": round(score(r["bg85"]), 2),
             "permits": [p["id"] for p in permits_on(date.fromisoformat(task["date"]))],
             "match": task["match"], "term": task["term"],
-            "delay": {c[0]: np.rint(r["delay"][:, i]).astype(int).tolist() for i, c in enumerate(ctx.corr)},
+            "delay": {c[0]: np.rint(r["delay50"][:, i]).astype(int).tolist() for i, c in enumerate(ctx.corr)},
+            "delay90": {c[0]: np.rint(r["delay90"][:, i]).astype(int).tolist() for i, c in enumerate(ctx.corr)},
+            "range": ranges(r["scores"]), "spread": round(r["spread"], 2),
+            "wet": P_WET.get(date.fromisoformat(task["date"]).month, 0.5), "incident": INCIDENT_P,
+            "lead": (date.fromisoformat(task["date"]) - ISSUED.date()).days,
             "timing": advice.get(task["date"]),
             "p85": {c[0]: pct(r["p85"][:, i]) for i, c in enumerate(ctx.corr)},
             "p100": {c[0]: pct(r["p100"][:, i]) for i, c in enumerate(ctx.corr)},
@@ -763,7 +836,11 @@ def main(argv=None) -> None:
                  "horizon": HORIZON.isoformat(), "n": args.n, "seed": SEED, "bin_minutes": BIN_MIN,
                  "at_risk": tm.AT_RISK, "unknown_pax_range": UNKNOWN_PAX_RANGE, "model": "v0.2-demo",
                  "scale": round(m.scale, 3), "scale_ext": round(m.scale_ext, 3),
-                 "capacity_notes": ctx.extra["capacity"], "uni_term": tm.UNI_TERM, "half_term": [x.isoformat() for x in HALF_TERM],
+                 "capacity_notes": ctx.extra["capacity"], "uni_term": tm.UNI_TERM,
+                 "uncertainty": {"p_wet": P_WET, "wet_capacity": WET_CAPACITY, "wet_demand": WET_DEMAND,
+                                 "incident_p": INCIDENT_P, "perception_sd": PERCEPTION_SD,
+                                 "logit_beta": tm.LOGIT_BETA, "noise": tm.NOISE,
+                                 "arrival_sd": TurnaroundParams().arrival_delay_sd_min}, "half_term": [x.isoformat() for x in HALF_TERM],
                  "turnaround": {"disembark_start": TurnaroundParams().disembark_start_min,
                                 "disembark_minutes": TurnaroundParams().disembark_duration_min,
                                 "embark_open": TurnaroundParams().embark_open_before_dep_min,

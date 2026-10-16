@@ -13,10 +13,17 @@ through traffic crosses between gateways, county visitors come to the shops, and
 fans travel to St Mary's. Cruise traffic is added per ship call.
 
 Allocation is dynamic. Every 15 minutes all of that traffic shares the network. Each origin-
-destination flow is split over up to three routes and shifted towards the quickest, given the
-congestion everyone else causes (method of successive averages with BPR travel times). Traffic that
-cannot get through a route's bottleneck in those 15 minutes waits and joins the next 15 minutes (a
-point queue), so queues build and clear through the day.
+destination flow is split over up to three routes and shifted towards the routes drivers think are
+quickest, given the congestion everyone else causes (method of successive averages with BPR travel
+times). Drivers are not perfect: each sampled day they misjudge each road's speed, and everyone
+using a road shares that misjudgement, so routes that overlap are misjudged together (correlated
+perception noise), and they choose with a logit rule rather than all taking the single quickest.
+Traffic that cannot get through a route's bottleneck in those 15 minutes waits and joins the next
+15 minutes (a point queue), so queues build and clear through the day.
+
+Demand is noisy in correlated ways: a day-wide factor shared by every kind of trip, a factor per
+kind of trip, 15-minute noise that persists (a busy 08:00 is followed by a busy 08:15), and zone
+factors that move together for neighbouring zones.
 """
 
 from __future__ import annotations
@@ -36,6 +43,8 @@ DAY_START_H = 5
 AT_RISK = 0.85
 ROUTES = 3
 CARRY = 0.8  # share of traffic stuck in a queue that is still waiting 15 minutes later
+LOGIT_BETA = 6.0  # route choice: a route 10% slower than the best gets exp(-0.6) of its weight
+NOISE = {"day": 0.04, "purpose": 0.04, "bin": 0.05, "rho": 0.8, "zone": 0.08, "zone_km": 2.0}
 LOCAL = {"primary", "primary_link", "secondary", "secondary_link", "tertiary", "tertiary_link",
          "unclassified"}
 GATEWAY_WEIGHT = {"motorway": 6.0, "trunk": 3.0, "primary": 2.0, "secondary": 1.0}
@@ -147,6 +156,9 @@ class Model:
     AT: sp.csr_matrix = field(repr=False)
     col_idx: np.ndarray = field(repr=False)  # edge indices per path, concatenated
     col_ptr: np.ndarray = field(repr=False)
+    uniq: np.ndarray = field(default=None, repr=False)  # n_od x ROUTES, False for padded duplicates
+    od_zone: np.ndarray = field(default=None, repr=False)  # n_od x 2 zone index of origin/dest, -1 if none
+    zone_kernel: np.ndarray = field(default=None, repr=False)  # zones x zones smoothing for zone noise
     scale: float = 1.0  # trips within the area (fitted to council counts)
     scale_ext: float = 1.0  # trips to, from and through the county (fitted to main-road loads)
     pre: dict = field(default_factory=dict)  # day type -> (bins, edges) local traffic on counted roads
@@ -398,6 +410,15 @@ def build(net_path: Path, gates: dict[str, tuple[int, int]], log=print) -> Model
         paths += found
     log(f"candidate routes: {len(paths)} ({important.sum()} pairs with alternatives)")
 
+    uniq = np.ones((len(pairs), ROUTES), bool)
+    for j in range(len(pairs)):
+        for r in range(1, ROUTES):
+            if paths[j * ROUTES + r] in paths[j * ROUTES: j * ROUTES + r]:
+                uniq[j, r] = False
+    zpos = {ci: k for k, ci in enumerate(Z)}
+    od_zone = np.array([[zpos.get(o, -1), zpos.get(d, -1)] for o, d in pairs])
+    kern = np.exp(-(zdist / (NOISE["zone_km"] * 1000.0)) ** 2)
+    kern /= np.sqrt((kern ** 2).sum(axis=1, keepdims=True))
     rows = np.concatenate([np.asarray(p) for p in paths])
     cols = np.repeat(np.arange(len(paths)), [len(p) for p in paths])
     A = sp.csr_matrix((np.ones(len(rows)), (rows, cols)), shape=(len(t0), len(paths)))
@@ -405,24 +426,49 @@ def build(net_path: Path, gates: dict[str, tuple[int, int]], log=print) -> Model
     return Model(xy=xy, eu=eu, ev=ev, t0=t0, cap=cap, length=length, cls=cls, name=name, ref=ref,
                  coords=coords, centroids=centroids, ods=pairs, od_index=od_index,
                  purpose_od=purpose_od, paths=paths, A=A, AT=A.T.tocsr(), col_idx=rows,
-                 col_ptr=col_ptr, size=(W, H), sets=sets)
+                 col_ptr=col_ptr, size=(W, H), sets=sets, uniq=uniq, od_zone=od_zone,
+                 zone_kernel=kern)
 
 
 # --- demand ------------------------------------------------------------------------------------
 
-def background(m: Model, dtype: int, rng: np.random.Generator | None = None, term: bool = True):
-    """Vehicles per bin for each OD pair, and per chart group, for one day type."""
+def ar1(rng: np.random.Generator, n: int, sd: float, rho: float) -> np.ndarray:
+    """Multiplicative noise that persists from one 15-minute bin to the next."""
+    e = np.empty(n)
+    e[0] = rng.normal(0.0, sd)
+    for i in range(1, n):
+        e[i] = rho * e[i - 1] + math.sqrt(1 - rho**2) * rng.normal(0.0, sd)
+    return np.exp(e - sd**2 / 2)
+
+
+def background(m: Model, dtype: int, rng: np.random.Generator | None = None, term: bool = True,
+               spread: float = 1.0, mult: dict | None = None):
+    """Vehicles per bin for each OD pair, and per chart group, for one day type.
+
+    With ``rng`` the day is noisy in correlated ways (see the module docstring); ``spread`` widens
+    the noise for dates further ahead, and ``mult`` scales chosen purposes (season, weather).
+    """
     D = np.zeros((N_BINS, m.n_od))
     groups = {}
+    od_mult = 1.0
+    day = 1.0
+    if rng is not None:
+        day = rng.lognormal(0.0, NOISE["day"] * spread)
+        z = m.zone_kernel @ rng.normal(0.0, NOISE["zone"] * spread, m.zone_kernel.shape[0])
+        zf = np.exp(z)
+        oz, dz = m.od_zone[:, 0], m.od_zone[:, 1]
+        od_mult = np.where(oz >= 0, zf[np.maximum(oz, 0)], 1.0) * np.where(dz >= 0, zf[np.maximum(dz, 0)], 1.0)
     for key, group, _, _, totals, profiles in PURPOSES:
         if key in SCHOOL_KEYS and not (term and dtype == 0):
             continue
         prof = bin_profile(PROFILES[profiles[0 if dtype == 0 else 1]])
-        total = totals[dtype] * (m.scale_ext if group in EXTERNAL else m.scale)
+        total = totals[dtype] * (m.scale_ext if group in EXTERNAL else m.scale) * day
+        if mult:
+            total *= mult.get(group, mult.get("all", 1.0))
         if rng is not None:
-            total *= rng.lognormal(0.0, 0.05)
-            prof = prof * rng.lognormal(0.0, 0.03, N_BINS)
-        D += np.outer(prof * total, m.purpose_od[key])
+            total *= rng.lognormal(0.0, NOISE["purpose"] * spread)
+            prof = prof * ar1(rng, N_BINS, NOISE["bin"] * spread, NOISE["rho"])
+        D += np.outer(prof * total, m.purpose_od[key] * od_mult)
         groups[group] = groups.get(group, 0) + prof * total
     return D, groups
 
@@ -449,22 +495,27 @@ def match_demand(m: Model, kickoff_h: float, rng: np.random.Generator | None = N
 # --- dynamic assignment ------------------------------------------------------------------------
 
 def equilibrium_bin(m: Model, rate: np.ndarray, cap: np.ndarray, shares: np.ndarray, iters: int,
-                    pre=0.0):
-    """Split each OD's flow (veh/h) over its routes; MSA towards the quickest. Returns path flows."""
+                    pre=0.0, noise: np.ndarray | None = None):
+    """Split each OD's flow (veh/h) over its routes, moving towards the routes drivers think are
+    quickest. ``noise`` multiplies each road's perceived travel time (shared by everyone on it).
+    Returns path flows."""
     f = (shares * rate[:, None]).ravel()
-    ar = np.arange(m.n_od)
     for k in range(iters):
         v = m.A @ f + pre
         t = m.t0 * (1.0 + 0.15 * (v / cap) ** 4)
+        if noise is not None:
+            t = t * noise
         c = (m.AT @ t).reshape(m.n_od, ROUTES)
-        y = np.zeros((m.n_od, ROUTES))
-        y[ar, c.argmin(axis=1)] = rate
+        rel = c / np.maximum(c.min(axis=1, keepdims=True), 30.0)
+        w = np.exp(-LOGIT_BETA * (rel - 1.0)) * m.uniq
+        y = w / w.sum(axis=1, keepdims=True) * rate[:, None]
         f += (y.ravel() - f) / (k + 2)
     return f
 
 
 def run_day(m: Model, D: np.ndarray, cap: np.ndarray, shares0: np.ndarray, iters: int,
-            cruise: np.ndarray | None = None, want=("x",), pre: np.ndarray | None = None):
+            cruise: np.ndarray | None = None, want=("x",), pre: np.ndarray | None = None,
+            noise: np.ndarray | None = None, events=()):
     """Route one day bin by bin, carrying unserved traffic forward as queues.
 
     D: vehicles per bin per OD (all traffic), cruise: the cruise part of D (or None).
@@ -478,21 +529,27 @@ def run_day(m: Model, D: np.ndarray, cap: np.ndarray, shares0: np.ndarray, iters
         veh = D[b] + queue
         rate = veh * 4.0
         pb = pre[b] if pre is not None else 0.0
-        f = equilibrium_bin(m, rate, cap, shares0[b], iters, pb)
+        capb = cap
+        for edges, b0, b1, factor in events:  # incidents: capacity drops for a while
+            if b0 <= b < b1:
+                capb = capb.copy() if capb is cap else capb
+                capb[edges] *= factor
+        f = equilibrium_bin(m, rate, capb, shares0[b], iters, pb, noise)
         v = m.A @ f + pb
-        x = v / cap
+        x = v / capb
         bottleneck = np.maximum.reduceat(x[m.col_idx], m.col_ptr)
         if "delay" in out:
             out["delay"].append(delay_minutes(m, x))
         served = f / np.maximum(bottleneck, 1.0)
         unserved = CARRY * (f - served).reshape(m.n_od, ROUTES).sum(axis=1) / 4.0
+        cap_now = capb
         with np.errstate(invalid="ignore", divide="ignore"):
             sh = np.where(rate[:, None] > 0, f.reshape(m.n_od, ROUTES) / rate[:, None], shares0[b])
         shares[b] = sh
         if "x" in out:
             out["x"].append(x)
         if "queue" in out:
-            out["queue"].append(np.maximum(v - cap, 0.0) / 4.0)
+            out["queue"].append(np.maximum(v - cap_now, 0.0) / 4.0)
         if cruise is not None:
             c_veh = cruise[b] + cruise_queue
             frac = np.divide(c_veh, veh, out=np.zeros_like(veh), where=veh > 0)
