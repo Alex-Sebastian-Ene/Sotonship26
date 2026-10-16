@@ -1,0 +1,108 @@
+[project]
+name = "sotonship26"
+version = "0.1.0"
+description = "Probabilistic crowd and waterway congestion forecasts for Southampton cruise turnaround days."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "gymnasium>=1.4.0",
+    "matplotlib>=3.11.2",
+    "networkx>=3.7",
+    "numpy>=2.5.4",
+    "optuna>=5.0.0",
+    "osmnx>=2.0",
+    "pandas>=2.2",
+    "pyyaml>=6.0.3",
+    "stable-baselines3[extra]>=2.9.0",
+    "tensorboard>=2.21.0",
+]
+
+# PyTorch backend: install exactly one per machine (scripts/setup_env.* picks it for you).
+[project.optional-dependencies]
+cpu = ["torch>=2.14.1,<2.15"]
+# NVIDIA, older GPUs (Pascal/Volta) up to Hopper; works with drivers back to CUDA 12.x.
+cu126 = ["torch>=2.14.1,<2.15"]
+# NVIDIA, Turing (sm_75) and newer incl. Blackwell; needs a CUDA 13 driver (R580+). Local RTX 2060.
+cu130 = ["torch>=2.14.1,<2.15"]
+# AMD GPUs via ROCm 7.2 (Linux only).
+rocm = [
+    "torch>=2.14.1,<2.15 ; sys_platform == 'linux'",
+    "triton-rocm ; sys_platform == 'linux'",
+]
+
+[project.scripts]
+sotonship-train = "sotonship26.train:main"
+sotonship-eval = "sotonship26.evaluate:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.17.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.1,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv]
+conflicts = [
+    [{ extra = "cpu" }, { extra = "cu126" }, { extra = "cu130" }, { extra = "rocm" }],
+]
+
+# The ROCm wheels are published without separate metadata, so uv would otherwise download a whole
+# ~5 GB wheel just to read its dependencies on every fresh re-lock. Copied from the wheel itself.
+[[tool.uv.dependency-metadata]]
+name = "torch"
+version = "2.14.1+rocm7.2"
+requires-python = ">=3.10"
+requires-dist = [
+    "filelock",
+    "fsspec>=0.8.5",
+    "jinja2",
+    "networkx>=2.5.1",
+    "setuptools>=77.0.3",
+    "sympy>=1.13.3",
+    "triton-rocm>=3.8.0,<3.9.dev0 ; python_full_version < '3.15' and sys_platform == 'linux'",
+    "typing-extensions>=4.10.0",
+]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", extra = "cpu", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu126", extra = "cu126", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu130", extra = "cu130", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-rocm", extra = "rocm", marker = "sys_platform == 'linux'" },
+]
+triton-rocm = [
+    { index = "pytorch-rocm", extra = "rocm", marker = "sys_platform == 'linux'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-rocm"
+url = "https://download.pytorch.org/whl/rocm7.2"
+explicit = true
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

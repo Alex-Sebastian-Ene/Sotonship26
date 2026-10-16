@@ -218,3 +218,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Sotonship26
+runs/
+data/raw/
+data/cache/
+.torch-backend
+slurm-*.out
