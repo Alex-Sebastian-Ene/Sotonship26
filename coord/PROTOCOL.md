@@ -68,11 +68,13 @@ class SimParams:  # every field Keanu's calibration may tune; defaults from conf
     mode_shares: dict[str, float]; approach_shares: dict[str, float]
     arrival_offset_min: float; background_scale: float
 
-# Keanu -> Seb, Edward
-def observed_uplift(site_ids: list[str], start: date, end: date) -> pd.DataFrame:
-    """Columns: site_id, bin_start, flow_veh, baseline_veh, uplift_veh, is_cruise_day."""
-def fitted_params() -> SimParams          # reads runs/calibration/best.json
-def backtest_table() -> pd.DataFrame      # model + 3 baselines, MAE / Brier / coverage, n_days
+# Keanu -> Seb, Edward  (branch keanu/SOT-6-7-uplift)
+from sotonship26.uplift import observed_uplift      # flows, days -> per site/date/15-min bin:
+    # flow_veh, baseline_veh (median of nearby same-weekday no-cruise days), uplift_veh, ...
+from sotonship26.backtest import day_features        # cruise days (+ calls) -> model features
+from sotonship26.uplift_model import predict_uplift  # features -> per site/date/bin:
+    # uplift_veh, lo80, hi80, p_event   (learned ridge model, models/uplift_ridge.json)
+# notes/backtest.md + notes/backtest_table.csv: model vs 3 baselines, MAE / Brier / coverage
 
 # Edward -> Seb, Keanu
 def load_schedule() -> pd.DataFrame
