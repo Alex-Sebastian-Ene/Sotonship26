@@ -107,12 +107,17 @@ def name_of(node: dict | None, default: str) -> str:
     return (node or {}).get("name", default)
 
 
+def unescape(text: str | None) -> str:
+    """Linear stores Markdown with escaped brackets, e.g. ``\\[keanu-claude\\]``."""
+    return (text or "").replace("\\[", "[").replace("\\]", "]")
+
+
 def collect_events(data: dict, agent: str) -> list[dict]:
     """Turn one poll into events, dropping what this agent wrote itself."""
     mine = marker(agent)
     events = []
     for c in data["comments"]["nodes"]:
-        if c["body"].lstrip().startswith(mine):
+        if unescape(c["body"]).lstrip().startswith(mine):
             continue
         events.append({
             "at": c["createdAt"], "kind": "comment", "issue": c["issue"]["identifier"],
@@ -120,7 +125,7 @@ def collect_events(data: dict, agent: str) -> list[dict]:
             "text": c["body"], "url": c["issue"]["url"],
         })
     for i in data["newIssues"]["nodes"]:
-        if mine in (i.get("description") or ""):
+        if mine in unescape(i.get("description")):
             continue
         labels = ", ".join(n["name"] for n in i["labels"]["nodes"])
         events.append({
@@ -162,8 +167,8 @@ def format_event(event: dict, agent: str) -> str:
     flag = ">>> FOR YOU " if is_directed(event, agent) else ""
     head = f"{flag}[{event['at'][11:16]}Z] {event['kind']} {event['issue']} by {event['who']}"
     body = event["text"].strip()
-    if len(body) > 1500:
-        body = body[:1500] + " ...(truncated, open the issue)"
+    if len(body) > 700:
+        body = body[:700] + " ...(truncated, open the issue)"
     return f"{head}: {event['title']}\n    " + body.replace("\n", "\n    ")
 
 
