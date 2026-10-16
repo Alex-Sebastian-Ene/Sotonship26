@@ -1,13 +1,17 @@
 import math
 
 import networkx as nx
+import pytest
 
+from sotonship26.config import load_config
 from sotonship26.corridors import (
+    Network,
     candidate_paths,
     corridor_edges,
     corridor_vc,
     gate_access_edges,
     locate_approaches,
+    terminal_gates,
 )
 
 
@@ -99,3 +103,29 @@ def test_approach_picks_the_right_carriageway():
     found = locate_approaches(g, {"m1": ((5.0, 200.0), ["M1"])}, ["G"])
     assert found[("m1", "in")] == "s2"
     assert found[("m1", "out")] == "n2"
+
+
+def test_terminal_gate_shares_fall_back_to_default():
+    table = terminal_gates(
+        {"Mayflower": {"default": {"G20": 0.7, "G10": 0.3}, "taxi": {"G10": 1.0}}}, ["G10", "G20"]
+    )
+    net = Network(nx.DiGraph(), 15.0, {}, {}, table, {}, {})
+    assert net.gate_shares("Mayflower", "taxi") == {"G10": 1.0}
+    assert net.gate_shares("Mayflower", "coach") == {"G20": 0.7, "G10": 0.3}
+    assert net.gate_of("Mayflower") == "G20"
+    assert net.gate_shares("Nowhere") is None and net.gate_of("Nowhere") is None
+
+
+def test_terminal_gates_reject_bad_tables():
+    with pytest.raises(ValueError, match="unknown gates"):
+        terminal_gates({"T": {"default": {"G5": 1.0}}}, ["G4"])
+    with pytest.raises(ValueError, match="sum to 1"):
+        terminal_gates({"T": {"default": {"G4": 0.5}}}, ["G4"])
+    with pytest.raises(ValueError, match="default"):
+        terminal_gates({"T": {"taxi": {"G4": 1.0}}}, ["G4"])
+
+
+def test_configured_terminal_gates_are_valid():
+    roads = load_config()["roads"]
+    table = terminal_gates(roads["terminal_gates"], roads["gates"])
+    assert table["City Cruise Terminal"]["taxi"] == {"Dock Gate 10": 1.0}

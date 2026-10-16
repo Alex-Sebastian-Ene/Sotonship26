@@ -30,14 +30,19 @@ roads:  # directed vehicle network for the cruise-day forecast (data/roads.py, c
     "Dock Gate 8": [50.89950, -1.41107]
     "Dock Gate 10": [50.90410, -1.41742]
     "Dock Gate 20": [50.91330, -1.46095]
-  # UNVERIFIED: nearest gate in a straight line (QEII is not geocoded; it sits beside Ocean in
-  # the Eastern Docks). Replace with ABP's published directions (SOT-19). Keys match vts.py.
+  # terminal -> mode -> {gate: share}; "default" covers every mode not listed (car, park, coach).
+  # Source: ABP "Travelling to your cruise terminal" PDFs on southamptonvts.co.uk and ABParking,
+  # retrieved 16 Oct 2026 (SOT-19). Keys match vts.py. Sources give the way in only; leaving by
+  # the same gate is assumed. No source gives a coach gate, so coaches use the car gate.
   terminal_gates:
-    "QEII Cruise Terminal": "Dock Gate 4"
-    "Ocean Cruise Terminal": "Dock Gate 4"
-    "City Cruise Terminal": "Dock Gate 8"
-    "Horizon Cruise Terminal": "Dock Gate 10"
-    "Mayflower Cruise Terminal": "Dock Gate 10"
+    "Ocean Cruise Terminal": {default: {"Dock Gate 4": 1.0}}
+    "QEII Cruise Terminal": {default: {"Dock Gate 4": 1.0}}
+    "City Cruise Terminal": {default: {"Dock Gate 8": 1.0}, taxi: {"Dock Gate 10": 1.0}}
+    "Horizon Cruise Terminal": {default: {"Dock Gate 10": 1.0}}
+    # ABP recommends Gate 20 for cars, Gate 10 as the alternative: split is a guess; calibrate
+    "Mayflower Cruise Terminal":
+      default: {"Dock Gate 20": 0.7, "Dock Gate 10": 0.3}
+      taxi: {"Dock Gate 10": 1.0}
   # Where cruise traffic enters and leaves the network. Each point (lat, lon) snaps to the
   # nearest node on a road with one of the refs (any road if no refs). Shares are SimParams.
   approaches:

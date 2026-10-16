@@ -46,27 +46,43 @@ class Network:
     bin_minutes: float
     gates: dict[str, Node]  # gate name -> node
     approaches: dict[tuple[str, str], Node]  # (approach, direction) -> node
-    terminal_gates: dict[str, str]  # terminal (as in vts.py) -> gate name
+    # terminal (as in vts.py) -> mode ("default", "car", "taxi", ...) -> gate name -> share
+    terminal_gates: dict[str, dict[str, dict[str, float]]]
     corridors: dict[str, Corridor]
     paths: dict[tuple[str, str, str], list[list[Node]]]  # (approach, gate, direction) -> paths
 
+    def gate_shares(self, terminal: str, mode: str = "default") -> dict[str, float] | None:
+        """Share of a terminal's ``mode`` traffic using each gate; None if outside coverage."""
+        modes = self.terminal_gates.get(terminal)
+        if modes is None:
+            return None
+        return modes.get(mode, modes["default"])
+
     def gate_of(self, terminal: str) -> str | None:
-        """Gate a terminal's traffic uses, or None if the terminal is outside coverage."""
-        return self.terminal_gates.get(terminal)
+        """Main gate of a terminal's traffic, or None if the terminal is outside coverage."""
+        shares = self.gate_shares(terminal)
+        return max(shares, key=shares.get) if shares else None
 
 
 def load_network(cfg: Mapping | None = None, *, refresh: bool = False) -> Network:
-    """Road graph, gates, approaches, corridors and candidate paths, cached per config."""
+    """Road graph, gates, approaches, corridors and candidate paths, cached per config.
+
+    The terminal -> gate table is read from the config on every load, so editing it does not
+    trigger a rebuild.
+    """
     cfg = cfg or load_config()
     roads = cfg["roads"]
     bin_minutes = float(cfg["time"]["bin_minutes"])
+    built = {k: v for k, v in roads.items() if k != "terminal_gates"}
     key = hashlib.sha1(
-        json.dumps({"roads": roads, "bin_minutes": bin_minutes}, sort_keys=True).encode()
+        json.dumps({"roads": built, "bin_minutes": bin_minutes}, sort_keys=True).encode()
     ).hexdigest()[:12]
     path = CACHE / f"network-{key}.pkl"
     if path.exists() and not refresh:
         with open(path, "rb") as f:
-            return pickle.load(f)
+            network = pickle.load(f)
+        network.terminal_gates = terminal_gates(roads["terminal_gates"], network.gates)
+        return network
     graph = load_roads(
         bbox=roads["bbox"],
         crs=roads["crs"],
@@ -91,10 +107,9 @@ def build_network(graph: nx.DiGraph, roads: Mapping, *, bin_minutes: float) -> N
         gates[name] = nearest_node(graph, xy)
         off = math.dist(graph.nodes[gates[name]]["pos"], xy)
         if off > roads.get("access_radius_m", 0.0):
-            warnings.warn(f"{name} snapped {off:.0f} m away: no kept road reaches it", stacklevel=2)
-    missing = {t: g for t, g in roads["terminal_gates"].items() if g not in gates}
-    if missing:
-        raise ValueError(f"terminal_gates names gates that are not in roads.gates: {missing}")
+            # Expected for Dock Gate 20: the public road ends at the link off Millbrook
+            # Roundabout and the gate itself is inside the port.
+            warnings.warn(f"{name} snapped to a road {off:.0f} m from its OSM point", stacklevel=2)
     approaches = locate_approaches(
         graph,
         {
@@ -114,10 +129,31 @@ def build_network(graph: nx.DiGraph, roads: Mapping, *, bin_minutes: float) -> N
         bin_minutes=bin_minutes,
         gates=gates,
         approaches=approaches,
-        terminal_gates=dict(roads["terminal_gates"]),
+        terminal_gates=terminal_gates(roads["terminal_gates"], gates),
         corridors=corridors,
         paths=paths,
     )
+
+
+def terminal_gates(
+    table: Mapping[str, Mapping[str, Mapping[str, float]]], gates: Iterable[str]
+) -> dict[str, dict[str, dict[str, float]]]:
+    """Check the config's terminal -> mode -> {gate: share} table: known gates, shares sum to 1."""
+    known = set(gates)
+    out = {}
+    for terminal, modes in table.items():
+        if "default" not in modes:
+            raise ValueError(f"terminal_gates[{terminal!r}] needs a 'default' entry")
+        for mode, shares in modes.items():
+            unknown = set(shares) - known
+            if unknown:
+                raise ValueError(f"terminal_gates[{terminal!r}][{mode!r}]: unknown gates {unknown}")
+            if not math.isclose(sum(shares.values()), 1.0, abs_tol=1e-6):
+                raise ValueError(f"terminal_gates[{terminal!r}][{mode!r}] shares must sum to 1")
+        out[terminal] = {
+            mode: {g: float(s) for g, s in shares.items()} for mode, shares in modes.items()
+        }
+    return out
 
 
 def locate_approaches(
