@@ -2,11 +2,14 @@
 
 The map and road network are real (OpenStreetMap, built by osm_base.py). The traffic model
 (traffic_model.py) builds zones, county gateways and routes from that geography and allocates
-traffic dynamically every 15 minutes. What is invented: the cruise schedule and ship names, the trip
-totals behind general traffic, capacities per lane, roadworks permits and match fixtures. Nothing
-here is observed traffic.
+traffic dynamically every 15 minutes. Real inputs: the ABP Southampton VTS cruise schedule once
+demo/collect_schedule.py has written data/raw/cruise_schedule.csv (else an invented one), Saints
+home fixtures, the council's school term dates and Street Manager roadworks permits. What is
+invented: the trip totals behind general traffic and capacities per lane. Nothing here is observed
+traffic.
 
     uv run --no-project --python 3.12 --with osmnx --with scipy python demo/osm_base.py   # once
+    uv run --no-project --python 3.12 python demo/collect_schedule.py   # VTS schedule, each run
     uv run --no-project --python 3.12 --with numpy --with scipy --with networkx --with pandas \
         --with shapely --with pyproj python demo/synthetic_demo.py
 """
@@ -14,6 +17,7 @@ here is observed traffic.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import math
 import os
@@ -35,6 +39,9 @@ import traffic_model as tm  # noqa: E402
 from sotonship26.demand.passengers import TurnaroundParams  # noqa: E402
 
 CACHE = HERE.parent / "data" / "cache" / "southampton"
+SCHEDULE_CSV = HERE.parent / "data" / "raw" / "cruise_schedule.csv"  # never committed
+VTS_PAGE = ("https://www.southamptonvts.co.uk/live_information/"
+            "shipping_movements_and_cruise_ship_schedule/cruise_ship_schedule/")
 BIN_MIN = 15
 N_BINS = tm.N_BINS
 ISSUED = datetime(2026, 10, 16, 22, 30)
@@ -90,19 +97,64 @@ SHIPS = [
     ("Test Tide", 2400), ("Placeholder Spirit", 4200), ("Stub Starlight", 3000),
     ("Draft Dawn", 2800), ("Example Explorer", 3900),
 ]
+# Roadworks on the corridors from DfT Street Manager open data (permit archives permit/2026/08.zip
+# and 09.zip, i.e. permit events up to 30 Sep 2026; read 16 Oct 2026, OGL v3.0). Kept: permits
+# granted for daytime works, or works with no hours given, that need signals or a lane closure,
+# since the model closes a lane for the whole 05:00-20:00 day. Left out: overnight-only lane
+# closures (M271, Millbrook Road West, Mountbatten Way, Redbridge Road, 4-7 Nov), a two-hour
+# Sunday closure on Northam Bridge (18 Oct), applications not granted by 30 Sep and works that only
+# encroach on the carriageway. Permits granted in October are not archived yet: a short list.
 PERMITS = [
-    {"id": "P1", "corridor": "wqr", "from": "2026-10-23", "to": "2026-10-25",
-     "what": "Lane closure for utility works"},
-    {"id": "P2", "corridor": "platform", "from": "2026-11-14", "to": "2026-11-15",
-     "what": "Lane closure for resurfacing"},
-    {"id": "P3", "corridor": "avenue", "from": "2026-11-03", "to": "2026-11-05",
-     "what": "Lane closure for a gas main repair"},
+    {"id": "XW100W123852173-09829-01", "corridor": "platform",
+     "from": "2026-10-19", "to": "2026-10-23",
+     "what": "Multi-way signals for Southern Gas Networks repair works (no hours given)",
+     "source": "Street Manager, granted 24 Sep 2026"},
+    {"id": "LP709S30000746-02", "corridor": "portswood", "from": "2026-10-19", "to": "2026-10-30",
+     "what": "Two-way signals, daytime, for SSEN electricity repair works",
+     "source": "Street Manager, granted 29 Sep 2026"},
+    {"id": "ZH00196278704-03", "corridor": "portswood", "from": "2026-10-20", "to": "2026-10-23",
+     "what": "Multi-way signals 09:30-15:30 for NWP Street works",
+     "source": "Street Manager, granted 9 Sep 2026"},
+    {"id": "LQ003SWAT14673649-01", "corridor": "m271", "from": "2026-10-29", "to": "2026-10-30",
+     "what": "Lane closure for Southern Water minor works (no hours given)",
+     "source": "Street Manager, granted 7 Sep 2026"},
+    {"id": "LQ002SWAT14500512-04", "corridor": "platform", "from": "2026-11-02", "to": "2026-11-06",
+     "what": "Lane closure for Southern Water repair works (no hours given)",
+     "source": "Street Manager, granted 21 Sep 2026"},
 ]
-MATCHES = [{"date": "2026-10-24", "kickoff": "15:00"}, {"date": "2026-11-03", "kickoff": "19:45"},
-           {"date": "2026-11-21", "kickoff": "12:30"}]
+# Saints home league games at St Mary's in the forecast window. Dates and opponents: Southampton FC,
+# "2026/27 fixtures: Saints start away to Watford" (25 Jun 2026). Moved kick-offs: "Six Saints
+# fixtures selected for Sky Sports coverage" (30 Jul 2026). Other Saturdays keep the 15:00 slot.
+# Checked 16 Oct 2026; TV picks can still move them. The model day ends at 20:00, so the Friday
+# evening game adds arrivals only.
+MATCHES = [
+    {"date": "2026-10-17", "kickoff": "15:00", "opponent": "Bolton Wanderers"},
+    {"date": "2026-10-31", "kickoff": "15:00", "opponent": "Queens Park Rangers"},
+    {"date": "2026-11-21", "kickoff": "12:30", "opponent": "Derby County"},
+    {"date": "2026-11-27", "kickoff": "20:00", "opponent": "Middlesbrough"},
+]
 WHATIF_ROADS = ["wqr", "mountbatten", "platform", "millbrook"]
-HALF_TERM = (date(2026, 10, 26), date(2026, 10, 30))  # assumed; check SCC 2026/27 term dates
+# Southampton City Council school year calendar 2026-27 (maintained and voluntary-controlled
+# schools; academies may differ), checked 16 Oct 2026: half-term 26-30 Oct, autumn two ends 18 Dec.
+HALF_TERM = (date(2026, 10, 26), date(2026, 10, 30))
 TERM_ENDS = date(2026, 12, 18)
+SOURCES = {  # shown on the page; make_schedule() fills in "schedule"
+    "permits": {"label": "DfT Street Manager permits granted by 30 Sep 2026, read 16 Oct 2026",
+                "short": "permits granted by 30 Sep 2026", "synthetic": False,
+                "url": "https://department-for-transport-streetmanager.github.io/"
+                       "street-manager-docs/archived-notifications/",
+                "files": ["permit/2026/08.zip", "permit/2026/09.zip"], "checked": "2026-10-16"},
+    "matches": {"label": "Southampton FC fixtures, checked 16 Oct 2026",
+                "url": "https://www.southamptonfc.com/en/news/article/"
+                       "2026-27-fixtures-saints-start-away-to-watford",
+                "tv_url": "https://www.southamptonfc.com/en/news/article/"
+                          "six-saints-fixtures-selected-for-sky-sports-coverage",
+                "checked": "2026-10-16"},
+    "terms": {"label": "Southampton City Council 2026-27 term dates, checked 16 Oct 2026",
+              "url": "https://www.southampton.gov.uk/schools-learning/school-information/"
+                     "school-term-dates/school-year-calendar-2026-27/",
+              "checked": "2026-10-16"},
+}
 DIS_OPTS = [-30, 45, 90, 150]  # minutes to move the start of disembarkation
 EMB_OPTS = [-90, -45, 30]  # minutes to move the check-in window
 
@@ -139,6 +191,7 @@ class Call:
     arrival: datetime
     departure: datetime
     pax: int | None
+    times: str = "exact"  # or "typical (VTS lists TBA/TBA)" while the schedule has no clock times
 
 
 @dataclass
@@ -539,9 +592,47 @@ def edge_chain(m: tm.Model, edges) -> list:
     return pts
 
 
-# --- synthetic schedule (unchanged from v0.1) -------------------------------------------------
+# --- cruise schedule: VTS when collected, else synthetic --------------------------------------
 
 def make_schedule(rng):
+    """The VTS schedule in SCHEDULE_CSV when it has been collected, else the invented one."""
+    if SCHEDULE_CSV.exists():
+        return vts_schedule(SCHEDULE_CSV)
+    SOURCES["schedule"] = {"label": "Synthetic schedule", "short": "synthetic", "synthetic": True,
+                           "note": "Invented ships, terminals and times"}
+    return synthetic_schedule(rng)
+
+
+def vts_schedule(path: Path) -> dict:
+    """Calls per day from the CSV demo/collect_schedule.py writes (load_schedule's columns)."""
+    with open(path, newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    sched = {FIRST_DAY + timedelta(days=i): [] for i in range((HORIZON - FIRST_DAY).days + 1)}
+    for r in rows:
+        arr, dep = datetime.fromisoformat(r["arrival"]), datetime.fromisoformat(r["departure"])
+        if arr.date() not in sched:
+            continue
+        pax = int(r["passengers"]) if (r.get("passengers") or "").strip() else None
+        # one model day per call: an overnight stay counts as a turnaround on its arrival day
+        times = r.get("times") or "exact"
+        sched[arr.date()].append(Call(r["ship"], r["terminal"], arr, dep, pax, times))
+    for calls in sched.values():
+        calls.sort(key=lambda c: (c.arrival, c.ship))
+    stamps = [r["collected"] for r in rows if r.get("collected")]
+    got = datetime.fromisoformat(max(stamps)) if stamps else None
+    when = f"{got.day} {got:%b %Y %H:%M}" if got else "date not recorded"
+    used = [c for v in sched.values() for c in v]
+    SOURCES["schedule"] = {
+        "label": f"VTS schedule, collected {when}", "short": f"VTS, collected {when}",
+        "synthetic": False, "collected": got.isoformat() if got else None, "url": VTS_PAGE,
+        "calls": len(used), "typical_times": sum(c.times != "exact" for c in used),
+        "note": ("ABP Southampton VTS provisional cruise ship schedule; lower-berth capacity from "
+                 "each cruise line's ship facts. Where VTS lists TBA, AM or PM the typical times "
+                 "in the same feed are used.")}
+    return sched
+
+
+def synthetic_schedule(rng):
     sched = {}
     d = FIRST_DAY
     while d <= HORIZON:
@@ -616,7 +707,8 @@ def main(argv=None) -> None:
     d = FIRST_DAY
     while d <= HORIZON and (args.days is None or len(tasks) < args.days):
         calls = [{"ship": c.ship, "terminal": c.terminal, "arrival": c.arrival.isoformat(),
-                  "departure": c.departure.isoformat(), "pax": c.pax} for c in sched[d]]
+                  "departure": c.departure.isoformat(), "pax": c.pax, "times": c.times}
+                 for c in sched[d]]
         tasks.append({"date": d.isoformat(), "key": "base", "calls": calls, "full": True,
                       "closed": [p["corridor"] for p in permits_on(d)], "match": match_on(d),
                       "n": args.n, "n_bg": args.n_bg, "term": in_term(d)})
@@ -673,7 +765,8 @@ def main(argv=None) -> None:
         day = {"date": task["date"], "calls": [
             {"ship": c["ship"], "terminal": c["terminal"],
              "gate": m.centroids[ctx.terminal_gate[c["terminal"]]].name,
-             "arr": c["arrival"][11:16], "dep": c["departure"][11:16], "pax": c["pax"]}
+             "arr": c["arrival"][11:16], "dep": c["departure"][11:16], "pax": c["pax"],
+             "times": c.get("times", "exact")}
             for c in task["calls"]],
             "score": round(score(r["p85"]), 2), "bg_score": round(score(r["bg85"]), 2),
             "permits": [p["id"] for p in permits_on(date.fromisoformat(task["date"]))],
@@ -759,7 +852,7 @@ def main(argv=None) -> None:
         x, y = to_bng.transform(lon, lat)
         water_labels.append({"name": name, "x": round(x - x0), "y": round(y1 - y)})
     data = {
-        "meta": {"synthetic": True, "issued": ISSUED.strftime("%Y-%m-%dT%H:%M"),
+        "meta": {"synthetic": True, "sources": SOURCES, "issued": ISSUED.strftime("%Y-%m-%dT%H:%M"),
                  "horizon": HORIZON.isoformat(), "n": args.n, "seed": SEED, "bin_minutes": BIN_MIN,
                  "at_risk": tm.AT_RISK, "unknown_pax_range": UNKNOWN_PAX_RANGE, "model": "v0.2-demo",
                  "scale": round(m.scale, 3), "scale_ext": round(m.scale_ext, 3),

@@ -101,7 +101,11 @@ Fill in the date collected and the licence for every source before submission.
 
 | Source | Used for | Collected | Licence |
 | --- | --- | --- | --- |
-| Southampton VTS cruise schedule (public pages, no API) | Ship calls → `data/raw/cruise_schedule.csv`, not committed | TODO | TODO: check reuse terms |
+| [ABP Southampton VTS cruise ship schedule](https://www.southamptonvts.co.uk/live_information/shipping_movements_and_cruise_ship_schedule/cruise_ship_schedule/) (the XML file behind the public page, no API) | Ship, berth → terminal, arrival and departure for 17 Oct to 29 Nov 2026, written by `demo/collect_schedule.py` to `data/raw/cruise_schedule.csv` (gitignored, never committed). Each row records when it was collected. The schedule is provisional. Only the next few days have clock times; for TBA/AM/PM entries the script uses the median exact times in the same feed (06:15 and 17:00). The page shows the XML times unchanged, so they are read as UK local time. | 17 Oct 2026, 00:20 BST (feed last modified 16 Oct, 23:16 GMT) | © ABP, all rights reserved. The [terms of use](https://www.southamptonvts.co.uk/terms_of_use/) allow extracts for personal reference only, so the data is read locally and not redistributed. The page always credits ABP. |
+| Cruise lines' published ship facts (P&O Cruises, Cunard, Celebrity, MSC, AIDA, Princess, Fred. Olsen, TUI Cruises, Oceania, NCL) | Passenger capacity per ship, keyed on IMO number, aiming at two guests per cabin. Each figure's basis and URL is in `CAPACITY` in `demo/collect_schedule.py` and in the CSV's `capacity_source` column. AIDA and MSC Preziosa publish only cabins and a maximum, so their figure is 2 × cabins. Cunard, TUI and some P&O pages give an unqualified "guests" number, used as published. Regatta's figure (670) comes from Oceania's withdrawn page: the ship has been on charter since Sep 2026. | 16-17 Oct 2026 | Facts cited to the operator's page; nothing copied beyond the figure |
+| Southampton FC: [2026/27 fixtures](https://www.southamptonfc.com/en/news/article/2026-27-fixtures-saints-start-away-to-watford) (25 Jun 2026) and [Sky Sports selections](https://www.southamptonfc.com/en/news/article/six-saints-fixtures-selected-for-sky-sports-coverage) (30 Jul 2026) | `MATCHES` in `demo/synthetic_demo.py`: home league games on 17 Oct (15:00), 31 Oct (15:00), 21 Nov (12:30) and Fri 27 Nov (20:00) | 16 Oct 2026 | Dates and kick-offs are facts, cited to the club. TV picks can still move them. |
+| Southampton City Council [school year calendar 2026-27](https://www.southampton.gov.uk/schools-learning/school-information/school-term-dates/school-year-calendar-2026-27/) | `HALF_TERM` (26 to 30 Oct 2026) and `TERM_ENDS` (18 Dec 2026). The calendar is for maintained and voluntary-controlled schools; academies may differ. | 16 Oct 2026 | No licence stated on the page; dates cited to the council |
+| DfT Street Manager open data, [permit archive](https://department-for-transport-streetmanager.github.io/street-manager-docs/archived-notifications/) `permit/2026/08.zip` and `09.zip` (written 1 Sep and 1 Oct 2026) | `PERMITS` in `demo/synthetic_demo.py`: five granted daytime works with signals or a lane closure on the corridors (Platform Road 19-23 Oct and 2-6 Nov, Portswood Road 19-30 Oct and 20-23 Oct, M271 29-30 Oct). Left out: overnight-only lane closures (M271, Millbrook Road West, Mountbatten Way, Redbridge Road, 4-7 Nov), a 07:00-09:00 closure on Northam Bridge (Sun 18 Oct), applications not granted by 30 Sep (Western Esplanade 19-24 Oct and 2-3 Nov, The Avenue 24 Nov, M27 overnight 22-23 Oct) and works that only encroach on the carriageway. Permits granted in October are not archived until 1 Nov, so later short-notice works are missing. | 16 Oct 2026 (events up to 30 Sep 2026) | Open Government Licence v3.0 |
 | UKHO ADMIRALTY UK Tidal API (Discovery tier, key in `UKHO_API_KEY`) | High/low water predictions | TODO | TODO |
 | OpenStreetMap via osmnx | Walking network around the terminals | TODO | ODbL |
 | Bathymetry + water polygon for Southampton Water | Replace the synthetic lattice | TODO | TODO |
@@ -112,6 +116,10 @@ Fill in the date collected and the licence for every source before submission.
 
 - **AI-generated:** the project scaffold (`pyproject.toml` backend extras, `src/`, `tests/`,
   `scripts/`, `cluster/`, `configs/`, this README) was generated with Claude Code on
-  Fri 16 Oct 2026.
+  Fri 16 Oct 2026. On 16-17 Oct 2026 Claude Code also wrote `demo/collect_schedule.py`, the
+  real-input wiring in `demo/synthetic_demo.py` (`make_schedule`, `MATCHES`, `HALF_TERM`,
+  `PERMITS`, `SOURCES`) and the source labels in `demo/page.html`. It also looked up and
+  transcribed the fixtures, term dates, ship capacities and Street Manager permits listed under
+  Data sources.
 - **Existed before the event:** TODO, confirm with the organisers.
 - **Who helped:** TODO.
