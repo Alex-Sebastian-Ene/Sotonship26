@@ -48,10 +48,12 @@ def day_matrix(flows: pd.DataFrame) -> tuple[pd.DataFrame, dict[int, np.ndarray]
         wide = g.pivot_table(index="date", columns="tod_bin", values="flow_veh", aggfunc="sum")
         wide = wide.reindex(columns=range(BINS_PER_DAY))
         good = g.groupby("date")["good_day"].all().reindex(wide.index)
+        # 100 rows = clocks went back and 01:00-02:00 is summed twice, so treat as incomplete
+        rows = g.groupby("date").size().reindex(wide.index)
         mats[site] = wide.to_numpy(dtype=float)
-        for d, ok, n in zip(wide.index, good, wide.notna().sum(axis=1), strict=True):
+        for d, ok, n, r in zip(wide.index, good, wide.notna().sum(axis=1), rows, strict=True):
             index_rows.append({"site_id": site, "date": d, "good_day": bool(ok),
-                               "complete": n == BINS_PER_DAY})
+                               "complete": n == BINS_PER_DAY and r == BINS_PER_DAY})
     return pd.DataFrame(index_rows), mats
 
 

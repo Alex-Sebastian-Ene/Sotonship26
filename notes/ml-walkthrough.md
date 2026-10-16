@@ -17,9 +17,12 @@ flag), or we would teach the model that cruise days have no effect.
 A model only counts as AI at the core if it beats something simple a person could do by hand
 (the brief says so, and so do the judges). Each forecaster ships with its baselines:
 
-- `flow_forecast.py`: **last_year** (same weekday 52 weeks ago), **recent_median** (the same
-  weekday over the newest 4 weeks we can see) and **planner_rule** (last year if we have it,
-  else recent).
+- `flow_forecast.py`: **last_year** (same weekday 52 weeks ago, one day so noisy),
+  **year_median** (median of the five same weekdays around 52 weeks ago), **recent_median** (the
+  same weekday over the newest 4 weeks we can see) and **planner_rule** (year_median if we have
+  it, else recent). Always quote skill against the *strongest* baseline: beating a weak one is
+  easy. Our first draft compared against last_year only and claimed 17%; against year_median the
+  same model wins by 4%.
 - `backtest.py`: **zero** (no cruise effect), **last_day** (the most comparable earlier cruise
   day, which is the brief's own suggestion) and **pax_linear** (uplift proportional to
   passengers).
@@ -68,9 +71,13 @@ honest about uncertainty.
 
 ## 7. What the numbers say tonight
 
-- **Everyday traffic** (`notes/flow-forecast.md`): at M3 J14 (356 test days) the learned model
-  beats the planner rule by **17%** MAE, with WAPE 9.7% vs 11.8% and 80% intervals covering
-  79%. At M271 NB (178 days) it wins by **15%**. Sites with under 30 comparable days are noise.
+- **Everyday traffic** (`notes/flow-forecast.md`): at M3 J14 (355 test days) the learned model
+  beats a careful planner (year_median) by **4%** MAE (35.9 vs 37.4 vehicles per 15 min, WAPE
+  9.7% vs 10.1%). It beats the one-day year-ago lookup by 17% and the recent median by 26%. Its
+  80% intervals cover 84%, a little wide; year_median's own intervals are narrower (106 vs 126
+  vehicles) at 80%. At M271 NB it beats the recent median by 12% over 147 days, but the
+  year-ago baselines exist for only 17 test days there, so we cannot say it beats a planner. Sites with under 30 comparable days are noise. Honest headline:
+  the model is a small, real improvement on the best hand rule, not a big one.
 - **Cruise uplift** (`notes/backtest.md` once labels exist): blocked. No permitted source has
   past cruise calls (`notes/cruise-history.md`, SOT-21). The code is tested on synthetic data
   with a known effect (`tests/test_uplift_backtest.py`) and runs as soon as a call list lands.

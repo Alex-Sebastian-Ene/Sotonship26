@@ -38,15 +38,16 @@ def day_features(days: pd.DataFrame, calls: pd.DataFrame | None = None) -> pd.Da
     d = days.assign(date=pd.to_datetime(days["date"]).dt.date).set_index("date")
     out = pd.DataFrame(index=d.index)
     for side in ("western", "eastern", "unknown"):
-        out[f"pax_{side}"] = d.get(f"pax_{side}", 0).fillna(0) / 1000
-    total = out[["pax_western", "pax_eastern", "pax_unknown"]].sum(axis=1)
+        col = d[f"pax_{side}"] if f"pax_{side}" in d else pd.Series(0.0, index=d.index)
+        out[f"pax_{side}"] = col.astype(float) / 1000  # NaN = a call of unknown size
+    total = out[["pax_western", "pax_eastern", "pax_unknown"]].sum(axis=1, skipna=False)
     weekend = pd.Series([x.weekday() >= 5 for x in out.index], index=out.index)
     out["pax_weekend"] = total * weekend
     out["pax_dep_shift"] = 0.0
     out["pax_arr_shift"] = 0.0
     if calls is not None and len(calls):
         c = calls.dropna(subset=["passengers"]).copy()
-        c["date"] = c["departure"].dt.tz_convert("Europe/London").dt.date
+        c["date"] = c["arrival"].dt.date  # same day key as cruise_history.cruise_days
         dep = c["departure"].dt.tz_convert("Europe/London")
         arr = c["arrival"].dt.tz_convert("Europe/London")
         c["dep_h"] = dep.dt.hour + dep.dt.minute / 60 - 17
@@ -241,6 +242,9 @@ def backtest_site(site_id: int, dates: np.ndarray, y: np.ndarray, feats: pd.Data
         model = cls().fit(f.iloc[proper], y[proper])
         resid = y[cal] - model.predict(f.iloc[cal])
         half = conformal_halfwidth(resid)
+        # refit on the whole training period so e.g. last_day can use the newest cruise days
+        model = (Ridge(lam=model.lam) if isinstance(model, Ridge) else cls()).fit(
+            f.iloc[idx_train], y[idx_train])
         pred = model.predict(f.iloc[test])
         prob = event_probability(pred, resid, threshold)
         rows += score(model.name, y[test], pred, half, prob, threshold, cruise_test)
