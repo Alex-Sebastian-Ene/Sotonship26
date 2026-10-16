@@ -4,6 +4,7 @@
 import { Graph, weidmannSpeed } from "./graph.js";
 import { PERSONAS, HeuristicPolicy } from "./policy.js";
 import { Rng } from "./rng.js";
+import { Transit } from "./transit.js";
 
 export class World {
   constructor({
@@ -16,6 +17,7 @@ export class World {
     peoplePerAgent = 4,
     congestionRouting = false,
     weather = "dry",
+    buses = null, // null for none, or Transit options ({ extraDelayMin, lines, profile })
     meta = {},
   } = {}) {
     this.graph = graph;
@@ -61,6 +63,7 @@ export class World {
     };
     this.totals = { spawned: 0, arrived: 0, late: 0, decisions: 0 };
     this.lastMinute = -1;
+    this.transit = buses ? new Transit(this, { seed, ...buses }) : null;
   }
 
   on(fn) {
@@ -96,6 +99,7 @@ export class World {
       const spec = this.plan[this.pi++];
       if (spec.t >= this.start) this.spawn(spec);
     }
+    this.transit?.tick(dt);
 
     const alive = [];
     for (const a of this.agents) {
@@ -120,9 +124,13 @@ export class World {
       this.lastMinute = m;
       let walking = 0;
       let dwelling = 0;
-      for (const a of this.agents) a.state === "walk" ? walking++ : dwelling++;
+      for (const a of this.agents) {
+        if (a.state === "walk") walking++;
+        else if (a.state === "dwell") dwelling++;
+      }
       this.series.walking[m] = walking * this.ppa;
       this.series.dwelling[m] = dwelling * this.ppa;
+      this.transit?.sample(m);
       for (const [id, occ] of this.occupancy) {
         const s = this.venueStats.get(id);
         s.series[m] = occ;
@@ -187,17 +195,36 @@ export class World {
     this.emit("decision", { agent: a, decision: d });
 
     if (d.choice === a.at) return this.arrive(a);
+    this.goTo(a, d.choice);
+  }
+
+  // Get to `target` on foot, or by bus when a line beats walking.
+  goTo(a, target) {
+    a.target = target;
+    const trip = this.transit?.plan(a, a.at, target);
+    if (trip) {
+      a.trip = { ...trip, target };
+      if (trip.board === a.at) return this.transit.wait(a);
+      return this.walkTo(a, trip.board);
+    }
+    this.walkTo(a, target);
+  }
+
+  walkTo(a, dest) {
+    if (dest === a.at) {
+      a.state = "walk";
+      return this.arrive(a);
+    }
     const weight = this.congestionRouting
       ? (e) => 1 + 3 * Math.min(2, this.graph.density(e, this.ppa))
       : null;
-    const path = this.graph.path(a.at, d.choice, weight);
+    const path = this.graph.path(a.at, dest, weight);
     if (!path) {
       // Destination cut off (an operator closed the only way there): count it and drop them.
       a.state = "done";
       this.emit("stranded", a);
       return;
     }
-    a.target = d.choice;
     a.path = path;
     a.si = 0;
     a.pos = 0;
@@ -247,6 +274,7 @@ export class World {
 
   arrive(a) {
     const node = this.graph.node(a.at);
+    if (a.trip && a.at === a.trip.board && a.state === "walk") return this.transit.wait(a);
     if (a.at === a.sink) {
       a.state = "done";
       if (this.t > a.deadline + 60) {

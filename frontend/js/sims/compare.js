@@ -18,7 +18,7 @@ const EXTRA_SHIP = SAMPLE_DAY.ships.find((s) => s.id === "s3");
 // Each lever maps to something the backend env can also do: edge cost scaling and closures are
 // its steering action, a longer disembarkation is its metering action.
 export const SCENARIOS = {
-  baseline: { label: "Baseline", desc: "Three ships, dry day, everyone takes the shortest path." },
+  baseline: { label: "Baseline", desc: "Three ships, dry day, buses as usual, everyone takes the shortest path." },
   rain: { label: "Rain", weather: "rain", desc: "Parks lose their pull; shops and SeaCity Museum gain it." },
   stagger: {
     label: "Staggered disembarkation",
@@ -41,6 +41,12 @@ export const SCENARIOS = {
     desc: "Every walker routes around crowded footways, as if following a live wayfinding app.",
   },
   extra: { label: "Fourth ship at Mayflower", ships: [EXTRA_SHIP], desc: "Adds a 5,200-passenger turnaround at Mayflower." },
+  nobus: { label: "No buses", buses: null, desc: "Every bus withdrawn: people with luggage walk to the station and ferries." },
+  buslate: {
+    label: "Buses 10 min late",
+    buses: { extraDelayMin: 10 },
+    desc: "Every bus runs ten minutes later than its usual lateness, as on a day of roadworks on West Quay Road.",
+  },
   walkmore: {
     label: "Rail disruption (45% walk)",
     params: { walkShare: 0.45 },
@@ -54,7 +60,7 @@ let seed = 26;
 let speed = 240;
 const sides = {
   a: { key: "baseline", graph: new Graph() },
-  b: { key: "canute", graph: new Graph() },
+  b: { key: "buslate", graph: new Graph() },
 };
 sides.a.renderer = new Renderer($("#map-a"), sides.a.graph);
 sides.b.renderer = new Renderer($("#map-b"), sides.b.graph);
@@ -94,6 +100,7 @@ function buildSide(side) {
     peoplePerAgent: 3,
     weather: sc.weather ?? "dry",
     congestionRouting: !!sc.congestionRouting,
+    buses: "buses" in sc ? sc.buses : {}, // buses run in every scenario unless it says otherwise
     policy: new HeuristicPolicy(),
   });
   side.peakEdge = 0;
@@ -155,7 +162,13 @@ function totals(w) {
     away += s.turnedAway;
     spend += s.revenue;
   }
-  return { away, spend, late: w.totals.late * w.ppa };
+  return {
+    away,
+    spend,
+    late: w.totals.late * w.ppa,
+    boardings: (w.transit?.totals.boardings ?? 0) * w.ppa,
+    gaveUp: (w.transit?.totals.gaveUp ?? 0) * w.ppa,
+  };
 }
 
 function signed(n, f = fmt) {
@@ -177,6 +190,8 @@ function refresh() {
   $("#d-away").textContent = signed(tb.away - ta.away);
   $("#d-late").textContent = signed(tb.late - ta.late);
   $("#d-spend").textContent = signed(tb.spend - ta.spend, gbp);
+  $("#d-board").textContent = signed(tb.boardings - ta.boardings);
+  $("#d-gave").textContent = signed(tb.gaveUp - ta.gaveUp);
 
   const rows = A.graph.venues
     .map((v) => ({ v, a: A.venueStats.get(v.id).peak, b: B.venueStats.get(v.id).peak }))

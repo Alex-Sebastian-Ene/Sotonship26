@@ -42,6 +42,11 @@
   --seq-5: #1c5cab;
   --seq-6: #104281;
 
+  /* Real-time departure boards are amber on black in every light, so these do not change theme. */
+  --board-bg: #0c0b07;
+  --board-ink: #ffb21a;
+  --board-dim: #8a6312;
+
   --font-display: "Barlow Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
   --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
@@ -788,4 +793,42 @@ input.scrub {
   width: 14px;
   height: 2px;
   border-radius: 1px;
+}
+
+/* Departure board: the dot-matrix sign at a bus stop */
+.board {
+  background: var(--board-bg);
+  color: var(--board-ink);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font: 600 13px / 1.5 var(--font-data);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 6px color-mix(in srgb, var(--board-ink) 45%, transparent);
+}
+
+.board .b-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px dashed var(--board-dim);
+  text-transform: uppercase;
+}
+
+.board .b-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.board .b-row span:nth-child(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board .b-dim {
+  color: var(--board-dim);
 }

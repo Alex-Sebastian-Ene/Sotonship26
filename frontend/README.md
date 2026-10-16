@@ -1,6 +1,6 @@
 # Gangway frontend
 
-Five browser simulations of cruise passengers walking from Southampton's terminals into the city,
+Six browser simulations of cruise passengers walking from Southampton's terminals into the city,
 built on one shared engine. Design notes: [docs/simulations](../docs/simulations/README.md).
 
 ```bash
@@ -14,7 +14,9 @@ system fallbacks.
 | Path | What it is |
 | --- | --- |
 | `index.html` | Landing page with a live preview and links to every simulation |
-| `swarm.html`, `day.html`, `policy.html`, `compare.html`, `skyline.html` | The simulations |
+| `swarm.html`, `day.html`, `policy.html`, `compare.html`, `skyline.html`, `buses.html` | The simulations |
+| `data/buses.js` | Bus lines and a lateness profile (synthetic until `scripts/bustimes.py export` writes `buses.observed.js`) |
+| `js/core/transit.js` | Buses: timetable, lateness, stop queues, boarding, the departure board |
 | `data/southampton.js` | The walking graph: nodes, edges, footway widths, coastline (hand-placed, schematic) |
 | `js/core/graph.js` | Projection, shortest paths, Weidmann walking speed, Fruin level of service |
 | `js/core/world.js` | The simulation loop: spawn, walk, dwell, decide; trace export |

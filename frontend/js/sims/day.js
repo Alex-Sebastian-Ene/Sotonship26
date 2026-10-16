@@ -25,6 +25,7 @@ let venueId = "V_OX";
 bindRange("speed", (v) => `${v}× · 1 h in ${Math.round(3600 / v)} s`, (v) => (speed = v));
 const walkshare = bindRange("walkshare", (v) => `${Math.round(v * 100)}%`, (v, final) => final && build());
 $("#weather").addEventListener("change", build);
+$("#buses").addEventListener("change", build);
 
 const venueSel = $("#venue");
 venueSel.innerHTML = graph.venues
@@ -50,6 +51,7 @@ function build() {
     end: END,
     peoplePerAgent: ppa,
     weather: $("#weather").value,
+    buses: $("#buses").value === "off" ? null : { extraDelayMin: +$("#buses").value },
     policy: new HeuristicPolicy(),
     meta: { schedule: SAMPLE_DAY.label },
   });

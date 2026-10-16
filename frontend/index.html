@@ -102,12 +102,13 @@
   <div>
     <h1>Where do <em>9,000 cruise passengers</em> go on a Saturday?</h1>
     <p>Southampton turns around up to four cruise ships a day. Each one sends a few thousand people on foot through Dock Gates 4, 8 and 10 towards the station, the ferries, the cafés and the shops. Gangway models every walker as an agent on the city's street graph, so each café, pub and shop cluster gets a forecast of how many people will come through the door, hour by hour, and how many staff that needs.</p>
-    <p>Five simulations below show the same agents from different angles. The routing and the choice of where to go next are placeholders that the reinforcement-learning backend replaces.</p>
+    <p>Six simulations below show the same agents from different angles. The routing and the choice of where to go next are placeholders that the reinforcement-learning backend replaces.</p>
     <ul class="facts">
       <li><b>5</b>cruise terminals</li>
       <li><b>14</b>venue clusters</li>
       <li><b>3</b>dock gates</li>
       <li><b>6</b>passenger types</li>
+      <li><b>4</b>bus lines</li>
     </ul>
   </div>
   <div class="live" aria-label="Live preview: a sampled turnaround day">
@@ -145,14 +146,14 @@
   import { mountBar, SIMS } from "./js/core/page.js";
 
   mountBar("index.html");
-  const kinds = ["Real time", "Whole day + staffing", "Inside the policy", "What if", "Isometric"];
+  const kinds = ["Real time", "Whole day + staffing", "Inside the policy", "What if", "Isometric", "Public transport"];
   document.getElementById("sims").innerHTML = SIMS.map((s, i) =>
     `<a class="sim" href="${s.href}"><span class="kind">${kinds[i]}</span><h2>${s.label}</h2><p>${s.blurb}</p><span class="go">Open ${s.label} →</span></a>`).join("");
 
   const graph = new Graph();
   const renderer = new Renderer(document.getElementById("map"), graph, { labels: false, flows: true });
   const plan = planDay(SAMPLE_DAY.ships, new Rng(26), { peoplePerAgent: 3 });
-  const world = new World({ graph, plan, start: hhmm("06:00"), end: hhmm("20:00"), peoplePerAgent: 3 });
+  const world = new World({ graph, plan, start: hhmm("06:00"), end: hhmm("20:00"), peoplePerAgent: 3, buses: {} });
   world.advance(hhmm("09:30") - world.start);
   const l = loop((dt) => {
     if (!world.done) world.advance(dt * (l.reduced ? 0 : 120));

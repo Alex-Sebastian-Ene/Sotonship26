@@ -6,7 +6,7 @@ shop cluster gets each hour, and so how many staff it needs. The choice of where
 next comes from the RL backend (`src/sotonship26/rl`); the frontend draws the result and offers a
 stand-in until the trained policy is ready.
 
-There are five simulations. Each has its own design note:
+There are six simulations. Each has its own design note:
 
 | Page | Note | Question it answers |
 | --- | --- | --- |
@@ -15,6 +15,7 @@ There are five simulations. Each has its own design note:
 | `policy.html` | [03-policy-lens.md](03-policy-lens.md) | Why did the policy send this passenger there? |
 | `compare.html` | [04-compare.md](04-compare.md) | What changes if it rains, a road closes or disembarkation is staggered? |
 | `skyline.html` | [05-skyline.md](05-skyline.md) | Which venues are under pressure right now, at a glance? |
+| `buses.html` | [06-buses.md](06-buses.md) | What do late buses do to passengers and to the venues waiting for them? |
 
 Run them with any static file server from the repo root:
 
@@ -72,8 +73,10 @@ One dot is one or more people (`peoplePerAgent`, shown in tooltips). Every agent
   still make it.
 
 The life of an agent: spawn at a terminal or exit → ask the policy where to go → walk the shortest
-path → dwell at the venue (or be turned away if it is full and ask again) → ask again → … → reach
-the sink.
+path, or walk to a stop and take a bus when that is clearly faster → dwell at the venue (or be
+turned away if it is full and ask again) → ask again → … → reach the sink. The bus choice sits
+below the policy: the policy picks where, the transit model picks how (see
+[06-buses.md](06-buses.md)).
 
 **Spawn timing matches the backend.** `js/core/schedule.js` uses the same shapes as
 `src/sotonship26/demand/passengers.py`: disembarkation starts 45 minutes after the ship is

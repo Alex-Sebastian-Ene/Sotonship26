@@ -11,6 +11,7 @@ export const SIMS = [
   { href: "policy.html", label: "Policy Lens", blurb: "Follow one passenger and see every option the policy weighed at each decision." },
   { href: "compare.html", label: "Compare", blurb: "Run two scenarios side by side on the same seed: rain, a closed gate, staggered disembarkation." },
   { href: "skyline.html", label: "Skyline", blurb: "Isometric city where each venue rises with the people inside it." },
+  { href: "buses.html", label: "Buses", blurb: "Timetabled buses that run late, passengers who wait for them, and what late buses cost." },
 ];
 
 export function mountBar(current) {
@@ -77,7 +78,11 @@ export function describeAgent(a, world) {
   const p = PERSONAS[a.persona];
   const g = world.graph;
   const where =
-    a.state === "dwell" ? `at ${g.node(a.at).name}` : `walking to ${g.node(a.target)?.name ?? "?"}`;
+    a.state === "dwell"
+      ? `at ${g.node(a.at).name}`
+      : a.state === "wait"
+        ? `waiting at ${g.node(a.at).name} for the ${a.trip.line}`
+        : `${a.trip ? "heading for the bus to" : "walking to"} ${g.node(a.target)?.name ?? "?"}`;
   return `<div class="tt-h">Passenger #${a.id} · ${p.label}</div>
     <div>${where}</div>
     <div class="row">Heading for<b>${g.node(a.sink).name}</b></div>
@@ -86,11 +91,33 @@ export function describeAgent(a, world) {
     <div>${world.ppa > 1 ? `1 dot = ${world.ppa} people` : ""}</div>`;
 }
 
+export function describeBus(b, world) {
+  const d = b.d;
+  const next = world.graph.node(d.order[Math.min(b.k, d.order.length - 1)]);
+  const late = b.delayNow;
+  const status = late > 1 ? `${late.toFixed(1)} min late` : late < -1 ? `${(-late).toFixed(1)} min early` : "on time";
+  return `<div class="tt-h">${b.line.id} ${b.line.name} → ${b.dir ? b.line.from : b.line.to}</div>
+    <div>${status} · ${b.state === "dwell" ? "at" : "next stop"} ${next.name}</div>
+    <div class="row">Timetabled departure<b>${clock(b.sched)}</b></div>
+    <div class="row">On board<b>${b.riders.length * world.ppa}</b></div>`;
+}
+
 export function mapTooltips(renderer, getWorld) {
   const tip = new Tooltip();
   renderer.on("hover", (hit) => {
     const world = getWorld();
     if (!hit || !world) return tip.hide();
+    if (hit.type === "bus") return tip.show(describeBus(hit.bus, world), hit.clientX, hit.clientY);
+    if (hit.type === "node" && hit.node.kind === "junction") {
+      const tr = world.transit;
+      const waiting = tr?.queues.get(hit.node.id)?.length ?? 0;
+      const lines = tr?.lines.filter((l) => l.dirs[0].index.has(hit.node.id)).map((l) => `${l.id} ${l.name}`) ?? [];
+      return tip.show(
+        `<div class="tt-h">Bus stop · ${hit.node.name}</div><div>${lines.join("<br>")}</div><div class="row">Waiting<b>${waiting * world.ppa}</b></div>`,
+        hit.clientX,
+        hit.clientY,
+      );
+    }
     const html = hit.type === "agent" ? describeAgent(hit.agent, world) : describeNode(hit.node, world);
     tip.show(html, hit.clientX, hit.clientY);
   });

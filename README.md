@@ -26,6 +26,7 @@ ferry timetable ─┘   (sampled per scenario)└─ waterway lattice minus the
 | `data/cruise.py` | Loads the cruise schedule CSV (`ship, terminal, arrival, departure, passengers`) |
 | `data/tides.py` | ADMIRALTY UK Tidal API client (`UKHO_API_KEY`) and tide height interpolation |
 | `data/streets.py` | OSM walking network around the terminals with per-edge capacity |
+| `data/buses.py` | bustimes.org client: live buses, timetabled trips, lateness by line and hour |
 | `data/waterway.py` | Southampton Water as a lattice, gated by depth at the predicted tide |
 | `demand/` | Passenger turnaround flows, ferry runs, leisure-craft trips per time bin |
 | `routing/pathfinder.py` | PathFinder (McMurchie & Ebeling) rip-up-and-reroute congestion negotiation |
@@ -96,7 +97,7 @@ uv run --extra cu130 ruff check .
 
 ## Frontend: Gangway
 
-[frontend/](frontend/) holds five browser simulations that draw passengers as agents walking a
+[frontend/](frontend/) holds six browser simulations that draw passengers as agents walking a
 geometric node graph of Southampton, from the cruise terminals through the dock gates to the
 station, ferries and venue clusters, ending in an hourly staffing forecast per venue. No build step:
 
@@ -111,10 +112,12 @@ python -m http.server -d frontend 8000   # then open http://localhost:8000
 | Policy Lens | Every option the policy weighed for one passenger; replays backend traces |
 | Compare | Two scenarios on the same seed (rain, closures, stewards, staggered disembarkation) |
 | Skyline | Isometric view, venues as towers of demand |
+| Buses | Timetabled buses that run late, stop queues, a live departure board |
 
 The policy is a gravity-model stand-in behind a `decide(agent, ctx)` interface for the RL backend
 to replace. Design decisions for each simulation are in [docs/simulations/](docs/simulations/).
-`scripts/export_frontend_graph.py` rebuilds the frontend graph from OpenStreetMap.
+`scripts/export_frontend_graph.py` rebuilds the frontend graph from OpenStreetMap, and
+`scripts/bustimes.py` collects live bus lateness from bustimes.org for the bus model.
 
 ## Data sources
 
@@ -130,6 +133,8 @@ Fill in the date collected and the licence for every source before submission.
 | Footway widths, pedestrian counts on turnaround days | Calibrate capacities | TODO | TODO |
 | Frontend schematic graph (`frontend/data/southampton.js`) | Node positions of terminals, gates, streets and venue clusters, placed by hand from public knowledge of the layout; venue capacities, dwell, spend and staff ratios are guesses | 2026-10-16 | Own work; replace with the OSM export (ODbL) |
 | Frontend sample schedule (`frontend/js/core/schedule.js`) | **Synthetic** four-ship day for the demos | 2026-10-16 | Own work |
+| bustimes.org API (`/vehicles.json`, `/api/trips/`), via `scripts/bustimes.py` | Live bus positions matched to timetabled trips → lateness by line and hour | TODO (not yet collected; host blocked from the build environment) | BODS data, OGL v3.0; check bustimes.org terms |
+| Frontend bus lines and lateness (`frontend/data/buses.js`) | **Synthetic** placeholder until the bustimes.org export replaces it | 2026-10-16 | Own work |
 | Red Funnel / Hythe ferry timetables, leisure-craft activity | Waterway demand | TODO | TODO |
 
 ## Provenance
@@ -137,6 +142,8 @@ Fill in the date collected and the licence for every source before submission.
 - **AI-generated:** the project scaffold (`pyproject.toml` backend extras, `src/`, `tests/`,
   `scripts/`, `cluster/`, `configs/`, this README) was generated with Claude Code on
   Fri 16 Oct 2026. The frontend (`frontend/`), its design notes (`docs/simulations/`) and
-  `scripts/export_frontend_graph.py` were also generated with Claude Code on Fri 16 Oct 2026.
+  `scripts/export_frontend_graph.py` were also generated with Claude Code on Fri 16 Oct 2026, as
+  were the bus model (`frontend/js/core/transit.js`, `src/sotonship26/data/buses.py`,
+  `scripts/bustimes.py`, `tests/test_buses.py`).
 - **Existed before the event:** TODO, confirm with the organisers.
 - **Who helped:** TODO.

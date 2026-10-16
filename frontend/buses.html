@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gangway Buses</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="bar"></header>
+<main class="app">
+  <section class="stage" aria-label="Map of Southampton with buses and passengers">
+    <canvas class="map" id="map"></canvas>
+    <div class="hud">
+      <div class="clock" id="clock">09:00</div>
+      <div class="sub" id="sub"></div>
+      <div><span class="chip synthetic" id="data-chip">Synthetic lines and lateness · schematic map</span></div>
+    </div>
+    <div class="map-tools">
+      <button class="btn" id="play" type="button" aria-pressed="true">Pause</button>
+      <button class="btn" id="reset-view" type="button">Fit</button>
+    </div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="section">
+      <h2>When the bus is late</h2>
+      <p>Four bus lines cross the city on the same four-ship Saturday. Passengers take a bus when it beats walking: mostly people with luggage heading for the station or the ferry. Every bus runs late by an amount drawn from a lateness profile, so late buses mean longer waits, fuller stops and people missing trains.</p>
+    </div>
+
+    <div class="section">
+      <h3>Departures</h3>
+      <div class="field"><label for="stop">Stop</label><select id="stop"></select></div>
+      <div class="board" id="board" aria-live="polite"></div>
+      <p class="note">Expected times come from the bus's lateness at its last stop, as on a real-time sign. Untracked departures show the timetable.</p>
+    </div>
+
+    <div class="section">
+      <h3>Lateness</h3>
+      <div class="controls">
+        <div class="field"><label for="extra">Every bus later by</label><output for="extra"></output><input type="range" id="extra" min="0" max="20" step="1" value="0"></div>
+        <div class="field"><label for="speed">Speed</label><output for="speed"></output><input type="range" id="speed" min="30" max="900" step="30" value="240"></div>
+      </div>
+      <div class="row-btns">
+        <button class="btn" type="button" id="buses-off" aria-pressed="false">No buses at all</button>
+        <button class="btn primary" type="button" id="restart">Restart day</button>
+      </div>
+      <div class="row-btns" id="late-key"></div>
+    </div>
+
+    <div class="section">
+      <h3>So far today</h3>
+      <div class="stats">
+        <div class="stat"><div class="label">Boardings</div><div class="value" id="s-board">0</div></div>
+        <div class="stat"><div class="label">Gave up waiting</div><div class="value" id="s-gave">0</div></div>
+        <div class="stat"><div class="label">Waiting at stops now</div><div class="value" id="s-wait">0</div></div>
+        <div class="stat"><div class="label">Late for ship or train</div><div class="value" id="s-late">0</div></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>By line</h3>
+      <table class="venues" id="lines"></table>
+    </div>
+
+    <div class="section">
+      <h3>People waiting at stops</h3>
+      <canvas class="chart" id="wait-chart"></canvas>
+    </div>
+
+    <div class="section">
+      <h3>Data</h3>
+      <p class="note" id="data-note"></p>
+    </div>
+  </aside>
+
+  <section class="timeline">
+    <div class="head"><h3>Average lateness of buses on the road, minutes</h3></div>
+    <canvas id="tl"></canvas>
+  </section>
+</main>
+<script type="module" src="js/sims/buses.js"></script>
+</body>
+</html>

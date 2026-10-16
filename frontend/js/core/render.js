@@ -234,6 +234,7 @@ export class Renderer {
     let bd = 10;
     if (this.world && this.opts.agents) {
       for (const a of this.world.agents) {
+        if (a.state === "ride") continue;
         const [ax, ay] = this.agentScreen(a);
         const d = Math.hypot(ax - sx, ay - sy);
         if (d < bd) {
@@ -242,9 +243,18 @@ export class Renderer {
         }
       }
     }
+    for (const b of this.world?.transit?.buses ?? []) {
+      const [bx, by] = this.toScreen(b.x, b.y);
+      const d = Math.hypot(bx - sx, by - sy);
+      if (d < 12 && d < bd + 4) {
+        bd = d;
+        best = { type: "bus", bus: b };
+      }
+    }
     if (!best || bd > 5) {
+      const stops = this.world?.transit?.stops;
       for (const n of this.graph.nodes.values()) {
-        if (n.kind === "junction") continue;
+        if (n.kind === "junction" && !stops?.has(n.id)) continue;
         const [nx, ny] = this.toScreen(n.x, n.y);
         const d = Math.hypot(nx - sx, ny - sy);
         if (d < 16 && d < bd + 6) {
@@ -405,6 +415,13 @@ export class Renderer {
   }
 
   agentScreen(a) {
+    if (a.state === "wait") {
+      const n = this.graph.node(a.at);
+      const [x, y] = this.toScreen(n.x, n.y);
+      const i = a.queuePos ?? 0;
+      return [x + 8 + (i % 10) * 3.2, y - 7 - Math.floor(i / 10) * 3.2];
+    }
+    if (a.state === "ride" && a.bus) return this.toScreen(a.bus.x, a.bus.y);
     if (a.state === "dwell") {
       const n = this.graph.node(a.at);
       const [x, y] = this.toScreen(n.x, n.y);
@@ -487,7 +504,9 @@ export class Renderer {
     if (overlay.path) this.drawPath(overlay.path, overlay.pathColor ?? pal.accent);
     if (overlay.history) this.drawHistory(overlay.history);
 
+    if (world?.transit && this.opts.buses !== false) this.drawRoutes(world.transit, overlay);
     this.drawNodes(world, overlay);
+    if (world?.transit && this.opts.buses !== false) this.drawBuses(world.transit, overlay);
     if (world && this.opts.agents) this.drawAgents(world, overlay);
     if (overlay.fan) this.drawFan(overlay.fan);
     if (this.opts.skyline && world) this.drawSkyline(world, overlay);
@@ -609,6 +628,98 @@ export class Renderer {
     }
   }
 
+  // Bus lines as thin parallel strokes (one per line, offset so shared streets show every line),
+  // with a stop sign at each stop.
+  drawRoutes(transit, overlay) {
+    const g = this.ctx;
+    const pal = this.pal;
+    const n = transit.lines.length;
+    g.lineCap = "round";
+    g.lineJoin = "round";
+    transit.lines.forEach((line, li) => {
+      const off = (li - (n - 1) / 2) * 3;
+      const hot = overlay.selectedLine === line.id;
+      g.beginPath();
+      for (const leg of line.dirs[0].legs) {
+        for (const [i, seg] of leg.segs.entries()) {
+          const es = this.edgeCache[seg.edge.id];
+          const sgn = seg.from === seg.edge.a ? 1 : -1;
+          const [fx, fy] = sgn > 0 ? [es.ax, es.ay] : [es.bx, es.by];
+          const [tx, ty] = sgn > 0 ? [es.bx, es.by] : [es.ax, es.ay];
+          const ox = es.nx * off * sgn;
+          const oy = es.ny * off * sgn;
+          if (i === 0) g.moveTo(fx + ox, fy + oy);
+          else g.lineTo(fx + ox, fy + oy);
+          g.lineTo(tx + ox, ty + oy);
+        }
+      }
+      g.strokeStyle = hot ? pal.accent : pal["ink-2"];
+      g.globalAlpha = hot ? 0.9 : 0.35;
+      g.lineWidth = hot ? 3 : 1.6;
+      g.stroke();
+      g.globalAlpha = 1;
+    });
+    const font = cssVar("--font-data");
+    for (const id of transit.stops) {
+      const s = this.graph.node(id);
+      const [x, y] = this.toScreen(s.x, s.y);
+      const hot = overlay.selectedStop === id;
+      g.beginPath();
+      g.arc(x, y, hot ? 6 : 4.5, 0, TAU);
+      g.fillStyle = pal.surface;
+      g.fill();
+      g.lineWidth = hot ? 2.5 : 1.6;
+      g.strokeStyle = hot ? pal.accent : pal.ink;
+      g.stroke();
+      g.beginPath();
+      g.arc(x, y, 1.6, 0, TAU);
+      g.fillStyle = hot ? pal.accent : pal.ink;
+      g.fill();
+      if (overlay.stopLabels) {
+        g.font = `500 9.5px ${font}`;
+        const lines = transit.lines.filter((l) => l.dirs[0].index.has(id)).map((l) => l.id).join(" ");
+        this.halo(g, lines, x - 6, y + 14, pal.muted);
+      }
+    }
+  }
+
+  // Buses: oriented along the street, filled by how late they are, with a load bar inside.
+  drawBuses(transit, overlay) {
+    const g = this.ctx;
+    const pal = this.pal;
+    const font = cssVar("--font-data");
+    const z = Math.min(1.6, Math.sqrt(this.cam.zoom));
+    const L = 9 * z;
+    const W = 4 * z;
+    for (const b of transit.buses) {
+      const [x, y] = this.toScreen(b.x, b.y);
+      const [x2, y2] = this.toScreen(b.x + b.hx * 10, b.y + b.hy * 10);
+      const ang = Math.atan2(y2 - y, x2 - x);
+      const late = b.delayNow;
+      const fill = late > 5 ? pal.critical : late > 3 ? pal.serious : late > 1 ? pal.warning : pal.good;
+      g.save();
+      g.translate(x, y);
+      g.rotate(ang);
+      g.beginPath();
+      g.roundRect(-L, -W, 2 * L, 2 * W, 2.5);
+      g.fillStyle = fill;
+      g.fill();
+      g.lineWidth = overlay.selectedBus === b ? 2.5 : 1.2;
+      g.strokeStyle = overlay.selectedBus === b ? pal.accent : pal.ink;
+      g.stroke();
+      const load = Math.min(1, (b.riders.length * this.world.ppa) / 80);
+      if (load > 0) {
+        g.fillStyle = pal.ink;
+        g.globalAlpha = 0.55;
+        g.fillRect(-L + 2, -1.2, (2 * L - 4) * load, 2.4);
+        g.globalAlpha = 1;
+      }
+      g.restore();
+      g.font = `700 9.5px ${font}`;
+      this.halo(g, b.line.id, x - 6, y - W - 5, pal.ink);
+    }
+  }
+
   hexPath(g, x, y, r) {
     g.beginPath();
     for (let i = 0; i < 6; i++) {
@@ -626,6 +737,7 @@ export class Renderer {
     const s = this.opts.agentSize * Math.min(1.8, Math.sqrt(this.cam.zoom));
     const groups = new Map();
     for (const a of world.agents) {
+      if (a.state === "ride") continue; // drawn as the bus they are on
       let key = a.persona;
       if (this.opts.colorBy === "state") key = a.state === "dwell" ? "dwell" : a.late ? "late" : "walk";
       if (overlay.dim && overlay.dim(a)) key = "dim";
