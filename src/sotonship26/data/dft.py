@@ -11,7 +11,10 @@ AADF is a yearly average for an average day, so it gives the background traffic 
 not the extra load on a cruise turnaround day. Rows are either counted on the day ("Counted") or
 estimated by DfT from earlier years or nearby links ("Estimated"); ``estimation_method`` says
 which. ``load_aadf`` keeps count points within ``radius_km`` of the docks and, by default, only
-the most recent year per count point and direction.
+each count point's most recent year (every direction counted that year). It goes by the point's
+latest year, not the latest year per direction, because DfT sometimes changes a point's direction
+codes between years (E/W one year, N/S or C later). Keeping the latest year per direction would
+mix years and count those points twice.
 """
 
 from __future__ import annotations
@@ -172,8 +175,9 @@ def load_aadf(
 
     Uses the newest cache in ``raw_dir``, fetching from the API if there is none or ``refresh`` is
     set. If the fetch fails and a cache exists, falls back to it with a warning; ``collected_at``
-    then shows its age. With ``latest_only``, keeps only the most recent year per
-    (count_point_id, direction_of_travel). Sorted by distance from the docks.
+    then shows its age. With ``latest_only``, keeps per ``count_point_id`` only the rows from that
+    point's most recent year, all of its directions in that year (see the module docstring for
+    why). Sorted by distance from the docks.
     """
     path = latest_cached(raw_dir)
     if refresh or path is None:
@@ -187,7 +191,7 @@ def load_aadf(
     df = parse_aadf(raw, collected_at(path))
     df = df[df["distance_km"] <= radius_km]
     if latest_only:
-        latest = df.groupby(["count_point_id", "direction_of_travel"])["year"].transform("max")
+        latest = df.groupby("count_point_id")["year"].transform("max")
         df = df[df["year"] == latest]
     return df.sort_values(
         ["distance_km", "count_point_id", "direction_of_travel", "year"]
@@ -206,8 +210,8 @@ def main() -> None:
         return
     print(f"Collected: {df['collected_at'].iloc[0]:%Y-%m-%d %H:%M %Z}")
     print(
-        f"{df['count_point_id'].nunique()} count points, {len(df)} rows (latest year per point "
-        f"and direction) within {radius_km} km of the docks; "
+        f"{df['count_point_id'].nunique()} count points, {len(df)} rows (each point's latest year) "
+        f"within {radius_km} km of the docks; "
         f"years {df['year'].min()} to {df['year'].max()}"
     )
     top = df.sort_values("all_motor_vehicles", ascending=False).head(15)

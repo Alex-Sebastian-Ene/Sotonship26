@@ -6,73 +6,100 @@ import pytest
 from sotonship26.data import dft
 
 # SYNTHETIC fixture: made-up count points shaped like the DfT AADF-by-direction API rows. Not real
-# DfT data. Point 9001 sits at the docks, 9002 about 2 km north, 9003 about 11 km away.
-SYNTHETIC_ROWS = [
-    {
-        "count_point_id": 9001,
-        "year": year,
-        "road_name": "A33",
-        "road_category": "PA",
-        "road_type": "Major",
-        "start_junction_road_name": "Synthetic Rd",
-        "end_junction_road_name": "Made Up St",
-        "latitude": "50.8985",
-        "longitude": "-1.4040",
-        "link_length_km": "0.5",
-        "estimation_method": "Counted",
-        "direction_of_travel": direction,
-        "cars_and_taxis": flow - 100,
-        "buses_and_coaches": 10,
-        "lgvs": 60,
-        "all_hgvs": 30,
-        "all_motor_vehicles": flow,
-    }
-    for year, direction, flow in [
-        (2022, "N", 10000),
-        (2023, "N", 11000),
-        (2021, "S", 9000),
-        (2022, "S", 9500),
+# DfT data. Point 9001 sits at the docks, 9002 about 2 km north, 9003 about 11 km away. Point 9004,
+# about 0.2 km from the docks, switches direction codes from E/W (2010) to C (2024), as some real
+# DfT count points do.
+SYNTHETIC_ROWS = (
+    [
+        {
+            "count_point_id": 9001,
+            "year": year,
+            "road_name": "A33",
+            "road_category": "PA",
+            "road_type": "Major",
+            "start_junction_road_name": "Synthetic Rd",
+            "end_junction_road_name": "Made Up St",
+            "latitude": "50.8985",
+            "longitude": "-1.4040",
+            "link_length_km": "0.5",
+            "estimation_method": "Counted",
+            "direction_of_travel": direction,
+            "cars_and_taxis": flow - 100,
+            "buses_and_coaches": 10,
+            "lgvs": 60,
+            "all_hgvs": 30,
+            "all_motor_vehicles": flow,
+        }
+        for year, direction, flow in [
+            (2022, "N", 10000),
+            (2023, "N", 11000),
+            (2021, "S", 9000),
+            (2022, "S", 9500),
+        ]
     ]
-] + [
-    {
-        "count_point_id": 9002,
-        "year": 2023,
-        "road_name": "U",
-        "road_category": "MCU",
-        "road_type": "Minor",
-        "start_junction_road_name": None,
-        "end_junction_road_name": None,
-        "latitude": "50.9165",
-        "longitude": "-1.4040",
-        "link_length_km": None,
-        "estimation_method": "Estimated",
-        "direction_of_travel": "C",
-        "cars_and_taxis": 900,
-        "buses_and_coaches": 5,
-        "lgvs": 80,
-        "all_hgvs": 15,
-        "all_motor_vehicles": 1000,
-    },
-    {
-        "count_point_id": 9003,
-        "year": 2023,
-        "road_name": "M27",
-        "road_category": "TM",
-        "road_type": "Major",
-        "start_junction_road_name": "J5",
-        "end_junction_road_name": "J7",
-        "latitude": "50.9975",
-        "longitude": "-1.4040",
-        "link_length_km": "3.1",
-        "estimation_method": "Counted",
-        "direction_of_travel": "E",
-        "cars_and_taxis": 50000,
-        "buses_and_coaches": 300,
-        "lgvs": 9000,
-        "all_hgvs": 4000,
-        "all_motor_vehicles": 63300,
-    },
-]
+    + [
+        {
+            "count_point_id": 9002,
+            "year": 2023,
+            "road_name": "U",
+            "road_category": "MCU",
+            "road_type": "Minor",
+            "start_junction_road_name": None,
+            "end_junction_road_name": None,
+            "latitude": "50.9165",
+            "longitude": "-1.4040",
+            "link_length_km": None,
+            "estimation_method": "Estimated",
+            "direction_of_travel": "C",
+            "cars_and_taxis": 900,
+            "buses_and_coaches": 5,
+            "lgvs": 80,
+            "all_hgvs": 15,
+            "all_motor_vehicles": 1000,
+        },
+        {
+            "count_point_id": 9003,
+            "year": 2023,
+            "road_name": "M27",
+            "road_category": "TM",
+            "road_type": "Major",
+            "start_junction_road_name": "J5",
+            "end_junction_road_name": "J7",
+            "latitude": "50.9975",
+            "longitude": "-1.4040",
+            "link_length_km": "3.1",
+            "estimation_method": "Counted",
+            "direction_of_travel": "E",
+            "cars_and_taxis": 50000,
+            "buses_and_coaches": 300,
+            "lgvs": 9000,
+            "all_hgvs": 4000,
+            "all_motor_vehicles": 63300,
+        },
+    ]
+    + [
+        {
+            "count_point_id": 9004,
+            "year": year,
+            "road_name": "A3024",
+            "road_category": "PA",
+            "road_type": "Major",
+            "start_junction_road_name": "Fictional Way",
+            "end_junction_road_name": "Pretend Rd",
+            "latitude": "50.9003",
+            "longitude": "-1.4040",
+            "link_length_km": "0.4",
+            "estimation_method": "Estimated",
+            "direction_of_travel": direction,
+            "cars_and_taxis": flow - 50,
+            "buses_and_coaches": 5,
+            "lgvs": 30,
+            "all_hgvs": 15,
+            "all_motor_vehicles": flow,
+        }
+        for year, direction, flow in [(2010, "E", 7000), (2010, "W", 6800), (2024, "C", 15000)]
+    ]
+)
 STAMP = "20261016T201500Z"
 
 
@@ -101,27 +128,39 @@ def test_column_contract(cache_dir, monkeypatch):
 def test_radius_filter(cache_dir, monkeypatch):
     monkeypatch.setattr(dft, "fetch_aadf", _no_fetch)
     df = dft.load_aadf(radius_km=4.0, raw_dir=cache_dir)
-    assert set(df["count_point_id"]) == {9001, 9002}
+    assert set(df["count_point_id"]) == {9001, 9002, 9004}
     assert df["distance_km"].max() <= 4.0
     near = df.loc[df["count_point_id"] == 9002, "distance_km"].iloc[0]
     assert near == pytest.approx(2.0, abs=0.05)
 
     wide = dft.load_aadf(radius_km=20.0, raw_dir=cache_dir)
-    assert set(wide["count_point_id"]) == {9001, 9002, 9003}
+    assert set(wide["count_point_id"]) == {9001, 9002, 9003, 9004}
 
-    tight = dft.load_aadf(radius_km=0.5, raw_dir=cache_dir)
+    tight = dft.load_aadf(radius_km=0.1, raw_dir=cache_dir)
     assert set(tight["count_point_id"]) == {9001}
 
 
 def test_latest_only(cache_dir, monkeypatch):
     monkeypatch.setattr(dft, "fetch_aadf", _no_fetch)
+    # Per count point, only rows from that point's newest year survive, whatever the direction.
     latest = dft.load_aadf(radius_km=0.5, raw_dir=cache_dir)
-    by_dir = dict(zip(latest["direction_of_travel"], latest["year"], strict=True))
-    assert by_dir == {"N": 2023, "S": 2022}
-    assert len(latest) == 2
+    cols = ["count_point_id", "direction_of_travel", "year"]
+    rows = set(latest[cols].itertuples(index=False, name=None))
+    assert rows == {(9001, "N", 2023), (9004, "C", 2024)}
 
     every_year = dft.load_aadf(radius_km=0.5, raw_dir=cache_dir, latest_only=False)
-    assert len(every_year) == 4
+    assert len(every_year) == 7
+
+
+def test_latest_only_keeps_every_direction_of_newest_year(tmp_path, monkeypatch):
+    monkeypatch.setattr(dft, "fetch_aadf", _no_fetch)
+    rows = [dict(r, year=2024) for r in SYNTHETIC_ROWS if r["count_point_id"] == 9004][:2]
+    rows += [r for r in SYNTHETIC_ROWS if r["count_point_id"] == 9004]
+    path = tmp_path / f"aadf_by_direction_la137_{STAMP}.json"
+    path.write_text(json.dumps({"data": rows}), encoding="utf-8")
+    latest = dft.load_aadf(radius_km=0.5, raw_dir=tmp_path)
+    assert (latest["year"] == 2024).all()
+    assert sorted(latest["direction_of_travel"]) == ["C", "E", "W"]
 
 
 def test_collected_at_from_file_name(cache_dir, monkeypatch):
@@ -149,7 +188,7 @@ def test_falls_back_to_cache_when_fetch_fails(cache_dir, monkeypatch):
     monkeypatch.setattr(dft, "fetch_aadf", broken_fetch)
     with pytest.warns(UserWarning, match="DfT fetch failed"):
         df = dft.load_aadf(refresh=True, raw_dir=cache_dir)
-    assert set(df["count_point_id"]) == {9001, 9002}
+    assert set(df["count_point_id"]) == {9001, 9002, 9004}
 
 
 def test_raises_without_cache_when_fetch_fails(tmp_path, monkeypatch):
