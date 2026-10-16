@@ -3,40 +3,32 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <style>
-/* Layout: one column for the duty officer. Calendar to pick a day, then that day's actions, heatmap, map and gates, then how it works. */
+/* Layout: one column for the duty officer. Calendar, then the day: a real map of Southampton first, then actions, route choice, traffic mix, the corridor heatmap and the gates. */
 :root {
-  --bg: #F1F4F6;
-  --surface: #FFFFFF;
-  --surface-2: #E7EDF1;
-  --ink: #11202A;
-  --muted: #55666F;
-  --line: #D2DBE1;
-  --accent: #0A5C78;
-  --accent-ink: #FFFFFF;
-  --accent-soft: #D9EAF1;
-  --warn-bg: #FFF3D1;
-  --warn-ink: #5E4300;
-  --warn-line: #E5C462;
-  --lv0-bg: #E6ECEF; --lv0-ink: #3B4F5C;
-  --lv1-bg: #FAEBBB; --lv1-ink: #5F4600;
-  --lv2-bg: #F7CDA3; --lv2-ink: #6F300C;
-  --lv3-bg: #EE9F8F; --lv3-ink: #5E110C;
+  --bg: #F1F4F6; --surface: #FFFFFF; --surface-2: #E7EDF1; --ink: #11202A; --muted: #55666F; --line: #D2DBE1;
+  --accent: #0A5C78; --accent-ink: #FFFFFF; --accent-soft: #D9EAF1;
+  --warn-bg: #FFF3D1; --warn-ink: #5E4300; --warn-line: #E5C462;
+  --lv0-bg: #E6ECEF; --lv0-ink: #3B4F5C; --lv1-bg: #FAEBBB; --lv1-ink: #5F4600;
+  --lv2-bg: #F7CDA3; --lv2-ink: #6F300C; --lv3-bg: #EE9F8F; --lv3-ink: #5E110C;
   --h0: #EBF0F2; --h1: #F6E5A9; --h2: #F2BC66; --h3: #E5803D; --h4: #C9472E; --h5: #8C1D1D;
-  --casing: #9BABB6;
-  --band: rgba(10, 92, 120, 0.18);
-  --hatch: #DCE3E8;
-  --vms-bg: #0B0B0B;
-  --vms-ink: #FFB21F;
+  --band: rgba(10, 92, 120, 0.18); --hatch: #DCE3E8;
+  --vms-bg: #0B0B0B; --vms-ink: #FFB21F;
+  /* map */
+  --land: #ECEFEA; --water: #B6D1E2; --water-ink: #2F6584; --mud: #D9DFD3; --green: #D2E2C6; --wood: #BFD6B1;
+  --resi: #E3E6E2; --comm: #E8E0DD; --ind: #DADBE2; --port: #D3D7E1; --campus: #E5DEEA; --airport: #DEE1E5;
+  --minor: #C8CED3; --rail: #8E98A0; --boundary: #4F7387; --casing: #FFFFFF; --road-quiet: #A9B3BA;
+  --l0: #3E9C74; --l1: #9CC45A; --l2: #E8C547; --l3: #EE8B3A; --l4: #D8432F; --l5: #7E1C1C;
+  --cruise: #7A3FD1; --queue: #D8432F;
+  --ra: #0A5C78; --rb: #B4458F; --rc: #C77A12;
+  --g-through: #8C9BA5; --g-county: #2F7EA6; --g-outbound: #7FB8D8; --g-internal: #8DB86A;
+  --g-visitors: #E3B04B; --g-match: #C2553A; --g-cruise: #7A3FD1;
   --font-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
   --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-data: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
-  --step--1: 0.8125rem;
-  --step-0: 1rem;
-  --step-1: 1.1875rem;
-  --step-2: 1.5rem;
-  --step-3: 2.125rem;
+  --step--1: 0.8125rem; --step-0: 1rem; --step-1: 1.1875rem; --step-2: 1.5rem; --step-3: 2.125rem;
   --radius: 6px;
 }
 @media (prefers-color-scheme: dark) {
@@ -47,8 +39,15 @@
     --lv0-bg: #1C2830; --lv0-ink: #A9B8C2; --lv1-bg: #3A3112; --lv1-ink: #F1D27B;
     --lv2-bg: #4A2A14; --lv2-ink: #F7B07C; --lv3-bg: #561C17; --lv3-ink: #FF9C8C;
     --h0: #1A262F; --h1: #4A4220; --h2: #7E5A1F; --h3: #B4632A; --h4: #D9473A; --h5: #FF6F61;
-    --casing: #3A4B57; --band: rgba(99, 190, 221, 0.22); --hatch: #1E2B34;
-    --vms-bg: #0B0B0B; --vms-ink: #FFB21F;
+    --band: rgba(99, 190, 221, 0.22); --hatch: #1E2B34;
+    --land: #141C22; --water: #0F2635; --water-ink: #7FB2CF; --mud: #1A2626; --green: #17261D; --wood: #1A2E21;
+    --resi: #19222A; --comm: #241E26; --ind: #1D212C; --port: #1C2230; --campus: #221C2A; --airport: #1B2228;
+    --minor: #2B3943; --rail: #4D5B66; --boundary: #6F95AA; --casing: #0D151B; --road-quiet: #3C4A55;
+    --l0: #4FBF8F; --l1: #ADD36A; --l2: #F2D25A; --l3: #FF9C4A; --l4: #FF5A45; --l5: #FF8FA3;
+    --cruise: #B894FF; --queue: #FF5A45;
+    --ra: #63BEDD; --rb: #E681C9; --rc: #F0B04B;
+    --g-through: #6E7F8B; --g-county: #4FA3CF; --g-outbound: #9CCDE8; --g-internal: #9CCB78;
+    --g-visitors: #F0C25E; --g-match: #E07058; --g-cruise: #B894FF;
     color-scheme: dark;
   }
 }
@@ -59,104 +58,60 @@
   --lv0-bg: #1C2830; --lv0-ink: #A9B8C2; --lv1-bg: #3A3112; --lv1-ink: #F1D27B;
   --lv2-bg: #4A2A14; --lv2-ink: #F7B07C; --lv3-bg: #561C17; --lv3-ink: #FF9C8C;
   --h0: #1A262F; --h1: #4A4220; --h2: #7E5A1F; --h3: #B4632A; --h4: #D9473A; --h5: #FF6F61;
-  --casing: #3A4B57; --band: rgba(99, 190, 221, 0.22); --hatch: #1E2B34;
-  --vms-bg: #0B0B0B; --vms-ink: #FFB21F;
+  --band: rgba(99, 190, 221, 0.22); --hatch: #1E2B34;
+  --land: #141C22; --water: #0F2635; --water-ink: #7FB2CF; --mud: #1A2626; --green: #17261D; --wood: #1A2E21;
+  --resi: #19222A; --comm: #241E26; --ind: #1D212C; --port: #1C2230; --campus: #221C2A; --airport: #1B2228;
+  --minor: #2B3943; --rail: #4D5B66; --boundary: #6F95AA; --casing: #0D151B; --road-quiet: #3C4A55;
+  --l0: #4FBF8F; --l1: #ADD36A; --l2: #F2D25A; --l3: #FF9C4A; --l4: #FF5A45; --l5: #FF8FA3;
+  --cruise: #B894FF; --queue: #FF5A45;
+  --ra: #63BEDD; --rb: #E681C9; --rc: #F0B04B;
+  --g-through: #6E7F8B; --g-county: #4FA3CF; --g-outbound: #9CCDE8; --g-internal: #9CCB78;
+  --g-visitors: #F0C25E; --g-match: #E07058; --g-cruise: #B894FF;
   color-scheme: dark;
 }
 
-body {
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--font-body);
-  font-size: var(--step-0);
-  line-height: 1.5;
-}
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: var(--step-0); line-height: 1.5; }
 .wrap {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 28px 48px;
-  display: grid;
-  gap: 28px;
+  max-width: 1240px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 48px; display: grid; gap: 28px;
 }
 h1, h2, h3 { font-family: var(--font-display); line-height: 1.15; text-wrap: balance; margin: 0; }
-h1 { font-size: var(--step-3); font-weight: 700; letter-spacing: 0.005em; }
+h1 { font-size: var(--step-3); font-weight: 700; }
 h2 { font-size: var(--step-2); font-weight: 600; }
 h3 { font-size: var(--step-1); font-weight: 600; }
 p { margin: 0; }
-.eyebrow {
-  font-family: var(--font-display);
-  font-size: var(--step--1);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-}
+.eyebrow { font-family: var(--font-display); font-size: var(--step--1); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
 .muted { color: var(--muted); }
 .num, .mono { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
 button, select, input { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* Header */
 .top { display: grid; gap: 18px; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); align-items: end; }
 .brand { display: grid; gap: 8px; }
-.lede { max-width: 60ch; color: var(--muted); font-size: var(--step-1); }
+.lede { max-width: 62ch; color: var(--muted); font-size: var(--step-1); }
 .meta { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; font-size: var(--step--1); }
 .meta dt { color: var(--muted); }
 .meta dd { margin: 0; font-family: var(--font-data); }
-.synthetic {
-  background: var(--warn-bg);
-  color: var(--warn-ink);
-  border: 1px solid var(--warn-line);
-  border-radius: var(--radius);
-  padding: 12px 16px;
-  max-width: 100%;
-}
+.synthetic { background: var(--warn-bg); color: var(--warn-ink); border: 1px solid var(--warn-line); border-radius: var(--radius); padding: 12px 16px; }
 .synthetic strong { font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.06em; margin-right: 6px; }
 
-/* Sections and cards */
 .sec { display: grid; gap: 14px; }
 .sec-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 16px; }
-.card {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 16px;
-  display: grid;
-  gap: 12px;
-  min-width: 0;
-  align-content: start;
-}
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: grid; gap: 12px; min-width: 0; align-content: start; }
 .card-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 12px; }
-.grid2 { display: grid; gap: 16px; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); }
+.grid2 { display: grid; gap: 16px; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
+.foot-note { font-size: var(--step--1); color: var(--muted); }
 
 /* Calendar */
 .cal-wrap { display: grid; gap: 6px; }
 .cal, .cal-dow { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
 .cal-dow span { font-family: var(--font-display); font-size: var(--step--1); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; padding-left: 4px; }
-.cell {
-  min-height: 92px;
-  border-radius: var(--radius);
-  border: 1px solid transparent;
-  padding: 8px;
-  display: grid;
-  grid-template-rows: auto auto 1fr auto;
-  gap: 2px;
-  text-align: left;
-  background: var(--lv0-bg);
-  color: var(--lv0-ink);
-  cursor: pointer;
-  min-width: 0;
-}
+.cell { min-height: 88px; border-radius: var(--radius); border: 1px solid transparent; padding: 8px; display: grid; grid-template-rows: auto auto 1fr auto; gap: 2px; text-align: left; background: var(--lv0-bg); color: var(--lv0-ink); cursor: pointer; min-width: 0; }
 button.cell:hover { border-color: var(--ink); }
 .cell[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 .cell-off { background: transparent; border: 1px dashed var(--line); color: var(--muted); cursor: default; }
-.cell-beyond {
-  background: repeating-linear-gradient(135deg, var(--surface) 0 6px, var(--hatch) 6px 12px);
-  color: var(--muted);
-  border-color: var(--line);
-}
+.cell-beyond { background: repeating-linear-gradient(135deg, var(--surface) 0 6px, var(--hatch) 6px 12px); color: var(--muted); border-color: var(--line); }
 .lv-quiet { background: var(--lv0-bg); color: var(--lv0-ink); }
 .lv-watch { background: var(--lv1-bg); color: var(--lv1-ink); }
 .lv-high { background: var(--lv2-bg); color: var(--lv2-ink); }
@@ -166,127 +121,122 @@ button.cell:hover { border-color: var(--ink); }
 .mon { font-family: var(--font-display); font-size: var(--step--1); text-transform: uppercase; letter-spacing: 0.06em; }
 .cell-ships { font-size: var(--step--1); }
 .cell-tags { display: flex; flex-wrap: wrap; gap: 3px; align-content: start; }
-.tag {
-  font-family: var(--font-display);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0 5px;
-  border-radius: 3px;
-  border: 1px solid currentColor;
-  line-height: 1.5;
-}
+.tag { font-family: var(--font-display); font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; padding: 0 5px; border-radius: 3px; border: 1px solid currentColor; line-height: 1.5; }
 .cell-lv { font-family: var(--font-display); font-weight: 600; font-size: var(--step--1); text-transform: uppercase; letter-spacing: 0.06em; }
 .today { font-size: 0.6875rem; font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.06em; }
 .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: var(--step--1); color: var(--muted); align-items: center; }
 .legend .sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; }
 
-/* Day view */
+/* Day */
 .day-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px 24px; }
 .day-stats { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
-.pill {
-  font-family: var(--font-display);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: var(--step--1);
-}
+.pill { font-family: var(--font-display); font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; padding: 3px 10px; border-radius: 999px; font-size: var(--step--1); }
 .big { font-family: var(--font-data); font-size: var(--step-1); }
 .notices { display: grid; gap: 8px; }
-.notice {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  align-items: baseline;
-  padding: 10px 14px;
-  border-radius: var(--radius);
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-}
+.notice { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; padding: 10px 14px; border-radius: var(--radius); background: var(--surface-2); border: 1px solid var(--line); }
 .notice .tag { color: var(--muted); }
 .notice-warn { background: var(--warn-bg); color: var(--warn-ink); border-color: var(--warn-line); }
 .notice-warn .tag { color: var(--warn-ink); }
-.linkbtn {
-  background: none;
-  border: 0;
-  padding: 0;
-  color: var(--accent);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  cursor: pointer;
-}
+.linkbtn { background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 
-/* Actions */
+/* Map */
+.map-card { padding: 0; overflow: hidden; gap: 0; }
+.map-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.map-bar h3 { margin-right: auto; }
+.seg-ctl { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.seg-ctl button { border: 0; background: var(--surface); padding: 5px 10px; cursor: pointer; font-size: var(--step--1); font-weight: 600; }
+.seg-ctl button + button { border-left: 1px solid var(--line); }
+.seg-ctl button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.map-box { position: relative; height: clamp(380px, 62vh, 640px); background: var(--land); }
+.map-box svg { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+.map-box svg:active { cursor: grabbing; }
+.lyr { stroke: none; }
+.f-water { fill: var(--water); } .f-mud { fill: var(--mud); } .f-green { fill: var(--green); } .f-wood { fill: var(--wood); }
+.f-residential { fill: var(--resi); } .f-commercial { fill: var(--comm); } .f-industrial { fill: var(--ind); }
+.f-port { fill: var(--port); } .f-campus { fill: var(--campus); } .f-airport { fill: var(--airport); }
+.s-minor { fill: none; stroke: var(--minor); stroke-width: 0.7px; vector-effect: non-scaling-stroke; }
+.s-rail { fill: none; stroke: var(--rail); stroke-width: 1px; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
+.s-boundary { fill: none; stroke: var(--boundary); stroke-width: 1.4px; stroke-dasharray: 7 4; vector-effect: non-scaling-stroke; opacity: 0.8; }
+.road, .casing { fill: none; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.casing { stroke: var(--casing); }
+.road { cursor: pointer; }
+.road.hl { stroke: var(--accent) !important; }
+.dim .road { opacity: 0.35; }
+.cruise-flow { fill: none; stroke: var(--cruise); stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; opacity: 0.85; pointer-events: none; }
+.route { fill: none; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; pointer-events: none; }
+.route-casing { fill: none; stroke: var(--casing); stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; pointer-events: none; }
+.r0 { stroke: var(--ra); } .r1 { stroke: var(--rb); stroke-dasharray: 9 5; } .r2 { stroke: var(--rc); stroke-dasharray: 3 4; }
+.lbl { font-family: var(--font-display); fill: var(--muted); pointer-events: none; paint-order: stroke; stroke: var(--land); stroke-width: 3px; stroke-linejoin: round; }
+.lbl-town { font-size: 14px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; fill: var(--ink); }
+.lbl-suburb { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+.lbl-minor { font-size: 10px; font-weight: 500; letter-spacing: 0.06em; }
+.lbl-water { font-family: var(--font-body); font-style: italic; font-size: 13px; fill: var(--water-ink); stroke: var(--water); letter-spacing: 0.04em; }
+.mk-label { font-family: var(--font-body); font-size: 11.5px; font-weight: 600; fill: var(--ink); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; pointer-events: none; }
+.mk-gate { fill: var(--accent); stroke: var(--surface); stroke-width: 1.5; }
+.mk-term { fill: var(--surface); stroke: var(--accent); stroke-width: 1.5; }
+.mk-poi { fill: var(--ink); stroke: var(--surface); stroke-width: 1.5; }
+.mk-gw { fill: var(--surface); stroke: var(--ink); stroke-width: 1.4; }
+.gw-pill rect { fill: var(--ink); }
+.gw-pill text { font-family: var(--font-data); font-size: 10.5px; fill: var(--surface); }
+.q-dot { fill: var(--queue); stroke: var(--surface); stroke-width: 1.5; opacity: 0.9; }
+.map-tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 9px; font-size: var(--step--1); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12); max-width: 260px; }
+.map-ctl { position: absolute; right: calc(10px + env(safe-area-inset-right, 0px)); bottom: 28px; display: grid; gap: 4px; }
+.map-ctl button { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); min-width: 34px; height: 30px; cursor: pointer; font-weight: 600; font-size: var(--step--1); padding: 0 8px; }
+.map-attr { position: absolute; left: 8px; bottom: 6px; font-size: 0.6875rem; color: var(--muted); background: var(--surface); padding: 1px 6px; border-radius: 3px; opacity: 0.9; }
+.map-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding: 10px 16px; border-top: 1px solid var(--line); font-size: var(--step--1); color: var(--muted); }
+.ramp { display: inline-flex; align-items: center; gap: 2px; }
+.ramp i { display: inline-block; width: 22px; height: 6px; border-radius: 2px; }
+.time-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 16px; border-top: 1px solid var(--line); }
+.time-row input[type="range"] { flex: 1 1 200px; accent-color: var(--accent); min-width: 0; }
+.clock { font-family: var(--font-data); font-size: var(--step-1); }
+
+/* Actions, tables */
 .actions { display: grid; gap: 10px; }
-.action {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px 14px;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
-}
+.action { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 14px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
 .action[data-state="accepted"] { border-color: var(--accent); background: var(--accent-soft); }
 .action[data-state="dismissed"] { opacity: 0.55; }
 .action-body { display: grid; gap: 4px; min-width: 0; }
 .action-kind { color: var(--accent); }
 .action-btns { display: flex; gap: 6px; align-items: start; }
-.btn {
-  border: 1px solid var(--line);
-  background: var(--surface);
-  border-radius: var(--radius);
-  padding: 4px 10px;
-  cursor: pointer;
-  font-size: var(--step--1);
-  font-weight: 600;
-}
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius); padding: 4px 10px; cursor: pointer; font-size: var(--step--1); font-weight: 600; }
 .btn:hover { border-color: var(--ink); }
 .btn-primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.vms {
-  grid-column: 1 / -1;
-  justify-self: start;
-  background: var(--vms-bg);
-  color: var(--vms-ink);
-  font-family: var(--font-data);
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  text-align: center;
-  padding: 10px 18px;
-  border-radius: 4px;
-  line-height: 1.45;
-  font-size: var(--step--1);
-  max-width: 100%;
-}
-.foot-note { font-size: var(--step--1); color: var(--muted); }
-
-/* Tables */
+.vms { grid-column: 1 / -1; justify-self: start; background: var(--vms-bg); color: var(--vms-ink); font-family: var(--font-data); font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; text-align: center; padding: 10px 18px; border-radius: 4px; line-height: 1.45; font-size: var(--step--1); max-width: 100%; }
 .table-scroll { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; font-size: var(--step--1); }
 th { text-align: left; font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
 td.num { text-align: right; white-space: nowrap; }
-.chip { display: inline-block; margin-left: 6px; }
 
-/* Scenario bar */
-.scenario { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
-.scenario label { font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; font-size: var(--step--1); color: var(--muted); }
-select {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 5px 8px;
-  max-width: 100%;
-}
-.delta { font-size: var(--step--1); }
+/* Route choice */
+.od-list { display: grid; gap: 6px; }
+.od { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; text-align: left; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); cursor: pointer; }
+.od[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: var(--accent-soft); }
+.od small { grid-column: 1 / -1; color: var(--muted); }
+.routes { display: grid; gap: 8px; }
+.rt { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; }
+.rt-key { width: 16px; height: 4px; border-radius: 2px; }
+.rt-bar { grid-column: 2 / -1; height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.rt-bar i { display: block; height: 100%; }
+.chart svg { display: block; width: 100%; height: auto; }
+.ax { font-family: var(--font-data); font-size: 9px; fill: var(--muted); }
+.grid-l { stroke: var(--line); }
+.now { stroke: var(--ink); stroke-width: 1; stroke-dasharray: 3 3; }
+
+/* Mix */
+.mix-legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 4px 16px; font-size: var(--step--1); }
+.mix-legend span.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+.gw-list { display: grid; gap: 6px; font-size: var(--step--1); }
+.gw-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; }
+.gw-row .rt-bar { grid-column: 1 / -1; }
 
 /* Heatmap */
+.scenario { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.scenario label { font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; font-size: var(--step--1); color: var(--muted); }
+select { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 5px 8px; max-width: 100%; }
+.delta { font-size: var(--step--1); }
 .hm-scroll { overflow-x: auto; }
-.hm-scroll svg { display: block; width: 100%; min-width: 760px; height: auto; }
+.hm-scroll svg { display: block; width: 100%; min-width: 780px; height: auto; }
 .hm-label { font-family: var(--font-body); font-size: 12px; fill: var(--ink); }
 .hm-label.sel { font-weight: 600; fill: var(--accent); }
 .hm-group { font-family: var(--font-display); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; fill: var(--muted); }
@@ -299,55 +249,46 @@ select {
 .scale { display: flex; align-items: center; gap: 8px; font-size: var(--step--1); color: var(--muted); flex-wrap: wrap; }
 .scale-bar { width: 160px; max-width: 40vw; height: 10px; border-radius: 3px; border: 1px solid var(--line); }
 
-/* Map */
-.map svg { display: block; width: 100%; height: auto; max-width: 100%; }
-.road-casing { stroke: var(--casing); stroke-linecap: round; }
-.road { stroke-linecap: round; cursor: pointer; }
-.road-sel { stroke: var(--accent); stroke-linecap: round; }
-.node { fill: var(--surface); stroke: var(--ink); stroke-width: 0.45; }
-.node-gate { fill: var(--accent); stroke: var(--surface); stroke-width: 0.5; }
-.node-approach { fill: var(--ink); }
-.map-label { font-family: var(--font-body); font-size: 3.1px; fill: var(--ink); }
-.map-label.gate { font-weight: 600; fill: var(--accent); }
-.map-label.halo { stroke: var(--surface); stroke-width: 0.9px; stroke-linejoin: round; fill: var(--surface); }
-.time-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
-.time-row input[type="range"] { flex: 1 1 180px; accent-color: var(--accent); min-width: 0; }
-.clock { font-family: var(--font-data); font-size: var(--step-1); }
+/* Activity timeline */
+.tl svg { display: block; width: 100%; height: auto; }
+.tl-row { font-family: var(--font-body); font-size: 11px; fill: var(--ink); }
+.tl-sub { font-family: var(--font-body); font-size: 10px; fill: var(--muted); }
+.tl-band { rx: 3; }
+.tl-commute { fill: var(--g-county); opacity: 0.55; }
+.tl-school { fill: var(--g-visitors); opacity: 0.75; }
+.tl-match { fill: var(--g-match); opacity: 0.7; }
+.tl-dis { fill: var(--g-cruise); opacity: 0.75; }
+.tl-emb { fill: var(--g-cruise); opacity: 0.4; }
+.tl-new { fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-dasharray: 4 3; }
+.tl-grid { stroke: var(--line); }
+.timing { display: grid; gap: 10px; }
+.timing-item { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); }
+.timing-item.better { border-color: var(--accent); background: var(--accent-soft); }
+.opts { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: var(--step--1); color: var(--muted); }
+.opts b { font-weight: 600; color: var(--ink); }
 
 /* Gates */
-.gates { display: grid; gap: 12px; }
-.gate-chart svg { display: block; width: 100%; height: auto; }
-.gate-axis { font-family: var(--font-data); font-size: 9px; fill: var(--muted); }
-.gate-grid { stroke: var(--line); }
+.gates { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 .gate-band { fill: var(--band); }
 .gate-mean { fill: none; stroke: var(--accent); stroke-width: 1.8; }
-.gate-now { stroke: var(--ink); stroke-width: 1; stroke-dasharray: 3 3; }
 .gate-title { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: var(--step--1); }
 
-/* Refusal */
 .refusal { border-style: dashed; }
-.refusal h2 { font-size: var(--step-2); }
-
-/* Method */
 .method-grid { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.steps { margin: 0; padding-left: 1.3em; display: grid; gap: 10px; max-width: 70ch; }
+.steps { margin: 0; padding-left: 1.3em; display: grid; gap: 10px; max-width: 72ch; }
 .steps li::marker { font-family: var(--font-display); font-weight: 700; color: var(--accent); }
 .plain { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; }
 .status { color: var(--warn-ink); background: var(--warn-bg); border: 1px solid var(--warn-line); }
 footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid var(--line); padding-top: 14px; }
 
-@media (max-width: 900px) {
-  .top, .grid2, .method-grid { grid-template-columns: minmax(0, 1fr); }
-}
+@media (max-width: 900px) { .top, .grid2, .method-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 640px) {
   .cell { min-height: 58px; padding: 6px; }
   .cell-ships, .cell-lv, .mon, .today { display: none; }
   .cell-tags .tag { font-size: 0; width: 7px; height: 7px; padding: 0; border-radius: 50%; background: currentColor; }
   .cal, .cal-dow { gap: 4px; }
   .action { grid-template-columns: minmax(0, 1fr); }
-}
-@media (prefers-reduced-motion: reduce) {
-  * { scroll-behavior: auto !important; }
+  .map-box { height: 420px; }
 }
 </style>
 
@@ -356,23 +297,21 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     <div class="brand">
       <p class="eyebrow">Prototype for SotonShip 2026</p>
       <h1>Turnaround traffic forecast</h1>
-      <p class="lede">Which roads around Southampton's docks go above 85% of capacity on cruise turnaround days, and when, in 15-minute steps.</p>
+      <p class="lede">How cruise turnarounds load Southampton's roads on top of everyday traffic from the city and the rest of the county, and which roads go above 85% of capacity, in 15-minute steps.</p>
     </div>
     <dl class="meta">
       <dt>Forecast issued</dt><dd id="m-issued"></dd>
       <dt>Schedule covers</dt><dd id="m-horizon"></dd>
       <dt>Sampled days per date</dt><dd id="m-n"></dd>
+      <dt>Road network</dt><dd id="m-net"></dd>
       <dt>Model</dt><dd id="m-model"></dd>
     </dl>
   </header>
 
-  <p class="synthetic" role="note"><strong>Synthetic demo data</strong>The cruise schedule, ship names, road capacities, background traffic, roadworks permits and match days are all invented. Real road names are used for orientation on a schematic network that is not to scale. Nothing on this page was observed.</p>
+  <p class="synthetic" role="note"><strong>Real map, synthetic traffic</strong>Roads, junctions, lanes, speed limits and land use come from OpenStreetMap. The cruise schedule, ship names, trip totals, roadworks permits and match fixtures are invented, and nothing on this page is observed traffic.</p>
 
   <section class="sec" aria-labelledby="cal-h">
-    <div class="sec-head">
-      <h2 id="cal-h">Next six weeks</h2>
-      <p class="muted">Pick a day to see when and where its roads are at risk.</p>
-    </div>
+    <div class="sec-head"><h2 id="cal-h">Next six weeks</h2><p class="muted">Pick a day to see when and where its roads are at risk.</p></div>
     <div class="cal-wrap">
       <div class="cal-dow" aria-hidden="true"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
       <div class="cal" id="cal"></div>
@@ -380,44 +319,136 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     <div class="legend" id="legend"></div>
   </section>
 
-  <section class="sec" id="day" aria-live="polite"></section>
+  <section class="sec" id="day" aria-live="polite">
+    <div class="day-head" id="day-head"></div>
+    <div class="notices" id="notices"></div>
+    <div class="card" id="tl-card">
+      <div class="card-head"><h3>What else is happening today</h3><span class="foot-note" id="tl-note"></span></div>
+      <div class="tl" id="timeline"></div>
+    </div>
+    <div id="day-body">
+      <div class="card map-card">
+        <div class="map-bar">
+          <h3>Roads at <span class="clock" id="clock"></span></h3>
+          <div class="seg-ctl" role="group" aria-label="Map layer">
+            <button data-layer="load" aria-pressed="true">All traffic</button>
+            <button data-layer="cruise" aria-pressed="false">Cruise traffic</button>
+            <button data-layer="queue" aria-pressed="false">Queues</button>
+          </div>
+          <label class="foot-note" for="scenario">Scenario</label>
+          <select id="scenario"></select>
+        </div>
+        <div class="map-box" id="map-box">
+          <svg id="map-svg" role="img" aria-label="Map of Southampton with main roads coloured by traffic load"><g id="zoom"><g id="world"></g></g><g id="ui"></g></svg>
+          <div class="map-tip" id="map-tip" hidden></div>
+          <div class="map-ctl">
+            <button id="z-in" aria-label="Zoom in">+</button>
+            <button id="z-out" aria-label="Zoom out">−</button>
+            <button id="z-docks">Docks</button>
+            <button id="z-all">All</button>
+          </div>
+          <p class="map-attr">© OpenStreetMap contributors</p>
+        </div>
+        <div class="map-legend" id="map-legend"></div>
+        <div class="time-row">
+          <button class="btn" id="play">Play</button>
+          <input type="range" id="slider" min="0" max="59" step="1" value="24" aria-label="Time of day">
+          <span class="delta" id="delta"></span>
+        </div>
+      </div>
+    </div>
+    <div class="grid2" id="row-actions">
+      <div class="card">
+        <div class="card-head"><h3>Suggested actions</h3><span class="foot-note">Suggestions only. The duty officer decides.</span></div>
+        <div class="actions" id="actions"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Ships and suggested timings</h3><span class="foot-note">Synthetic schedule</span></div>
+        <div id="ships"></div>
+        <div class="timing" id="timing"></div>
+        <p class="foot-note">Arrival times are fixed by tides, pilots and itineraries. What can move is when disembarkation starts and when check-in opens, so these are requests to the cruise line and the port.</p>
+      </div>
+    </div>
+    <div class="grid2" id="row-model">
+      <div class="card">
+        <div class="card-head"><h3>How cruise traffic is routed</h3><span class="foot-note">Shares and times at <span class="mono" id="rt-clock"></span></span></div>
+        <div class="od-list" id="od-list"></div>
+        <div class="routes" id="routes"></div>
+        <div class="chart" id="share-chart"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Who is on the roads</h3><span class="foot-note">Trips starting, vehicles per hour</span></div>
+        <div class="chart" id="mix-chart"></div>
+        <div class="mix-legend" id="mix-legend"></div>
+        <h3 style="font-size: var(--step-0)">Coming in from the county now</h3>
+        <div class="gw-list" id="gw-list"></div>
+      </div>
+    </div>
+    <div class="card" id="heat-card">
+      <div class="card-head">
+        <h3>When each road is at risk</h3>
+        <div class="seg-ctl" role="group" aria-label="Heatmap measure">
+          <button data-metric="risk" aria-pressed="true">Chance at risk</button>
+          <button data-metric="delay" aria-pressed="false">Delay in minutes</button>
+        </div>
+        <div class="scale"><span id="scale-label">Chance above 85% of capacity</span><span class="scale-bar" id="scale-bar"></span><span class="mono" id="scale-range">0–100%</span></div>
+      </div>
+      <div class="hm-scroll" id="hm"></div>
+      <p class="info" id="info"></p>
+    </div>
+    <div class="card" id="gates-card">
+      <div class="card-head"><h3>Dock gate cruise traffic</h3><span class="foot-note">Vehicles per hour, coaches count as 2</span></div>
+      <div class="gates" id="gates"></div>
+    </div>
+  </section>
 
   <section class="sec" aria-labelledby="method-h">
     <h2 id="method-h">How this forecast is made</h2>
     <div class="method-grid">
       <div class="card">
         <ol class="steps">
-          <li><strong>Vehicles from the schedule.</strong> Each turnaround is split into car drop-offs and pick-ups, park and cruise, taxis and coaches. Their timing follows the disembarkation and boarding curves, and each goes to its terminal's dock gate. A coach counts as two cars.</li>
-          <li><strong>Background traffic.</strong> Weekday, Saturday and Sunday profiles on every road, raised around kick-off on match days. The product takes these from DfT traffic counts.</li>
-          <li><strong>Route choice.</strong> Traffic is split into packets of 20 vehicles. Each packet picks the quickest of up to four sensible routes; roads that fill up become slower until traffic spreads out.</li>
-          <li><strong>Many sampled days.</strong> <span id="m-n2"></span> versions of each day vary ship delays, how full ships are, how people travel and background traffic. A road's chance of being at risk is the share of those days where it goes above 85% of capacity in that 15 minutes.</li>
+          <li><strong>The network is Southampton's.</strong> <span id="m-edges"></span> one-way road links from OpenStreetMap, with lanes and speed limits, from motorways down to unclassified roads.</li>
+          <li><strong>Zones and gateways come from geography.</strong> <span id="m-zones"></span> zones built from OSM places. Each zone's homes, jobs and shops come from nearby residential, commercial, industrial, port and retail land. <span id="m-gw"></span> county gateways sit where the M27, M3, A35, A33 and other roads cross into the area.</li>
+          <li><strong>General traffic is generated, not assumed.</strong> Commuters from the county to the area's jobs and back, residents working outside, trips between zones (more between big, close zones), through traffic between gateways and county visitors to the shops. Each has its own pattern over the day, different at weekends. The school run adds drop-off and pick-up peaks on term-time weekdays only (assumed half-term 26–30 Oct). Match days add fans to St Mary's.</li>
+          <li><strong>Counted roads use the counts.</strong> On Portswood Road, Highfield Lane and Bevois Hill, measured peak speeds of 16–20 mph on 30 mph roads show they are at their limit, so the counted peak-hour flow sets their capacity. Local traffic the zones miss is added so flows match the counts, plus <span id="m-uni"></span> for university term, because the counts were taken in July.</li>
+          <li><strong>Cruise traffic is added per ship.</strong> Car drop-offs, park and cruise, taxis and coaches, timed by disembarkation and boarding and sent to the terminal's nearest dock gate.</li>
+          <li><strong>Routes are allocated dynamically.</strong> Every 15 minutes each of the <span id="m-ods"></span> origin–destination flows splits over up to three real routes and shifts towards the quickest given everyone's congestion. Traffic that cannot get through a full road waits and joins the next 15 minutes, so queues build and clear.</li>
+          <li><strong>Many sampled days.</strong> Ship delays, loads, travel choices and background traffic vary across <span id="m-n2"></span> samples. A road's chance of being at risk is the share of samples where it goes above 85% of capacity.</li>
         </ol>
       </div>
       <div class="card status">
         <p class="eyebrow" style="color: inherit">Backtest: not run yet</p>
-        <p>The demo has no observed traffic, so it cannot show accuracy. The product learns the travel assumptions below from 15-minute traffic counts on past cruise days (lead candidate: National Highways WebTRIS on the M271), then tests on later days it has not seen.</p>
+        <p>The demo has no observed traffic, so it cannot show accuracy. The product replaces the invented totals with Census 2021 travel-to-work flows and DfT counts, learns the cruise travel assumptions from 15-minute counts on past cruise days (lead candidate: National Highways WebTRIS on the M271), and tests on later days it has not seen.</p>
         <p>It reports average error, Brier score and how often observations fall inside the 80% range, against three baselines: the last comparable cruise day, a model using passenger numbers only, and no cruise effect.</p>
       </div>
       <div class="card">
-        <h3>Assumptions in this demo</h3>
-        <div class="table-scroll"><table id="assumptions"></table></div>
-        <p class="foot-note">All invented. In the product these are learned from observed traffic, with ranges.</p>
+        <h3>Trip totals in this demo</h3>
+        <div class="table-scroll"><table id="purposes"></table></div>
+        <p class="foot-note">Invented, then scaled <span id="m-scale"></span>. Trips within the area are fitted to council counts. County and through trips are set so weekday peaks on motorway and trunk roads sit near 85% of capacity, a stand-in until WebTRIS counts are used. Cruise travel split: <span id="m-modes"></span>.</p>
+      </div>
+      <div class="card" style="grid-column: 1 / -1">
+        <h3>Checked against council traffic counts</h3>
+        <p class="foot-note">Trips within the area are scaled so that, summed over four counting sites around Portswood, modelled weekday flows match what was counted. Saturday is a check, not fitted. Single roads are less accurate because each zone loads the network at one point; finer zones are the next step. Source: <span id="calib-src"></span>.</p>
+        <div class="table-scroll"><table id="calib"></table></div>
+        <p class="foot-note">The same report gives bus run times on Portswood Road (Table 3-5): in July 2024 services ran 0:24 to 4:22 minutes behind timetable in the peaks, and a quarter of Bluestar 2 southbound buses were 5 or more minutes late. The modelled delays on Portswood Road should sit in that range out of term and above it in term. Longer waits that residents report, such as 30 minutes, build up across several junctions on a whole journey; checking them needs term-time journey times, for example bus positions from the Bus Open Data Service.</p>
       </div>
       <div class="card">
-        <h3>Not modelled</h3>
+        <h3>Not modelled yet</h3>
         <ul class="plain">
-          <li>Incidents, breakdowns and weather</li>
-          <li>Queues backing up into the next 15 minutes</li>
+          <li>Queues blocking junctions upstream (queues wait at the bottleneck only)</li>
+          <li>School locations: OpenStreetMap was overloaded, so school trips follow where people live for now</li>
           <li>Signal timings at individual junctions</li>
+          <li>Incidents, breakdowns and weather</li>
+          <li>Buses, rail and people switching mode when roads are busy</li>
           <li>Traffic inside the port</li>
-          <li>Events that are not in the feeds</li>
+          <li>County traffic from real origin–destination data (some bottlenecks, such as Itchen Bridge and Redbridge, run over capacity even without ships)</li>
         </ul>
         <p class="foot-note">Only roads with sensors can be checked against reality. Every other road on this page is a model output.</p>
       </div>
     </div>
   </section>
 
-  <footer>Generated by <span class="mono">demo/synthetic_demo.py</span> (seed <span id="m-seed"></span>). Gate assignments for each terminal are assumptions for the demo.</footer>
+  <footer>Map data © OpenStreetMap contributors, available under the Open Database Licence. Generated by <span class="mono">demo/synthetic_demo.py</span> (seed <span id="m-seed"></span>). Gate positions and terminal-to-gate assignments are assumptions for the demo.</footer>
 </div>
 
 <script id="demo-data" type="application/json">__DEMO_DATA__</script>
@@ -425,53 +456,36 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
 (() => {
   const DATA = JSON.parse(document.getElementById('demo-data').textContent);
   const M = DATA.meta;
+  const MAP = DATA.map;
+  const [MW, MH] = MAP.size;
+  const SEGS = DATA.segments;
   const CORR = Object.fromEntries(DATA.corridors.map(c => [c.id, c]));
-  const NODE = Object.fromEntries(DATA.nodes.map(n => [n.id, n]));
-  const GATE_NAME = Object.fromEntries(DATA.gates.map(g => [g.id, g.name]));
   const PERMIT = Object.fromEntries(DATA.permits.map(p => [p.id, p]));
   const BY_DATE = Object.fromEntries(DATA.days.map(d => [d.date, d]));
-  const N_BINS = 60;
+  const N_BINS = 60, HALF = 30;
   const ISSUED_DAY = M.issued.slice(0, 10);
-
-  const GROUPS = [
-    { name: 'Western approach and docks', ids: ['a35', 'a33w', 'mountbatten', 'wqr', 'station', 'esplanade', 'g20', 'g10'] },
-    { name: 'Town Quay and Eastern Docks', ids: ['queensway', 'platform', 'canute', 'g4'] },
-    { name: 'North and east', ids: ['avenue', 'kingsway', 'civic', 'stmarys', 'northam', 'terminus'] },
-  ];
-  const AREA = { a35: 'west', a33w: 'west', mountbatten: 'west', wqr: 'west', station: 'west', esplanade: 'west',
-    queensway: 'docks-east', platform: 'docks-east', canute: 'docks-east',
-    avenue: 'north', kingsway: 'north', civic: 'north', stmarys: 'east', northam: 'east', terminus: 'east' };
-  const SIGNS = {
-    west: { where: 'M271 / A35 and A33 Millbrook Road approaches', lines: ['CRUISE TRAFFIC', 'WESTERN DOCKS', 'ALLOW EXTRA TIME'] },
-    'docks-east': { where: 'Queensway and Platform Road', lines: ['CRUISE TRAFFIC', 'EASTERN DOCKS', 'ALLOW EXTRA TIME'] },
-    north: { where: 'A33 The Avenue approach', lines: ['CRUISE TRAFFIC', 'CITY CENTRE', 'EXPECT DELAYS'] },
-    east: { where: 'A3024 Northam Bridge approach', lines: ['CRUISE TRAFFIC', 'EASTERN DOCKS', 'EXPECT DELAYS'] },
-  };
+  const CH = '0123456789abcdefghijklmnopqrstuvwxyz';
+  const GROUP_ORDER = ['through', 'county', 'outbound', 'internal', 'visitors', 'match', 'cruise'];
+  const WIDTH = { motorway: 3.4, trunk: 3.0, primary: 2.6, secondary: 2.1, tertiary: 1.7, unclassified: 1.3 };
   const LEVELS = [
-    { key: 'quiet', label: 'Quiet', min: 0, n: 0 },
-    { key: 'watch', label: 'Watch', min: 1, n: 1 },
-    { key: 'high', label: 'High', min: 4, n: 2 },
-    { key: 'severe', label: 'Severe', min: 8, n: 3 },
+    { key: 'quiet', label: 'Quiet', min: 0, n: 0 }, { key: 'watch', label: 'Watch', min: 1, n: 1 },
+    { key: 'high', label: 'High', min: 3, n: 2 }, { key: 'severe', label: 'Severe', min: 6, n: 3 },
   ];
-  const MAP_LABELS = {
-    W: ['M271 / A35', 0, -3.2, 'start'],
-    N: ['A33 The Avenue', 3, 1.2, 'start'],
-    E: ['A3024 Northam Bridge', 1.5, -3.4, 'end'],
-    G20: ['Western Docks west gate', 0, 5.6, 'middle', 'gate'],
-    G10: ['Western Docks east gate', 0, 5.6, 'middle', 'gate'],
-    G4: ['Eastern Docks gate', 0, 5.6, 'middle', 'gate'],
-    MB: ['Millbrook', 0, -3, 'middle'],
-    CS: ['Central station', -2.6, 1.1, 'end'],
-    CC: ['City centre', 2.8, 1.1, 'start'],
-    TQ: ['Town Quay', 0, 5, 'middle'],
-    SD: ["St Mary's", 0, -3, 'middle'],
-    CP: ['Charlotte Place', -2.6, 1.1, 'end'],
+  const EXTERNAL = new Set(['county', 'outbound', 'through', 'visitors']);
+  const uplift = d => Math.max(0, d.score - d.bg_score);
+  const SIGNS = {
+    'Western approach': { where: 'M271 / A35 and A33 approaches', lines: ['CRUISE TRAFFIC', 'WESTERN DOCKS', 'ALLOW EXTRA TIME'] },
+    'Town Quay and Eastern Docks': { where: 'Queensway and Platform Road', lines: ['CRUISE TRAFFIC', 'EASTERN DOCKS', 'ALLOW EXTRA TIME'] },
+    'City centre': { where: 'city centre ring road', lines: ['CRUISE TRAFFIC', 'CITY CENTRE', 'EXPECT DELAYS'] },
+    'North and east': { where: 'A33 The Avenue and A3024 approaches', lines: ['CRUISE TRAFFIC', 'DOCKS', 'EXPECT DELAYS'] },
+    'Motorway': { where: 'M27 approaching junctions 3 and 5', lines: ['CRUISE TRAFFIC', 'SOUTHAMPTON DOCKS', 'USE M271'] },
   };
 
-  const state = { date: null, bin: 30, corr: 'wqr', scenario: 'base', playing: null };
+  const state = { date: null, bin: 24, corr: null, scenario: 'base', layer: 'load', od: 0, playing: null, metric: 'risk' };
+  const hm2m = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+  const m2hm = m => `${pad(Math.floor(m / 60))}:${pad(Math.round(m % 60))}`;
   const decisions = {};
-
-  const $ = sel => document.querySelector(sel);
+  const $ = s => document.querySelector(s);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const pad = n => String(n).padStart(2, '0');
   const isoOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -481,46 +495,64 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
   const binTime = b => { const m = 300 + b * M.bin_minutes; return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`; };
   const binRange = (a, b) => `${binTime(a)}–${binTime(b + 1)}`;
   const fmt1 = x => x.toFixed(1);
+  const int = x => Math.round(x).toLocaleString('en-GB');
   const level = s => LEVELS.reduce((l, x) => (s >= x.min ? x : l), LEVELS[0]);
+  const day = () => BY_DATE[state.date];
 
-  function hexRgb(s) {
-    s = s.trim().replace('#', '');
-    if (s.length === 3) s = s.split('').map(c => c + c).join('');
-    return [0, 2, 4].map(i => parseInt(s.slice(i, i + 2), 16));
+  /* ---------- colours ---------- */
+  const css = () => getComputedStyle(document.documentElement);
+  function rgb(s) { s = s.trim().replace('#', ''); if (s.length === 3) s = s.split('').map(c => c + c).join(''); return [0, 2, 4].map(i => parseInt(s.slice(i, i + 2), 16)); }
+  let PAL = {};
+  function readPalette() {
+    const cs = css();
+    PAL = {
+      heat: [0, 1, 2, 3, 4, 5].map(i => rgb(cs.getPropertyValue(`--h${i}`))),
+      load: [0, 1, 2, 3, 4, 5].map(i => rgb(cs.getPropertyValue(`--l${i}`))),
+      quiet: cs.getPropertyValue('--road-quiet').trim(),
+      groups: Object.fromEntries(GROUP_ORDER.map(g => [g, cs.getPropertyValue(`--g-${g}`).trim()])),
+    };
   }
-  function palette() {
-    const cs = getComputedStyle(document.documentElement);
-    return [0, 1, 2, 3, 4, 5].map(i => hexRgb(cs.getPropertyValue(`--h${i}`)));
+  function ramp(stops, x) {
+    const t = Math.max(0, Math.min(1, x)) * (stops.length - 1);
+    const i = Math.min(stops.length - 2, Math.floor(t)), f = t - i;
+    const a = stops[i], b = stops[i + 1];
+    return `rgb(${a.map((v, k) => Math.round(v + (b[k] - v) * f)).join(',')})`;
   }
-  function heat(p, P) {
-    const x = Math.max(0, Math.min(1, p / 100)) * 5;
-    const i = Math.min(4, Math.floor(x));
-    const f = x - i;
-    const a = P[i], b = P[i + 1];
+  const heat = p => ramp(PAL.heat, p / 100);
+  const LOAD_STOPS = [0, 0.5, 0.7, 0.85, 1.0, 1.25];
+  function loadColor(x) {
+    let i = 0;
+    while (i < LOAD_STOPS.length - 2 && x > LOAD_STOPS[i + 1]) i++;
+    const f = Math.max(0, Math.min(1, (x - LOAD_STOPS[i]) / (LOAD_STOPS[i + 1] - LOAD_STOPS[i])));
+    const a = PAL.load[i], b = PAL.load[i + 1];
     return `rgb(${a.map((v, k) => Math.round(v + (b[k] - v) * f)).join(',')})`;
   }
 
-  function scenarioP85(day, key) {
-    if (key === 'bg') return day.bg85;
-    if (key !== 'base' && day.whatif[key]) return day.whatif[key].p85;
-    return day.p85;
+  /* ---------- scenario accessors ---------- */
+  const addedCache = new Map();
+  function added(d) {
+    if (!addedCache.has(d.date)) addedCache.set(d.date, Object.fromEntries(Object.keys(d.p85).map(id => [id, d.p85[id].map((v, b) => Math.max(0, v - d.bg85[id][b]))])));
+    return addedCache.get(d.date);
   }
-  function scenarioScore(day, key) {
-    if (key === 'bg') return day.bg_score;
-    if (key !== 'base' && day.whatif[key]) return day.whatif[key].score;
-    return day.score;
-  }
-  function scenarioLabel(day, key) {
-    if (key === 'base') return day.permits.length ? 'As planned (permit in place)' : 'As planned';
-    if (key === 'bg') return 'Without cruise traffic';
-    if (key === 'move_permit') return `Move permit ${day.permits.join(', ')} to another day`;
-    if (key.startsWith('close_')) return `Cone off one lane on ${CORR[key.slice(6)].name}`;
+  function scenP85(d, key) { if (key === 'bg') return d.bg85; if (key === 'cruise') return added(d); if (key !== 'base' && d.whatif[key]) return d.whatif[key].p85; return d.p85; }
+  function scenScore(d, key) { if (key === 'bg') return d.bg_score; if (key === 'cruise') return uplift(d); if (key !== 'base' && d.whatif[key]) return d.whatif[key].score; return d.score; }
+  function scenLabel(d, key) {
+    if (key === 'base') return d.permits.length ? 'As planned (permit in place)' : 'As planned';
+    if (key === 'bg') return 'Without cruise traffic (heatmap only)';
+    if (key === 'cruise') return 'Added by cruise traffic (heatmap only)';
+    if (key === 'move_permit') return `Move permit ${d.permits.join(', ')} to another day`;
+    if (key.startsWith('close_')) return `Cone off one lane on ${CORR[key.slice(6)] ? CORR[key.slice(6)].name : key.slice(6)}`;
     return key;
   }
-
+  function segLevel(d, i, h) {
+    if (state.scenario !== 'base' && state.scenario !== 'bg' && d.whatif[state.scenario]) {
+      const w = d.whatif[state.scenario].seg[i];
+      if (w) return CH.indexOf(w[h]);
+    }
+    return CH.indexOf(d.seg[i * HALF + h]);
+  }
   function runs(series, thr, minLen = 2) {
-    const out = [];
-    let s = -1, peak = 0;
+    const out = []; let s = -1, peak = 0;
     for (let b = 0; b <= series.length; b++) {
       const on = b < series.length && series[b] >= thr;
       if (on) { if (s < 0) { s = b; peak = 0; } peak = Math.max(peak, series[b]); }
@@ -530,31 +562,40 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
   }
   const windowsText = ws => ws.map(([a, b]) => binRange(a, b)).join(', ');
 
-  /* ---------- header and calendar ---------- */
+  /* ---------- header, calendar ---------- */
   function renderMeta() {
     const issued = new Date(M.issued);
     $('#m-issued').textContent = `${issued.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} ${pad(issued.getHours())}:${pad(issued.getMinutes())}`;
     $('#m-horizon').textContent = `to ${shortDate(M.horizon)} (synthetic)`;
-    $('#m-n').textContent = M.n;
-    $('#m-n2').textContent = M.n;
-    $('#m-model').textContent = M.model;
-    $('#m-seed').textContent = M.seed;
-    const a = M.assumptions;
-    const share = a.mode_share;
-    const rows = [
-      ['Car drop-off and pick-up', share.car, a.people_per_vehicle.car, 1],
-      ['Park and cruise', share.park, a.people_per_vehicle.park, 1],
-      ['Taxi', share.taxi, a.people_per_vehicle.taxi, 1],
-      ['Coach', share.coach, a.people_per_vehicle.coach, a.coach_pcu],
-      ['Walk or shuttle', share.other, '–', '–'],
-    ];
-    $('#assumptions').innerHTML = `<thead><tr><th>Mode</th><th>Share</th><th>People per vehicle</th><th>Car units</th></tr></thead><tbody>${rows.map(r =>
-      `<tr><td>${r[0]}</td><td class="num">${Math.round(r[1] * 100)}%</td><td class="num">${r[2]}</td><td class="num">${r[3]}</td></tr>`).join('')}</tbody>`;
-    $('#legend').innerHTML = LEVELS.map(l => {
-      const next = LEVELS[l.n + 1];
-      const range = next ? `${l.min}–${next.min}` : `${l.min}+`;
-      return `<span><span class="sw lv-${l.key}"></span>${l.label} <span class="mono">${range}</span></span>`;
-    }).join('') + '<span>corridor-hours at risk</span><span><span class="tag">Works</span> roadworks permit</span><span><span class="tag">Match</span> home match</span><span><span class="tag">?</span> passenger figure missing</span>';
+    $('#m-n').textContent = M.n; $('#m-n2').textContent = M.n;
+    $('#m-model').textContent = M.model; $('#m-seed').textContent = M.seed;
+    const c = M.counts;
+    $('#m-net').textContent = `${int(c.edges)} links · OpenStreetMap`;
+    $('#m-edges').textContent = int(c.edges);
+    $('#m-zones').textContent = int(c.zones);
+    $('#m-gw').textContent = int(c.gateways);
+    $('#m-ods').textContent = int(c.ods);
+    $('#m-scale').textContent = `×${M.scale} for trips within the area and ×${M.scale_ext} for county and through trips`;
+    const ms = M.assumptions.mode_share;
+    $('#m-modes').textContent = `car drop-off ${Math.round(ms.car * 100)}%, park and cruise ${Math.round(ms.park * 100)}%, taxi ${Math.round(ms.taxi * 100)}%, coach ${Math.round(ms.coach * 100)}%`;
+    const rows = {};
+    M.purposes.forEach(p => { (rows[p.group] ||= [0, 0, 0]); p.totals.forEach((t, i) => rows[p.group][i] += t); });
+    $('#purposes').innerHTML = `<thead><tr><th>Trips per day</th><th>Weekday</th><th>Saturday</th><th>Sunday</th></tr></thead><tbody>${Object.entries(rows).map(([g, t]) =>
+      `<tr><td>${esc(M.groups[g])}</td>${t.map(v => `<td class="num">${int(v * (EXTERNAL.has(g) ? M.scale_ext : M.scale))}</td>`).join('')}</tr>`).join('')}</tbody>`;
+    const cal = M.calibration;
+    const keep = cal.rows.filter(r => r.period !== 'day');
+    const sum = (dd, per, k) => keep.filter(r => r.day === dd && r.period === per).reduce((a, r) => a + r[k], 0);
+    const label = { am: '07:00–10:00', pm: '16:00–19:00' };
+    const rowsHtml = keep.map(r => `<tr><td>${esc(r.road)}</td><td>${r.day === 'weekday' ? 'Weekday' : 'Saturday'} ${label[r.period]}</td><td class="num">${int(r.observed)}</td><td class="num">${int(r.modelled)}</td><td class="num">${r.observed ? Math.round((r.modelled / r.observed - 1) * 100) + '%' : ''}</td></tr>`).join('');
+    const sums = ['weekday', 'saturday'].flatMap(dd => ['am', 'pm'].map(per => [dd, per])).map(([dd, per]) => {
+      const o = sum(dd, per, 'observed'), mm = sum(dd, per, 'modelled');
+      return `<tr><td><strong>All four sites</strong>${dd === 'weekday' ? ' (fitted)' : ' (check)'}</td><td>${dd === 'weekday' ? 'Weekday' : 'Saturday'} ${label[per]}</td><td class="num">${int(o)}</td><td class="num">${int(mm)}</td><td class="num">${Math.round((mm / o - 1) * 100)}%</td></tr>`;
+    }).join('');
+    $('#calib').innerHTML = `<thead><tr><th>Count site</th><th>When</th><th>Counted</th><th>Modelled</th><th>Diff</th></tr></thead><tbody>${sums}${rowsHtml}</tbody>`;
+    $('#calib-src').textContent = cal.source;
+    $('#m-uni').textContent = `+${Math.round((M.uni_term - 1) * 100)}%`;
+    $('#legend').innerHTML = LEVELS.map(l => { const nx = LEVELS[l.n + 1]; return `<span><span class="sw lv-${l.key}"></span>${l.label} <span class="mono">${nx ? `${l.min}–${nx.min}` : `${l.min}+`}</span></span>`; }).join('') +
+      '<span>extra corridor-hours at risk from cruise traffic</span><span><span class="tag">Works</span> roadworks permit</span><span><span class="tag">Match</span> home match</span><span><span class="tag">?</span> passenger figure missing</span>';
   }
 
   function renderCalendar() {
@@ -562,425 +603,585 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     const last = dateOf(DATA.days[DATA.days.length - 1].date);
     const cells = [];
     for (const d = new Date(first); d <= last; d.setDate(d.getDate() + 1)) {
-      const iso = isoOf(d);
-      const day = BY_DATE[iso];
+      const iso = isoOf(d), dd = BY_DATE[iso];
       const mon = (d.getDate() === 1 || iso === '2026-10-12') ? `<span class="mon">${d.toLocaleDateString('en-GB', { month: 'short' })}</span>` : '';
-      if (!day) {
-        cells.push(`<div class="cell cell-off"><span class="cell-top"><span class="dnum">${d.getDate()}</span>${mon}</span>${iso === ISSUED_DAY ? '<span class="today">Issued today</span>' : ''}</div>`);
-        continue;
-      }
+      if (!dd) { cells.push(`<div class="cell cell-off"><span class="cell-top"><span class="dnum">${d.getDate()}</span>${mon}</span>${iso === ISSUED_DAY ? '<span class="today">Issued today</span>' : ''}</div>`); continue; }
       const pressed = iso === state.date ? 'true' : 'false';
-      if (day.beyond) {
-        cells.push(`<button class="cell cell-beyond" data-date="${iso}" aria-pressed="${pressed}" aria-label="${esc(longDate(iso))}: no published schedule"><span class="cell-top"><span class="dnum">${d.getDate()}</span>${mon}</span><span class="cell-ships">No schedule</span></button>`);
-        continue;
-      }
-      const lv = level(day.score);
-      const n = day.calls.length;
-      const tags = [];
-      day.permits.forEach(id => tags.push(`<span class="tag" title="Roadworks permit ${id}">Works</span>`));
-      if (day.match) tags.push(`<span class="tag" title="Home match, kick-off ${day.match}">Match</span>`);
-      if (day.calls.some(c => c.pax == null)) tags.push('<span class="tag" title="A ship has no published passenger figure">?</span>');
-      const label = `${longDate(iso)}: ${n} ${n === 1 ? 'ship' : 'ships'}, ${lv.label}, ${fmt1(day.score)} corridor-hours at risk`;
-      cells.push(`<button class="cell lv-${lv.key}" data-date="${iso}" aria-pressed="${pressed}" aria-label="${esc(label)}">
+      if (dd.beyond) { cells.push(`<button class="cell cell-beyond" data-date="${iso}" aria-pressed="${pressed}" aria-label="${esc(longDate(iso))}: no published schedule"><span class="cell-top"><span class="dnum">${d.getDate()}</span>${mon}</span><span class="cell-ships">No schedule</span></button>`); continue; }
+      const lv = level(uplift(dd)), n = dd.calls.length, tags = [];
+      dd.permits.forEach(id => tags.push(`<span class="tag" title="Roadworks permit ${id}">Works</span>`));
+      if (dd.match) tags.push(`<span class="tag" title="Home match, kick-off ${dd.match}">Match</span>`);
+      if (dd.calls.some(c => c.pax == null)) tags.push('<span class="tag" title="A ship has no published passenger figure">?</span>');
+      cells.push(`<button class="cell lv-${lv.key}" data-date="${iso}" aria-pressed="${pressed}" aria-label="${esc(`${longDate(iso)}: ${n} ships, ${lv.label}, cruise traffic adds ${fmt1(uplift(dd))} corridor-hours at risk`)}">
         <span class="cell-top"><span class="dnum">${d.getDate()}</span>${mon}</span>
         <span class="cell-ships">${n ? `${n} ${n === 1 ? 'ship' : 'ships'}` : 'No ships'}</span>
-        <span class="cell-tags">${tags.join('')}</span>
-        <span class="cell-lv">${lv.label}</span></button>`);
+        <span class="cell-tags">${tags.join('')}</span><span class="cell-lv">${lv.label}</span></button>`);
     }
     $('#cal').innerHTML = cells.join('');
   }
+  $('#cal').addEventListener('click', e => { const b = e.target.closest('button[data-date]'); if (b) selectDay(b.dataset.date, true); });
 
-  $('#cal').addEventListener('click', e => {
-    const b = e.target.closest('button[data-date]');
-    if (b) selectDay(b.dataset.date, true);
-  });
+  /* ---------- map ---------- */
+  let T = { k: 1, x: 0, y: 0 }, fit = { s: 1, ox: 0, oy: 0 }, zoomer = null, segCenters = {};
+  const svg = $('#map-svg');
+  function buildMap() {
+    const L = MAP.layers;
+    const fills = ['water', 'mud', 'green', 'wood', 'residential', 'commercial', 'industrial', 'port', 'campus', 'airport'];
+    const order = ['residential', 'commercial', 'industrial', 'campus', 'airport', 'port', 'green', 'wood', 'mud', 'water'];
+    let html = order.filter(k => L[k]).map(k => `<path class="lyr f-${k}" fill-rule="evenodd" d="${L[k]}"/>`).join('');
+    if (L.minor) html += `<path class="s-minor" d="${L.minor}"/>`;
+    if (L.rail) html += `<path class="s-rail" d="${L.rail}"/>`;
+    if (L.boundary) html += `<path class="s-boundary" d="${L.boundary}"/>`;
+    const order2 = SEGS.map((s, i) => i).sort((a, b) => (WIDTH[SEGS[a].c] || 1) - (WIDTH[SEGS[b].c] || 1));
+    html += '<g id="casings">' + order2.map(i => `<path class="casing" d="${SEGS[i].d}" style="stroke-width:${(WIDTH[SEGS[i].c] || 1.2) + 1.8}px"/>`).join('') + '</g>';
+    html += '<g id="roads">' + order2.map(i => `<path class="road" id="s${i}" data-s="${i}" d="${SEGS[i].d}" style="stroke-width:${WIDTH[SEGS[i].c] || 1.2}px"/>`).join('') + '</g>';
+    html += '<g id="cruise-lyr"></g><g id="route-lyr"></g>';
+    $('#world').innerHTML = html;
+    void fills;
+    layout();
+    if (window.d3) {
+      zoomer = d3.zoom().scaleExtent([0.8, 16]).on('zoom', e => { T = e.transform; $('#zoom').setAttribute('transform', `translate(${T.x},${T.y}) scale(${T.k})`); placeUI(); });
+      d3.select(svg).call(zoomer).on('dblclick.zoom', null);
+      zoomTo('docks', false);
+    }
+    $('#z-in').addEventListener('click', () => zoomer && d3.select(svg).transition().duration(250).call(zoomer.scaleBy, 1.6));
+    $('#z-out').addEventListener('click', () => zoomer && d3.select(svg).transition().duration(250).call(zoomer.scaleBy, 1 / 1.6));
+    $('#z-docks').addEventListener('click', () => zoomTo('docks', true));
+    $('#z-all').addEventListener('click', () => zoomTo('all', true));
+    $('#world').addEventListener('mousemove', onRoadHover);
+    $('#world').addEventListener('mouseleave', () => { $('#map-tip').hidden = true; });
+    $('#world').addEventListener('click', e => {
+      const p = e.target.closest('.road'); if (!p) return;
+      const i = +p.dataset.s;
+      const c = DATA.corridors.find(c => c.segs.includes(i));
+      if (c) { state.corr = c.id; renderHeat(); renderInfo(); highlightCorr(); }
+    });
+    new ResizeObserver(() => { layout(); }).observe($('#map-box'));
+  }
+  function layout() {
+    const w = svg.clientWidth || 800, h = svg.clientHeight || 500;
+    fit.s = Math.min(w / MW, h / MH); fit.ox = (w - MW * fit.s) / 2; fit.oy = (h - MH * fit.s) / 2;
+    $('#world').setAttribute('transform', `translate(${fit.ox},${fit.oy}) scale(${fit.s})`);
+    placeUI();
+  }
+  function screen(x, y) { return [T.x + T.k * (fit.ox + x * fit.s), T.y + T.k * (fit.oy + y * fit.s)]; }
+  function zoomTo(which, animate) {
+    if (!zoomer) return;
+    const w = svg.clientWidth, h = svg.clientHeight;
+    let box = [0, 0, MW, MH];
+    if (which === 'docks') {
+      const keys = Object.keys(DATA.terminal_gate).concat(['station', 'stadium']);
+      const pts = DATA.gates.map(g => [g.x, g.y]).concat(keys.filter(k => MAP.landmarks[k]).map(k => MAP.landmarks[k]));
+      const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+      box = [Math.min(...xs) - 1200, Math.min(...ys) - 900, Math.max(...xs) + 1200, Math.max(...ys) + 700];
+    }
+    const bw = (box[2] - box[0]) * fit.s, bh = (box[3] - box[1]) * fit.s;
+    const k = Math.max(0.8, Math.min(16, 0.95 * Math.min(w / bw, h / bh)));
+    const cx = fit.ox + ((box[0] + box[2]) / 2) * fit.s, cy = fit.oy + ((box[1] + box[3]) / 2) * fit.s;
+    const t = d3.zoomIdentity.translate(w / 2 - k * cx, h / 2 - k * cy).scale(k);
+    (animate ? d3.select(svg).transition().duration(450) : d3.select(svg)).call(zoomer.transform, t);
+  }
 
-  /* ---------- day view ---------- */
-  function selectDay(iso, scroll) {
-    stopPlay();
-    state.date = iso;
-    state.scenario = 'base';
-    const day = BY_DATE[iso];
-    if (!day.beyond) {
-      let best = -1, bestBin = 30;
-      for (let b = 0; b < N_BINS; b++) {
-        let s = 0;
-        for (const c of DATA.corridors) s += day.p85[c.id][b];
-        if (s > best) { best = s; bestBin = b; }
+  function placeUI() {
+    if (!state.date || BY_DATE[state.date].beyond) { $('#ui').innerHTML = ''; return; }
+    const d = day(), parts = [], k = T.k * fit.s, named = new Set();
+    const showMinor = k > 0.11, showSub = k > 0.05;
+    for (const p of MAP.places) {
+      if (named.has(p.name)) continue;
+      named.add(p.name);
+      const big = p.kind === 'town';
+      const sub = p.kind === 'suburb';
+      if (!big && !sub && !showMinor) continue;
+      if (sub && !showSub) continue;
+      const [x, y] = screen(p.x, p.y);
+      const cls = big ? 'lbl-town' : sub ? 'lbl-suburb' : 'lbl-minor';
+      parts.push(`<text class="lbl ${cls}" x="${x}" y="${y}" text-anchor="middle">${esc(p.name)}</text>`);
+    }
+    for (const wl of MAP.water) { const [x, y] = screen(wl.x, wl.y); parts.push(`<text class="lbl lbl-water" x="${x}" y="${y}" text-anchor="middle">${esc(wl.name)}</text>`); }
+    // queues
+    if (state.layer === 'queue') {
+      const h = Math.floor(state.bin / 2);
+      for (const [i, s] of Object.entries(d.queue)) {
+        const q = CH.indexOf(s[h]) * 10;
+        if (q < 5) continue;
+        const c = centerOf(+i); if (!c) continue;
+        const [x, y] = screen(c[0], c[1]);
+        parts.push(`<circle class="q-dot" cx="${x}" cy="${y}" r="${(3 + Math.sqrt(q) * 0.9).toFixed(1)}"><title>${esc(SEGS[i].n || 'Road')}: about ${q} vehicles waiting per 15 minutes</title></circle>`);
       }
-      state.bin = best > 0 ? bestBin : 30;
-      let top = 'wqr', topP = -1;
-      for (const c of DATA.corridors) if (day.p85[c.id][state.bin] > topP) { topP = day.p85[c.id][state.bin]; top = c.id; }
-      state.corr = top;
     }
-    renderCalendar();
-    renderDay();
-    if (scroll) $('#day').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    // county gateways with inflow
+    for (const g of DATA.gateways) {
+      const [x, y] = screen(g.x, g.y);
+      const v = (d.gw_in[g.name] || [])[state.bin] || 0;
+      const label = `${g.name}`;
+      parts.push(`<circle class="mk-gw" cx="${x}" cy="${y}" r="5"/><text class="mk-label" x="${x + 8}" y="${y - 6}">${esc(label)}</text>`);
+      const txt = `${int(v)}/h in`;
+      const w = txt.length * 6.6 + 10;
+      parts.push(`<g class="gw-pill" transform="translate(${x + 8},${y + 1})"><rect width="${w}" height="16" rx="8"/><text x="5" y="11.5">${txt}</text><title>${esc(g.name)} (${esc(g.hint)}): ${int(v)} vehicles per hour entering</title></g>`);
+    }
+    // landmarks
+    const lm = MAP.landmarks;
+    for (const [key, name] of [['station', 'Central station'], ['stadium', "St Mary's"]]) {
+      if (!lm[key]) continue;
+      const [x, y] = screen(...lm[key]);
+      parts.push(`<circle class="mk-poi" cx="${x}" cy="${y}" r="4.5"/><text class="mk-label" x="${x + 7}" y="${y + 4}">${name}</text>`);
+    }
+    const termGate = DATA.terminal_gate;
+    for (const t of Object.keys(termGate)) {
+      if (!lm[t]) continue;
+      const [x, y] = screen(...lm[t]);
+      const busy = d.calls.some(c => c.terminal === t);
+      parts.push(`<path class="mk-term" d="M${x - 7},${y - 2} L${x + 7},${y - 2} L${x + 4},${y + 4} L${x - 4},${y + 4} Z" style="${busy ? 'fill: var(--accent)' : ''}"><title>${esc(t)} Cruise Terminal${busy ? ': ship in today' : ''}</title></path>`);
+      if (busy || T.k > 2) parts.push(`<text class="mk-label" x="${x + 9}" y="${y + 4}">${esc(t)}</text>`);
+    }
+    for (const g of DATA.gates) {
+      const [x, y] = screen(g.x, g.y);
+      parts.push(`<rect class="mk-gate" x="${x - 5}" y="${y - 5}" width="10" height="10" rx="2"/><text class="mk-label" x="${x + 8}" y="${y + 13}">${esc(g.name)}</text>`);
+    }
+    $('#ui').innerHTML = parts.join('');
+  }
+  function centerOf(i) {
+    if (segCenters[i]) return segCenters[i];
+    const el = document.getElementById('s' + i); if (!el) return null;
+    const b = el.getBBox(); segCenters[i] = [b.x + b.width / 2, b.y + b.height / 2];
+    return segCenters[i];
   }
 
-  function renderDay() {
-    const day = BY_DATE[state.date];
-    const el = $('#day');
-    if (day.beyond) {
-      el.innerHTML = `<div class="card refusal">
-        <p class="eyebrow">Outside coverage</p>
-        <h2>No forecast for ${esc(longDate(day.date))}</h2>
-        <p>The published cruise schedule ends on ${esc(longDate(M.horizon))}. Without a schedule there are no ship calls to forecast from, so the tool shows nothing rather than a guess. Dates fill in when the next schedule is published.</p>
-        <p><button class="btn btn-primary" id="goto-last">Open ${esc(shortDate(M.horizon))}, the last covered day</button></p>
-      </div>`;
-      $('#goto-last').addEventListener('click', () => selectDay(M.horizon, true));
-      return;
+  function paintRoads() {
+    const d = day(); if (!d || d.beyond) return;
+    const h = Math.floor(state.bin / 2);
+    const roads = $('#roads').children;
+    const cruiseMode = state.layer === 'cruise';
+    for (const el of roads) {
+      const i = +el.dataset.s;
+      el.style.stroke = cruiseMode ? PAL.quiet : loadColor(segLevel(d, i, h) * 0.05);
     }
-    const lv = level(day.score);
-    const notices = [];
-    day.permits.forEach(id => {
-      const p = PERMIT[id];
-      const canMove = !!day.whatif.move_permit;
-      notices.push(`<div class="notice"><span class="tag">Works</span><span><strong>Permit ${id}:</strong> ${esc(p.what)} on ${esc(CORR[p.corridor].name)}, ${esc(shortDate(p.from))} to ${esc(shortDate(p.to))}. Already included in this forecast.${canMove ? ' <button class="linkbtn" data-scenario="move_permit">See it moved</button>' : ''}</span></div>`);
+    let cr = '';
+    if (cruiseMode) {
+      for (const [i, s] of Object.entries(d.cruise)) {
+        const v = CH.indexOf(s[h]) * 20;
+        if (v < 10) continue;
+        cr += `<path class="cruise-flow" d="${SEGS[i].d}" style="stroke-width:${(1.5 + v / 45).toFixed(1)}px"/>`;
+      }
+    }
+    $('#cruise-lyr').innerHTML = cr;
+    $('#world').classList.toggle('dim', !!state.showRoutes);
+    renderRouteOverlay();
+    highlightCorr();
+    $('#clock').textContent = binRange(state.bin, state.bin);
+    $('#rt-clock').textContent = binTime(state.bin);
+    renderMapLegend();
+  }
+  function highlightCorr() {
+    document.querySelectorAll('#roads .hl').forEach(el => el.classList.remove('hl'));
+    const c = CORR[state.corr]; if (!c) return;
+    c.segs.forEach(i => { const el = document.getElementById('s' + i); if (el) el.classList.add('hl'); });
+  }
+  function renderMapLegend() {
+    const L = state.layer;
+    let html = '';
+    if (L === 'cruise') html = `<span><svg width="44" height="10" aria-hidden="true"><line x1="2" y1="5" x2="42" y2="5" stroke="var(--cruise)" stroke-width="2"/></svg> 50</span><span><svg width="44" height="12" aria-hidden="true"><line x1="3" y1="6" x2="41" y2="6" stroke="var(--cruise)" stroke-width="6" stroke-linecap="round"/></svg> 200 cruise vehicles per hour</span>`;
+    else html = `<span class="ramp">${[0.3, 0.6, 0.78, 0.92, 1.1, 1.3].map(x => `<i style="background:${loadColor(x)}"></i>`).join('')}</span><span>Load: under 50% · 70% · 85% · full · over capacity</span>`;
+    if (L === 'queue') html += '<span><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="5" class="q-dot"/></svg> vehicles waiting at a bottleneck</span>';
+    html += '<span><svg width="12" height="12" aria-hidden="true"><rect x="1" y="1" width="10" height="10" rx="2" class="mk-gate"/></svg> dock gate</span><span><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="5" class="mk-gw"/></svg> county gateway, vehicles per hour coming in</span>';
+    html += '<span class="muted">Drag to pan, scroll or pinch to zoom.</span>';
+    $('#map-legend').innerHTML = html;
+  }
+  function onRoadHover(e) {
+    const p = e.target.closest('.road'); const tip = $('#map-tip');
+    if (!p) { tip.hidden = true; return; }
+    const i = +p.dataset.s, d = day(), h = Math.floor(state.bin / 2);
+    const x = segLevel(d, i, h) * 0.05;
+    const cr = d.cruise[i] ? CH.indexOf(d.cruise[i][h]) * 20 : 0;
+    const corr = DATA.corridors.find(c => c.segs.includes(i));
+    tip.innerHTML = `<strong>${esc(SEGS[i].n || 'Unnamed ' + SEGS[i].c + ' road')}</strong><br>Load <span class="mono">${Math.round(x * 100)}%</span> of capacity${cr ? ` · cruise <span class="mono">${cr}</span>/h` : ''}${corr ? `<br><span class="muted">Click to show ${esc(corr.name)} in the heatmap</span>` : ''}`;
+    const r = $('#map-box').getBoundingClientRect();
+    tip.hidden = false;
+    const tx = Math.min(e.clientX - r.left + 14, r.width - tip.offsetWidth - 8);
+    tip.style.left = `${Math.max(8, tx)}px`; tip.style.top = `${Math.max(8, e.clientY - r.top + 14)}px`;
+  }
+  document.querySelectorAll('[data-layer]').forEach(b => b.addEventListener('click', () => {
+    state.layer = b.dataset.layer;
+    document.querySelectorAll('[data-layer]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    paintRoads(); placeUI();
+  }));
+
+  /* ---------- route choice ---------- */
+  function renderRoutesCard() {
+    const d = day();
+    if (!d.routes.length) { $('#od-list').innerHTML = '<p class="muted">No cruise traffic today.</p>'; $('#routes').innerHTML = ''; $('#share-chart').innerHTML = ''; state.showRoutes = false; return; }
+    state.od = Math.min(state.od, d.routes.length - 1);
+    $('#od-list').innerHTML = d.routes.map((r, i) => `<button class="od" data-od="${i}" aria-pressed="${i === state.od}">
+      <span><strong>${esc(r.from)}</strong> → <strong>${esc(r.to)}</strong></span><span class="mono">${int(r.veh)}</span>
+      <small>${r.hint ? esc(r.hint) + ' · ' : ''}cruise vehicles over the day</small></button>`).join('');
+    $('#od-list').querySelectorAll('[data-od]').forEach(b => b.addEventListener('click', () => { state.od = +b.dataset.od; state.showRoutes = true; renderRoutesCard(); paintRoads(); }));
+    renderRouteDetail();
+  }
+  function renderRouteDetail() {
+    const d = day(); const od = d.routes[state.od]; if (!od) return;
+    const b = state.bin;
+    $('#routes').innerHTML = od.routes.map((r, i) => `<div class="rt">
+      <span class="rt-key" style="background: var(--${['ra', 'rb', 'rc'][i]})"></span>
+      <span>Route ${'ABC'[i]}: ${r.via.length ? esc(r.via.join(' → ')) : 'local roads'}</span>
+      <span class="mono">${r.share[b]}% · ${(r.min[b] / 10).toFixed(1)} min</span>
+      <span class="rt-bar"><i style="width:${r.share[b]}%; background: var(--${['ra', 'rb', 'rc'][i]})"></i></span></div>`).join('') +
+      `<p class="foot-note">Shares are for all traffic between these two places at ${binTime(b)}, and shift as roads fill. <button class="linkbtn" id="toggle-routes">${state.showRoutes ? 'Hide routes on the map' : 'Show routes on the map'}</button></p>`;
+    $('#toggle-routes').addEventListener('click', () => { state.showRoutes = !state.showRoutes; renderRouteDetail(); paintRoads(); });
+    // stacked share chart
+    const X0 = 30, X1 = 314, Y0 = 6, Y1 = 70;
+    const x = i => X0 + (i + 0.5) * (X1 - X0) / N_BINS;
+    let acc = new Array(N_BINS).fill(0), areas = '';
+    od.routes.forEach((r, ri) => {
+      const top = r.share.map((s, i) => acc[i] + s);
+      const pts = top.map((v, i) => `${x(i).toFixed(1)},${(Y1 - v / 100 * (Y1 - Y0)).toFixed(1)}`)
+        .concat(acc.map((v, i) => `${x(i).toFixed(1)},${(Y1 - v / 100 * (Y1 - Y0)).toFixed(1)}`).reverse());
+      areas += `<polygon points="${pts.join(' ')}" style="fill: var(--${['ra', 'rb', 'rc'][ri]}); opacity: 0.75"/>`;
+      acc = top;
     });
-    if (day.match) notices.push(`<div class="notice"><span class="tag">Match</span><span>Home match at St Mary's, kick-off ${day.match}. Background traffic on Northam Bridge, St Mary's Road, Terminus Terrace and Kingsway is raised before kick-off and after the final whistle.</span></div>`);
-    day.calls.filter(c => c.pax == null).forEach(c => notices.push(`<div class="notice notice-warn"><span class="tag">Missing data</span><span><strong>${esc(c.ship)}</strong> has no published passenger figure. The forecast assumes ${M.unknown_pax_range[0].toLocaleString('en-GB')} to ${M.unknown_pax_range[1].toLocaleString('en-GB')} passengers, so its gate traffic has a wider range than usual.</span></div>`));
-    if (!day.calls.length) notices.push('<div class="notice"><span class="tag">No ships</span><span>No turnarounds today. Background traffic only.</span></div>');
+    const ticks = [6, 9, 12, 15, 18].map(hh => `<text class="ax" x="${x((hh - 5) * 4)}" y="${Y1 + 11}" text-anchor="middle">${pad(hh)}:00</text>`).join('');
+    $('#share-chart').innerHTML = `<svg viewBox="0 0 320 84" role="img" aria-label="Share of traffic on each route through the day">${areas}
+      <text class="ax" x="${X0 - 4}" y="${Y0 + 6}" text-anchor="end">100%</text><text class="ax" x="${X0 - 4}" y="${Y1}" text-anchor="end">0</text>
+      <line class="now" x1="${x(b)}" x2="${x(b)}" y1="${Y0}" y2="${Y1}"/>${ticks}</svg>`;
+  }
+  function renderRouteOverlay() {
+    const d = day(); const lyr = $('#route-lyr');
+    if (!state.showRoutes || !d.routes[state.od]) { lyr.innerHTML = ''; return; }
+    const od = d.routes[state.od];
+    lyr.innerHTML = od.routes.map((r, i) => {
+      const dd = DATA.paths[r.pid]; if (!dd) return '';
+      const w = 2.5 + r.share[state.bin] / 14;
+      return `<path class="route-casing" d="${dd}" style="stroke-width:${w + 3}px"/><path class="route r${i}" d="${dd}" style="stroke-width:${w}px"/>`;
+    }).reverse().join('');
+  }
 
-    const scenOpts = ['base', 'bg', ...Object.keys(day.whatif)];
-    const whatifNote = Object.keys(day.whatif).length ? '' : '<span class="foot-note">Road closure what-ifs are precomputed for the busiest days and permit days in this demo. The product runs them on request in a few seconds.</span>';
-
-    el.innerHTML = `
-      <div class="day-head">
-        <div><p class="eyebrow">Day view</p><h2>${esc(longDate(day.date))}</h2></div>
-        <div class="day-stats">
-          <span class="pill lv-${lv.key}">${lv.label}</span>
-          <span><span class="big">${fmt1(day.score)}</span> corridor-hours at risk</span>
-          <span class="muted"><span class="mono">${fmt1(day.bg_score)}</span> without cruise traffic</span>
-        </div>
-      </div>
-      <div class="notices">${notices.join('')}</div>
-      <div class="grid2">
-        <div class="card">
-          <div class="card-head"><h3>Suggested actions</h3><span class="foot-note">Suggestions only. The duty officer decides.</span></div>
-          <div class="actions" id="actions"></div>
-        </div>
-        <div class="card">
-          <div class="card-head"><h3>Ships turning around</h3><span class="foot-note">Synthetic schedule</span></div>
-          ${shipsTable(day)}
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-head">
-          <h3>When each road is at risk</h3>
-          <div class="scale"><span>Chance above 85% of capacity</span><span class="scale-bar" id="scale-bar"></span><span class="mono">0–100%</span></div>
-        </div>
-        <div class="scenario">
-          <label for="scenario">Scenario</label>
-          <select id="scenario">${scenOpts.map(k => `<option value="${k}"${k === state.scenario ? ' selected' : ''}>${esc(scenarioLabel(day, k))}</option>`).join('')}</select>
-          <span class="delta" id="delta"></span>
-          ${whatifNote}
-        </div>
-        <div class="hm-scroll" id="hm"></div>
-        <p class="info" id="info"></p>
-      </div>
-      <div class="grid2">
-        <div class="card map">
-          <div class="card-head"><h3>Roads at <span class="clock" id="clock"></span></h3><span class="foot-note">Schematic, not to scale</span></div>
-          <div id="map"></div>
-          <div class="time-row">
-            <button class="btn" id="play" aria-label="Play through the day">Play</button>
-            <input type="range" id="slider" min="0" max="${N_BINS - 1}" step="1" value="${state.bin}" aria-label="Time of day">
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-head"><h3>Dock gate traffic</h3><span class="foot-note">Cars per hour, coaches count as 2</span></div>
-          <div class="gates" id="gates"></div>
-        </div>
-      </div>`;
-
-    el.querySelectorAll('[data-scenario]').forEach(b => b.addEventListener('click', () => setScenario(b.dataset.scenario)));
-    $('#scenario').addEventListener('change', e => setScenario(e.target.value));
-    $('#slider').addEventListener('input', e => setBin(+e.target.value));
-    $('#play').addEventListener('click', togglePlay);
-    $('#hm').addEventListener('click', onHeatPointer);
-    $('#hm').addEventListener('mousemove', onHeatHover);
-    $('#hm').addEventListener('mouseleave', renderInfo);
-    $('#map').addEventListener('click', e => {
-      const t = e.target.closest('[data-c]');
-      if (t) { state.corr = t.dataset.c; renderHeat(); renderMap(); renderInfo(); }
+  /* ---------- traffic mix ---------- */
+  function renderMix() {
+    const d = day(); const b = state.bin;
+    const groups = GROUP_ORDER.filter(g => d.mix[g] && d.mix[g].some(v => v > 0));
+    const total = new Array(N_BINS).fill(0);
+    groups.forEach(g => d.mix[g].forEach((v, i) => total[i] += v));
+    const max = Math.max(...total, 1);
+    const step = max > 40000 ? 10000 : max > 15000 ? 5000 : 2000;
+    const ymax = Math.ceil(max / step) * step;
+    const X0 = 40, X1 = 314, Y0 = 6, Y1 = 110;
+    const x = i => X0 + (i + 0.5) * (X1 - X0) / N_BINS, y = v => Y1 - v / ymax * (Y1 - Y0);
+    let acc = new Array(N_BINS).fill(0), areas = '';
+    groups.forEach(g => {
+      const top = d.mix[g].map((v, i) => acc[i] + v);
+      const pts = top.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).concat(acc.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).reverse());
+      areas += `<polygon points="${pts.join(' ')}" style="fill:${PAL.groups[g]}"><title>${esc(M.groups[g])}</title></polygon>`;
+      acc = top;
     });
-    renderActions();
-    renderVisuals();
-  }
-
-  function shipsTable(day) {
-    if (!day.calls.length) return '<p class="muted">None.</p>';
-    return `<div class="table-scroll"><table><thead><tr><th>Ship</th><th>Terminal and gate</th><th>Alongside</th><th>Berths</th></tr></thead><tbody>${day.calls.map(c => `
-      <tr><td>${esc(c.ship)}</td><td>${esc(c.terminal)}<br><span class="muted">${esc(GATE_NAME[c.gate])}</span></td>
-      <td class="num">${c.arr}–${c.dep}</td>
-      <td class="num">${c.pax == null ? '<span class="tag" style="color: var(--warn-ink)">Not published</span>' : c.pax.toLocaleString('en-GB')}</td></tr>`).join('')}</tbody></table></div>`;
-  }
-
-  function setScenario(key) {
-    state.scenario = key;
-    const sel = $('#scenario');
-    if (sel) sel.value = key;
-    renderVisuals();
-  }
-  function setBin(b) {
-    state.bin = Math.max(0, Math.min(N_BINS - 1, b));
-    const s = $('#slider');
-    if (s && +s.value !== state.bin) s.value = state.bin;
-    renderHeat(); renderMap(); renderGates(); renderInfo();
-  }
-  function togglePlay() {
-    if (state.playing) return stopPlay();
-    if (state.bin >= N_BINS - 1) state.bin = 0;
-    $('#play').textContent = 'Pause';
-    state.playing = setInterval(() => {
-      if (state.bin >= N_BINS - 1) return stopPlay();
-      setBin(state.bin + 1);
-    }, 220);
-  }
-  function stopPlay() {
-    if (state.playing) clearInterval(state.playing);
-    state.playing = null;
-    const b = $('#play');
-    if (b) b.textContent = 'Play';
-  }
-
-  function renderVisuals() {
-    const day = BY_DATE[state.date];
-    const P = palette();
-    $('#scale-bar').style.background = `linear-gradient(90deg, ${[0, 20, 40, 60, 80, 100].map(p => heat(p, P)).join(',')})`;
-    const base = day.score, now = scenarioScore(day, state.scenario);
-    let delta = '';
-    if (state.scenario !== 'base') {
-      const diff = now - base;
-      delta = `Corridor-hours at risk: <span class="mono">${fmt1(base)}</span> as planned → <span class="mono">${fmt1(now)}</span> (<span class="mono">${diff >= 0 ? '+' : '−'}${fmt1(Math.abs(diff))}</span>)`;
-    }
-    $('#delta').innerHTML = delta;
-    renderHeat(); renderMap(); renderGates(); renderInfo();
+    const grid = [0, ymax / 2, ymax].map(v => `<line class="grid-l" x1="${X0}" x2="${X1}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${X0 - 4}" y="${y(v) + 3}" text-anchor="end">${v >= 1000 ? (v / 1000) + 'k' : v}</text>`).join('');
+    const ticks = [6, 9, 12, 15, 18].map(hh => `<text class="ax" x="${x((hh - 5) * 4)}" y="${Y1 + 11}" text-anchor="middle">${pad(hh)}:00</text>`).join('');
+    $('#mix-chart').innerHTML = `<svg viewBox="0 0 320 126" role="img" aria-label="Vehicles per hour starting trips, by kind of trip">${grid}${areas}<line class="now" x1="${x(b)}" x2="${x(b)}" y1="${Y0}" y2="${Y1}"/>${ticks}</svg>`;
+    $('#mix-legend').innerHTML = groups.slice().reverse().map(g => `<span><span class="sw" style="background:${PAL.groups[g]}"></span>${esc(M.groups[g])} <span class="mono">${int(d.mix[g][b])}</span></span>`).join('') +
+      `<span class="muted">Waiting in queues: <span class="mono">${int(d.held[b])}</span> vehicles</span>`;
+    const gws = DATA.gateways.map(g => ({ g, v: (d.gw_in[g.name] || [])[b] || 0 })).sort((a, c) => c.v - a.v).slice(0, 6);
+    const gmax = Math.max(...gws.map(r => r.v), 1);
+    $('#gw-list').innerHTML = gws.map(({ g, v }) => `<div class="gw-row"><span>${esc(g.name)} <span class="muted">${esc(g.hint)}</span></span><span class="mono">${int(v)}/h</span><span class="rt-bar"><i style="width:${(v / gmax * 100).toFixed(0)}%; background: var(--g-county)"></i></span></div>`).join('');
   }
 
   /* ---------- heatmap ---------- */
-  const HM = { LW: 206, CW: 12, RH: 20, GH: 22, TOP: 24 };
+  const HM = { LW: 220, CW: 12, RH: 20, GH: 22, TOP: 24 };
   let hmRows = [];
   function renderHeat() {
-    const day = BY_DATE[state.date];
-    const p = scenarioP85(day, state.scenario);
-    const P = palette();
+    const d = day(), parts = [];
+    const delayMode = state.metric === 'delay';
+    const p = delayMode ? Object.fromEntries(Object.entries(d.delay).map(([id, a]) => [id, a.map(v => Math.min(100, v / 30 * 100))])) : scenP85(d, state.scenario);
     const { LW, CW, RH, GH, TOP } = HM;
-    const parts = [];
-    hmRows = [];
-    let y = TOP;
-    for (const g of GROUPS) {
-      parts.push(`<text class="hm-group" x="0" y="${y + 15}">${esc(g.name)}</text>`);
-      y += GH;
-      for (const id of g.ids) {
-        const sel = id === state.corr;
+    hmRows = []; let y = TOP;
+    const groups = [...new Set(DATA.corridors.map(c => c.group))];
+    for (const g of groups) {
+      parts.push(`<text class="hm-group" x="0" y="${y + 15}">${esc(g)}</text>`); y += GH;
+      for (const c of DATA.corridors.filter(c => c.group === g)) {
+        const sel = c.id === state.corr;
         if (sel) parts.push(`<rect class="hm-rowsel" x="0" y="${y - 1}" width="${LW - 6}" height="${RH}" rx="3"/>`);
-        parts.push(`<text class="hm-label${sel ? ' sel' : ''}" x="6" y="${y + 13}">${esc(CORR[id].name)}</text>`);
-        for (let b = 0; b < N_BINS; b++) {
-          parts.push(`<rect class="hm-cell" x="${LW + b * CW}" y="${y}" width="${CW - 1}" height="${RH - 2}" fill="${heat(p[id][b], P)}"/>`);
-        }
-        hmRows.push([y, y + RH, id]);
-        y += RH;
+        parts.push(`<text class="hm-label${sel ? ' sel' : ''}" x="6" y="${y + 13}">${esc(c.name)}</text>`);
+        for (let b = 0; b < N_BINS; b++) parts.push(`<rect class="hm-cell" x="${LW + b * CW}" y="${y}" width="${CW - 1}" height="${RH - 2}" fill="${heat(p[c.id][b])}"/>`);
+        hmRows.push([y, y + RH, c.id]); y += RH;
       }
       y += 4;
     }
-    for (let h = 5; h <= 20; h++) {
-      const x = LW + (h - 5) * 4 * CW;
+    for (let hh = 5; hh <= 20; hh++) {
+      const x = LW + (hh - 5) * 4 * CW;
       parts.push(`<line class="hm-tick" x1="${x - 0.5}" x2="${x - 0.5}" y1="${TOP - 6}" y2="${TOP - 1}"/>`);
-      if (h < 20) parts.push(`<text class="hm-axis" x="${x + 1}" y="${TOP - 9}">${pad(h)}</text>`);
+      if (hh < 20) parts.push(`<text class="hm-axis" x="${x + 1}" y="${TOP - 9}">${pad(hh)}</text>`);
     }
     parts.push(`<rect class="hm-sel" x="${LW + state.bin * CW - 1}" y="${TOP - 2}" width="${CW + 1}" height="${y - TOP}" rx="2"/>`);
-    const W = LW + N_BINS * CW + 4;
-    $('#hm').innerHTML = `<svg viewBox="0 0 ${W} ${y + 2}" role="img" aria-label="Heatmap of the chance each road is above 85% of capacity, by 15 minutes from 05:00 to 20:00">${parts.join('')}</svg>`;
+    $('#hm').innerHTML = `<svg viewBox="0 0 ${LW + N_BINS * CW + 4} ${y + 2}" role="img" aria-label="Chance each named road is above 85% of capacity, by 15 minutes from 05:00 to 20:00">${parts.join('')}</svg>`;
   }
   function heatHit(e) {
-    const svg = $('#hm svg');
-    if (!svg) return null;
-    const pt = svg.createSVGPoint();
-    pt.x = e.clientX; pt.y = e.clientY;
-    const loc = pt.matrixTransform(svg.getScreenCTM().inverse());
+    const s = $('#hm svg'); if (!s) return null;
+    const pt = s.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+    const loc = pt.matrixTransform(s.getScreenCTM().inverse());
     const b = Math.floor((loc.x - HM.LW) / HM.CW);
     const row = hmRows.find(([a, z]) => loc.y >= a && loc.y < z);
     return { b: b >= 0 && b < N_BINS ? b : null, id: row ? row[2] : null };
   }
-  function onHeatPointer(e) {
-    const h = heatHit(e);
-    if (!h) return;
-    if (h.id) state.corr = h.id;
-    if (h.b != null) setBin(h.b); else { renderHeat(); renderMap(); renderInfo(); }
-  }
-  function onHeatHover(e) {
-    const h = heatHit(e);
-    if (h && h.id && h.b != null) renderInfo(h.id, h.b); else renderInfo();
-  }
-
-  function renderInfo(id = state.corr, b = state.bin) {
+  $('#hm').addEventListener('click', e => { const h = heatHit(e); if (!h) return; if (h.id) state.corr = h.id; if (h.b != null) setBin(h.b); else { renderHeat(); renderInfo(); highlightCorr(); } });
+  $('#hm').addEventListener('mousemove', e => { const h = heatHit(e); if (h && h.id && h.b != null) renderInfo(h.id, h.b); else renderInfo(); });
+  $('#hm').addEventListener('mouseleave', () => renderInfo());
+  function renderInfo(id, b) {
     if (typeof id !== 'string') { id = state.corr; b = state.bin; }
-    const day = BY_DATE[state.date];
-    const c = CORR[id];
-    const p = scenarioP85(day, state.scenario)[id][b];
-    let text = `<strong>${esc(c.name)}</strong>, ${binRange(b, b)}: <span class="mono">${p}%</span> chance above 85% of capacity`;
-    if (state.scenario === 'base') {
-      text += ` · <span class="mono">${day.p100[id][b]}%</span> chance over capacity · average load <span class="mono">${(day.vc[id][b] / 100).toFixed(2)}</span> of capacity`;
-    }
-    text += ` · <span class="muted">${c.sensor ? esc(c.sensor) : 'Modelled, no sensor'}</span>`;
-    $('#info').innerHTML = text;
-  }
-
-  /* ---------- map ---------- */
-  function renderMap() {
-    const day = BY_DATE[state.date];
-    const p = scenarioP85(day, state.scenario);
-    const P = palette();
-    $('#clock').textContent = binRange(state.bin, state.bin);
-    const parts = [];
-    for (const c of DATA.corridors) {
-      const a = NODE[c.a], b = NODE[c.b];
-      const w = c.lanes > 1 ? 3.0 : 2.1;
-      parts.push(`<line class="road-casing" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke-width="${w + 1.2}"/>`);
-      if (c.id === state.corr) parts.push(`<line class="road-sel" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke-width="${w + 2.6}"/>`);
-    }
-    for (const c of DATA.corridors) {
-      const a = NODE[c.a], b = NODE[c.b];
-      const w = c.lanes > 1 ? 3.0 : 2.1;
-      const v = p[c.id][state.bin];
-      parts.push(`<line class="road" data-c="${c.id}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${heat(v, P)}" stroke-width="${w}"><title>${esc(c.name)}: ${v}% chance above 85% of capacity</title></line>`);
-    }
-    for (const n of DATA.nodes) {
-      if (n.kind === 'gate') parts.push(`<rect class="node-gate" x="${n.x - 1.9}" y="${n.y - 1.9}" width="3.8" height="3.8" rx="0.6"/>`);
-      else if (n.kind === 'approach') parts.push(`<circle class="node-approach" cx="${n.x}" cy="${n.y}" r="1.5"/>`);
-      else parts.push(`<circle class="node" cx="${n.x}" cy="${n.y}" r="1.1"/>`);
-    }
-    for (const [id, [text, dx, dy, anchor, cls]] of Object.entries(MAP_LABELS)) {
-      const n = NODE[id];
-      const attrs = `x="${n.x + dx}" y="${n.y + dy}" text-anchor="${anchor}"`;
-      parts.push(`<text class="map-label halo" ${attrs}>${esc(text)}</text>`);
-      parts.push(`<text class="map-label${cls ? ' ' + cls : ''}" ${attrs}>${esc(text)}</text>`);
-    }
-    $('#map').innerHTML = `<svg viewBox="-8 -6 140 92" role="img" aria-label="Schematic map of the dock-area roads coloured by the chance of being above 85% of capacity at ${binRange(state.bin, state.bin)}">${parts.join('')}</svg>`;
+    const d = day(), c = CORR[id]; if (!c) { $('#info').textContent = ''; return; }
+    const p = scenP85(d, state.scenario)[id][b];
+    let t = `<strong>${esc(c.name)}</strong>, ${binRange(b, b)}: <span class="mono">${p}%</span> chance above 85% of capacity · expected extra delay <span class="mono">${d.delay[id][b]}</span> min`;
+    if (state.scenario === 'base') t += ` · <span class="mono">${d.p100[id][b]}%</span> chance over capacity · average load <span class="mono">${(d.vc[id][b] / 100).toFixed(2)}</span>`;
+    t += ` · <span class="muted">${c.sensor ? esc(c.sensor) : 'Modelled, no sensor'}</span>`;
+    $('#info').innerHTML = t;
   }
 
   /* ---------- gates ---------- */
-  function niceMax(v) {
-    const step = v > 2000 ? 500 : v > 800 ? 250 : 100;
-    return Math.max(step, Math.ceil(v / step) * step);
-  }
   function renderGates() {
-    const day = BY_DATE[state.date];
-    const el = $('#gates');
-    if (!day.calls.length) { el.innerHTML = '<p class="muted">No cruise traffic at the gates today.</p>'; return; }
-    let max = 0;
-    for (const g of DATA.gates) max = Math.max(max, ...day.gates[g.id].p90);
-    const ymax = niceMax(max);
+    const d = day(), el = $('#gates');
+    const names = Object.keys(d.gates);
+    if (!names.length) { el.innerHTML = '<p class="muted">No cruise traffic at the gates today.</p>'; return; }
+    const max = Math.max(...names.map(n => Math.max(...d.gates[n].p90)), 100);
+    const step = max > 2000 ? 500 : max > 800 ? 250 : 100, ymax = Math.ceil(max / step) * step;
     const X0 = 36, X1 = 314, Y0 = 8, Y1 = 78;
-    const x = b => X0 + (b + 0.5) * (X1 - X0) / N_BINS;
-    const y = v => Y1 - (v / ymax) * (Y1 - Y0);
-    el.innerHTML = DATA.gates.map(g => {
-      const s = day.gates[g.id];
-      const peak = Math.max(...s.mean);
-      const used = day.calls.filter(c => c.gate === g.id).map(c => c.terminal);
-      if (!used.length) return `<div class="gate-chart"><div class="gate-title"><strong>${esc(g.name)}</strong><span class="muted">No ships today</span></div></div>`;
-      const pb = s.mean.indexOf(peak);
-      const top = s.p90.map((v, b) => `${x(b).toFixed(1)},${y(v).toFixed(1)}`);
-      const bot = s.p10.map((v, b) => `${x(b).toFixed(1)},${y(v).toFixed(1)}`).reverse();
+    const x = b => X0 + (b + 0.5) * (X1 - X0) / N_BINS, y = v => Y1 - (v / ymax) * (Y1 - Y0);
+    el.innerHTML = names.map(n => {
+      const s = d.gates[n], peak = Math.max(...s.mean), pb = s.mean.indexOf(peak);
+      const used = d.calls.filter(c => c.gate === n).map(c => c.terminal);
+      const top = s.p90.map((v, b) => `${x(b).toFixed(1)},${y(v).toFixed(1)}`), bot = s.p10.map((v, b) => `${x(b).toFixed(1)},${y(v).toFixed(1)}`).reverse();
       const mean = s.mean.map((v, b) => `${x(b).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
-      const grid = [0, ymax / 2, ymax].map(v => `<line class="gate-grid" x1="${X0}" x2="${X1}" y1="${y(v)}" y2="${y(v)}"/><text class="gate-axis" x="${X0 - 4}" y="${y(v) + 3}" text-anchor="end">${v.toLocaleString('en-GB')}</text>`).join('');
-      const ticks = [6, 9, 12, 15, 18].map(h => `<text class="gate-axis" x="${x((h - 5) * 4) - 3}" y="${Y1 + 12}" text-anchor="middle">${pad(h)}:00</text>`).join('');
-      const now = `<line class="gate-now" x1="${x(state.bin)}" x2="${x(state.bin)}" y1="${Y0}" y2="${Y1}"/>`;
-      return `<div class="gate-chart">
-        <div class="gate-title"><strong>${esc(g.name)}</strong><span class="muted">${esc(used.join(', '))} · peak <span class="mono">${peak.toLocaleString('en-GB')}</span>/h at ${binTime(pb)} · now <span class="mono">${s.mean[state.bin].toLocaleString('en-GB')}</span>/h</span></div>
-        <svg viewBox="0 0 320 94" role="img" aria-label="${esc(g.name)}: vehicles per hour through the day, average and 10 to 90 percent range">
-          ${grid}
-          <polygon class="gate-band" points="${top.concat(bot).join(' ')}"/>
-          <polyline class="gate-mean" points="${mean}"/>
-          ${now}${ticks}
-        </svg></div>`;
+      const grid = [0, ymax / 2, ymax].map(v => `<line class="grid-l" x1="${X0}" x2="${X1}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${X0 - 4}" y="${y(v) + 3}" text-anchor="end">${int(v)}</text>`).join('');
+      const ticks = [6, 9, 12, 15, 18].map(hh => `<text class="ax" x="${x((hh - 5) * 4)}" y="${Y1 + 12}" text-anchor="middle">${pad(hh)}:00</text>`).join('');
+      return `<div class="chart"><div class="gate-title"><strong>${esc(n)}</strong><span class="muted">${esc(used.join(', '))} · peak <span class="mono">${int(peak)}</span>/h at ${binTime(pb)}</span></div>
+        <svg viewBox="0 0 320 94" role="img" aria-label="${esc(n)}: cruise vehicles per hour, average and 10 to 90 percent range">${grid}<polygon class="gate-band" points="${top.concat(bot).join(' ')}"/><polyline class="gate-mean" points="${mean}"/><line class="now" x1="${x(state.bin)}" x2="${x(state.bin)}" y1="${Y0}" y2="${Y1}"/>${ticks}</svg></div>`;
     }).join('');
   }
 
-  /* ---------- suggested actions ---------- */
+  /* ---------- actions ---------- */
   function renderActions() {
-    const day = BY_DATE[state.date];
-    const p = day.p85;
-    const acts = [];
-    for (const g of DATA.gates) {
-      const ws = runs(p[g.id.toLowerCase()], 40);
-      if (ws.length) {
-        const peak = Math.max(...ws.map(w => w[2]));
-        acts.push({ id: `marshals-${g.id}`, kind: 'Marshals', title: `Put marshals at the ${g.name}`,
-          detail: `${windowsText(ws)}. Gate access forecast above 85% of capacity on up to <span class="mono">${peak}%</span> of sampled days.` });
-      }
+    const d = day(), p = added(d), acts = [];
+    for (const c of DATA.corridors.filter(c => c.group === 'Dock gates')) {
+      const ws = runs(p[c.id], 40);
+      if (ws.length) acts.push({ id: 'm-' + c.id, kind: 'Marshals', title: `Put marshals at the ${c.name.replace(' access', '')}`, detail: `${windowsText(ws)}. Cruise traffic pushes the gate approach above 85% of capacity on up to <span class="mono">${Math.max(...ws.map(w => w[2]))}%</span> more sampled days.` });
     }
-    const areas = {};
-    for (const [id, area] of Object.entries(AREA)) (areas[area] ||= []).push(id);
-    for (const [area, ids] of Object.entries(areas)) {
-      const series = Array.from({ length: N_BINS }, (_, b) => Math.max(...ids.map(id => p[id][b])));
-      const ws = runs(series, 50);
-      if (!ws.length) continue;
-      const roads = ids.filter(id => runs(p[id], 50).length).map(id => CORR[id].name);
-      const peak = Math.max(...ws.map(w => w[2]));
-      const signs = ws.map(([a, b]) => [Math.max(0, a - 2), b]);
-      acts.push({ id: `sign-${area}`, kind: 'Sign message', title: `Set signs on the ${SIGNS[area].where}`,
-        detail: `${windowsText(signs)}, each starting 30 minutes before the risk window. At risk: ${esc(roads.join(', '))} (up to <span class="mono">${peak}%</span>).`,
-        vms: SIGNS[area].lines });
+    const groups = [...new Set(DATA.corridors.map(c => c.group))].filter(g => SIGNS[g]);
+    for (const g of groups) {
+      const cs = DATA.corridors.filter(c => c.group === g);
+      const series = Array.from({ length: N_BINS }, (_, b) => Math.max(...cs.map(c => p[c.id][b])));
+      const ws = runs(series, 50); if (!ws.length) continue;
+      const roads = cs.filter(c => runs(p[c.id], 50).length).map(c => c.name);
+      acts.push({ id: 'sign-' + g, kind: 'Sign message', title: `Set signs on the ${SIGNS[g].where}`,
+        detail: `${windowsText(ws.map(([a, b, pk]) => [Math.max(0, a - 2), b, pk]))}, each starting 30 minutes before the risk window. Cruise traffic adds risk on ${esc(roads.join(', '))} (up to <span class="mono">${Math.max(...ws.map(w => w[2]))}</span> percentage points).`, vms: SIGNS[g].lines });
     }
-    for (const id of day.permits) {
-      const pm = PERMIT[id];
-      const ws = runs(p[pm.corridor], 30, 1);
-      const moved = day.whatif.move_permit;
-      let detail = `${esc(pm.what)} on ${esc(CORR[pm.corridor].name)} overlaps today's turnarounds`;
-      detail += ws.length ? `, with that road at risk ${windowsText(ws)}.` : '.';
-      if (moved) detail += ` Moving it cuts corridor-hours at risk from <span class="mono">${fmt1(day.score)}</span> to <span class="mono">${fmt1(moved.score)}</span>.`;
-      acts.push({ id: `permit-${id}`, kind: 'Roadworks', title: `Ask the works promoter to move permit ${id}`, detail, scenario: moved ? 'move_permit' : null });
+    for (const od of d.routes) {
+      if (od.routes.length < 2) continue;
+      const alt = od.routes.slice(1).map((r, i) => ({ r, i: i + 1, ws: runs(r.share, 35, 2) })).filter(x => x.ws.length);
+      if (!alt.length) continue;
+      const a = alt[0];
+      acts.push({ id: 'div-' + od.from + od.to, kind: 'Diversion', title: `Expect traffic from ${od.from} to ${od.to} to divert`,
+        detail: `Up to <span class="mono">${Math.max(...a.ws.map(w => w[2]))}%</span> take route ${'ABC'[a.i]} (${esc(a.r.via.join(' → ') || 'local roads')}) ${windowsText(a.ws)} as the main route fills. Check that route can take it.` });
     }
-    if (day.match) {
-      const hits = ['northam', 'stmarys', 'terminus', 'kingsway'].filter(id => runs(p[id], 40).length);
-      if (hits.length) acts.push({ id: 'match', kind: 'Event', title: "Agree a joint plan with the club's match-day traffic team",
-        detail: `Kick-off ${day.match}. At risk: ${esc(hits.map(h => CORR[h].name).join(', '))}.` });
+    if (d.timing && d.timing.best < d.timing.base - 0.15) {
+      const moves = d.timing.shifts.map((sh, i) => [sh, d.calls[i]]).filter(([sh]) => sh[0] || sh[1]);
+      acts.push({ id: 'timing', kind: 'Ship timing', title: `Ask the port to move ${moves.length === 1 ? 'one ship\'s' : moves.length + ' ships\''} disembarkation or check-in`,
+        detail: `${moves.map(([sh, c]) => esc(c.ship) + (sh[0] ? ` disembarkation ${sh[0] > 0 ? '+' : '−'}${Math.abs(sh[0])} min` : '') + (sh[1] ? ` check-in ${sh[1] > 0 ? '+' : '−'}${Math.abs(sh[1])} min` : '')).join('; ')}. Corridor-hours at risk <span class="mono">${fmt1(d.timing.base)}</span> → <span class="mono">${fmt1(d.timing.best)}</span>.` });
+    }
+    for (const id of d.permits) {
+      const pm = PERMIT[id], moved = d.whatif.move_permit;
+      const ws = CORR[pm.corridor] ? runs(d.p85[pm.corridor], 30, 1) : [];
+      let detail = `${esc(pm.what)} on ${esc(CORR[pm.corridor] ? CORR[pm.corridor].name : pm.corridor)} overlaps today's turnarounds${ws.length ? `, with that road at risk ${windowsText(ws)}` : ''}.`;
+      if (moved) detail += ` Moving it cuts corridor-hours at risk from <span class="mono">${fmt1(d.score)}</span> to <span class="mono">${fmt1(moved.score)}</span>.`;
+      acts.push({ id: 'p-' + id, kind: 'Roadworks', title: `Ask the works promoter to move permit ${id}`, detail, scenario: moved ? 'move_permit' : null });
+    }
+    if (d.match) {
+      const hits = DATA.corridors.filter(c => c.group === 'North and east' && runs(p[c.id], 40).length);
+      if (hits.length) acts.push({ id: 'match', kind: 'Event', title: "Agree a joint plan with the club's match-day traffic team", detail: `Kick-off ${d.match}. At risk: ${esc(hits.map(h => h.name).join(', '))}.` });
     }
     const el = $('#actions');
-    if (!acts.length) {
-      el.innerHTML = '<p class="muted">Nothing to do. No road is forecast above 85% of capacity for 30 minutes or more on most sampled days.</p>';
-      return;
-    }
+    if (!acts.length) { el.innerHTML = '<p class="muted">Nothing to do. Cruise traffic does not push any named road above 85% of capacity for 30 minutes or more on most sampled days.</p>'; return; }
     el.innerHTML = acts.map(a => {
-      const key = `${state.date}:${a.id}`;
-      const st = decisions[key] || 'open';
-      return `<div class="action" data-key="${key}" data-state="${st}">
-        <div class="action-body">
-          <span class="eyebrow action-kind">${esc(a.kind)}${st !== 'open' ? ` · ${st === 'accepted' ? 'Accepted' : 'Dismissed'}` : ''}</span>
-          <strong>${esc(a.title)}</strong>
-          <span class="foot-note" style="color: var(--ink)">${a.detail}</span>
-          ${a.scenario ? `<span><button class="linkbtn" data-scenario="${a.scenario}">Show the forecast with it moved</button></span>` : ''}
-        </div>
-        <div class="action-btns">
-          <button class="btn ${st === 'accepted' ? '' : 'btn-primary'}" data-act="accepted">${st === 'accepted' ? 'Undo' : 'Accept'}</button>
-          <button class="btn" data-act="dismissed">${st === 'dismissed' ? 'Undo' : 'Dismiss'}</button>
-        </div>
-        ${a.vms ? `<div class="vms" aria-label="Suggested sign text">${a.vms.map(esc).join('<br>')}</div>` : ''}
-      </div>`;
+      const key = `${state.date}:${a.id}`, st = decisions[key] || 'open';
+      return `<div class="action" data-key="${esc(key)}" data-state="${st}">
+        <div class="action-body"><span class="eyebrow action-kind">${esc(a.kind)}${st !== 'open' ? ` · ${st === 'accepted' ? 'Accepted' : 'Dismissed'}` : ''}</span>
+          <strong>${esc(a.title)}</strong><span class="foot-note" style="color: var(--ink)">${a.detail}</span>
+          ${a.scenario ? `<span><button class="linkbtn" data-scenario="${a.scenario}">Show the forecast with it moved</button></span>` : ''}</div>
+        <div class="action-btns"><button class="btn ${st === 'accepted' ? '' : 'btn-primary'}" data-act="accepted">${st === 'accepted' ? 'Undo' : 'Accept'}</button><button class="btn" data-act="dismissed">${st === 'dismissed' ? 'Undo' : 'Dismiss'}</button></div>
+        ${a.vms ? `<div class="vms" aria-label="Suggested sign text">${a.vms.map(esc).join('<br>')}</div>` : ''}</div>`;
     }).join('') + '<p class="foot-note">In the product each decision is logged with who made it and why.</p>';
     el.querySelectorAll('[data-scenario]').forEach(b => b.addEventListener('click', () => setScenario(b.dataset.scenario)));
     el.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => {
-      const card = b.closest('.action');
-      const key = card.dataset.key;
-      const want = b.dataset.act;
-      decisions[key] = decisions[key] === want ? 'open' : want;
-      renderActions();
+      const key = b.closest('.action').dataset.key, want = b.dataset.act;
+      decisions[key] = decisions[key] === want ? 'open' : want; renderActions();
     }));
   }
 
-  /* ---------- boot ---------- */
-  function rerenderForTheme() {
-    if (!state.date) return;
-    if (!BY_DATE[state.date].beyond) renderVisuals();
+  /* ---------- activities and ship timings ---------- */
+  function activities(d) {
+    const wd = dateOf(d.date).getDay(), weekday = wd >= 1 && wd <= 5, out = [];
+    if (weekday) {
+      out.push({ row: 'Commuting', cls: 'tl-commute', a: 420, b: 570, label: 'to work' }, { row: 'Commuting', cls: 'tl-commute', a: 960, b: 1110, label: 'home' });
+    } else {
+      out.push({ row: 'Shopping and leisure', cls: 'tl-commute', a: 600, b: 990, label: 'busiest' });
+    }
+    if (d.term) out.push({ row: 'School run', cls: 'tl-school', a: 480, b: 545, label: 'drop-off' }, { row: 'School run', cls: 'tl-school', a: 885, b: 950, label: 'pick-up' });
+    if (d.match) { const k = hm2m(d.match); out.push({ row: "Match at St Mary's", cls: 'tl-match', a: k - 150, b: k, label: 'fans arrive' }, { row: "Match at St Mary's", cls: 'tl-match', a: k + 110, b: k + 180, label: 'fans leave' }); }
+    return out;
   }
-  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rerenderForTheme);
-  new MutationObserver(rerenderForTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  function shipWindows(c, sh) {
+    const TA = M.turnaround, arr = hm2m(c.arr), dep = hm2m(c.dep);
+    const ds = arr + TA.disembark_start + (sh ? sh[0] : 0), es = sh ? sh[1] : 0;
+    return { dis: [ds, ds + TA.disembark_minutes], emb: [dep - TA.embark_open + es, dep - TA.embark_close + es] };
+  }
+  const overlap = (w, acts) => acts.reduce((s, a) => s + Math.max(0, Math.min(w[1], a.b) - Math.max(w[0], a.a)), 0);
+  function renderTimeline() {
+    const d = day(); if (!d || d.beyond) return;
+    const acts = activities(d);
+    const rows = [...new Set(acts.map(a => a.row))];
+    const LW = 150, X0 = LW, X1 = 618, RH = 22, T0 = 300, T1 = 1200;
+    const x = m => X0 + (Math.max(T0, Math.min(T1, m)) - T0) / (T1 - T0) * (X1 - X0);
+    const parts = []; let y = 18;
+    for (let h = 6; h <= 20; h += 2) parts.push(`<line class="tl-grid" x1="${x(h * 60)}" x2="${x(h * 60)}" y1="12" y2="999"/><text class="ax" x="${x(h * 60)}" y="10" text-anchor="middle">${pad(h)}:00</text>`);
+    for (const r of rows) {
+      parts.push(`<text class="tl-row" x="0" y="${y + 14}">${esc(r)}</text>`);
+      acts.filter(a => a.row === r).forEach(a => parts.push(`<rect class="tl-band ${a.cls}" x="${x(a.a)}" y="${y + 3}" width="${x(a.b) - x(a.a)}" height="${RH - 6}"><title>${esc(r)}: ${m2hm(a.a)}–${m2hm(a.b)} ${esc(a.label)}</title></rect><text class="tl-sub" x="${x(a.a) + 4}" y="${y + 15}">${esc(a.label)}</text>`));
+      y += RH;
+    }
+    d.calls.forEach((c, i) => {
+      const w = shipWindows(c), sh = d.timing ? d.timing.shifts[i] : null;
+      parts.push(`<text class="tl-row" x="0" y="${y + 14}">${esc(c.ship)}</text>`);
+      parts.push(`<rect class="tl-band tl-dis" x="${x(w.dis[0])}" y="${y + 3}" width="${x(w.dis[1]) - x(w.dis[0])}" height="${RH - 6}"><title>Disembarkation ${m2hm(w.dis[0])}–${m2hm(w.dis[1])}</title></rect>`);
+      parts.push(`<rect class="tl-band tl-emb" x="${x(w.emb[0])}" y="${y + 3}" width="${x(w.emb[1]) - x(w.emb[0])}" height="${RH - 6}"><title>Check-in ${m2hm(w.emb[0])}–${m2hm(w.emb[1])}</title></rect>`);
+      if (sh && (sh[0] || sh[1])) {
+        const n = shipWindows(c, sh);
+        if (sh[0]) parts.push(`<rect class="tl-new" x="${x(n.dis[0])}" y="${y + 2}" width="${x(n.dis[1]) - x(n.dis[0])}" height="${RH - 4}" rx="3"><title>Suggested disembarkation ${m2hm(n.dis[0])}–${m2hm(n.dis[1])}</title></rect>`);
+        if (sh[1]) parts.push(`<rect class="tl-new" x="${x(n.emb[0])}" y="${y + 2}" width="${x(n.emb[1]) - x(n.emb[0])}" height="${RH - 4}" rx="3"><title>Suggested check-in ${m2hm(n.emb[0])}–${m2hm(n.emb[1])}</title></rect>`);
+      }
+      parts.push(`<text class="tl-sub" x="${x(w.dis[0]) + 4}" y="${y + 15}">off</text><text class="tl-sub" x="${x(w.emb[0]) + 4}" y="${y + 15}">check-in</text>`);
+      y += RH;
+    });
+    const nowX = x(300 + state.bin * 15 + 7.5);
+    parts.push(`<line class="now" x1="${nowX}" x2="${nowX}" y1="12" y2="${y}"/>`);
+    $('#timeline').innerHTML = `<svg viewBox="0 0 640 ${y + 4}" role="img" aria-label="Today's commuting, school run, match and ship windows">${parts.join('').replace(/y2="999"/g, `y2="${y}"`)}</svg>`;
+    $('#tl-note').textContent = d.timing && d.timing.best < d.timing.base - 0.15 ? 'Dashed outlines: suggested ship windows' : (d.term ? 'School term' : 'No school run today');
+  }
+  function renderTiming() {
+    const d = day(), el = $('#timing');
+    $('#ships').innerHTML = d.calls.length ? `<div class="table-scroll"><table><thead><tr><th>Ship</th><th>Terminal and gate</th><th>Alongside</th><th>Berths</th></tr></thead><tbody>${d.calls.map(c => `
+      <tr><td>${esc(c.ship)}</td><td>${esc(c.terminal)}<br><span class="muted">${esc(c.gate)}</span></td><td class="num">${c.arr}–${c.dep}</td>
+      <td class="num">${c.pax == null ? '<span class="tag" style="color: var(--warn-ink)">Not published</span>' : int(c.pax)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">None.</p>';
+    if (!d.calls.length) { el.innerHTML = ''; return; }
+    if (!d.timing) { el.innerHTML = `<p class="foot-note">${uplift(d) < 1 ? 'No timing change needed: cruise traffic adds little risk today.' : 'Timing advice is computed for the busiest days in this demo.'}</p>`; return; }
+    const acts = activities(d), T = d.timing;
+    const items = d.calls.map((c, i) => {
+      const sh = T.shifts[i], o = T.options[i];
+      const w = shipWindows(c), n = shipWindows(c, sh);
+      const lines = [];
+      if (sh[0]) {
+        const avoided = acts.filter(a => overlap(w.dis, [a]) > overlap(n.dis, [a])).map(a => `${a.row.toLowerCase()} ${a.label}`);
+        lines.push(`Start disembarkation at <strong>${m2hm(n.dis[0])}</strong> instead of ${m2hm(w.dis[0])}${avoided.length ? ` (avoids ${esc([...new Set(avoided)].join(', '))})` : ''}.`);
+      }
+      if (sh[1]) {
+        const avoided = acts.filter(a => overlap(w.emb, [a]) > overlap(n.emb, [a])).map(a => `${a.row.toLowerCase()} ${a.label}`);
+        lines.push(`Open check-in <strong>${m2hm(n.emb[0])}–${m2hm(n.emb[1])}</strong> instead of ${m2hm(w.emb[0])}–${m2hm(w.emb[1])}${avoided.length ? ` (avoids ${esc([...new Set(avoided)].join(', '))})` : ''}.`);
+      }
+      const fmtOpts = (kind, label) => Object.entries(o[kind]).sort((a, b) => +a[0] - +b[0]).map(([k, v]) => `<span>${+k === 0 ? 'now' : (+k > 0 ? '+' : '−') + Math.abs(+k) + ' min'} <b>${fmt1(v)}</b></span>`).join('');
+      return `<div class="timing-item${lines.length ? ' better' : ''}"><strong>${esc(c.ship)}</strong>
+        ${lines.length ? lines.map(l => `<span>${l}</span>`).join('') : '<span class="muted">Keep the current timings.</span>'}
+        <div class="opts"><span>Disembarkation:</span>${fmtOpts('dis')}</div>
+        <div class="opts"><span>Check-in:</span>${fmtOpts('emb')}</div></div>`;
+    }).join('');
+    const gain = T.base - T.best;
+    el.innerHTML = `<p>${gain > 0.15 ? `Trying earlier and later windows for each ship, the best combination cuts corridor-hours at risk from <span class="mono">${fmt1(T.base)}</span> to <span class="mono">${fmt1(T.best)}</span>.` : 'None of the windows tried does better than the current timings.'}</p>${items}
+      <p class="foot-note">Numbers after each option are corridor-hours at risk for the whole day with that change (same sampled days for every option).</p>`;
+  }
 
+  /* ---------- day ---------- */
+  function selectDay(iso, scroll) {
+    stopPlay();
+    state.date = iso; state.scenario = 'base'; state.od = 0; state.showRoutes = false;
+    const d = BY_DATE[iso];
+    if (!d.beyond) {
+      let best = -1, bb = 24;
+      for (let b = 0; b < N_BINS; b++) { let s = 0; for (const c of DATA.corridors) s += d.p85[c.id][b]; if (s > best) { best = s; bb = b; } }
+      state.bin = best > 0 ? bb : 24;
+      let top = DATA.corridors[0].id, tp = -1;
+      for (const c of DATA.corridors) if (d.p85[c.id][state.bin] > tp) { tp = d.p85[c.id][state.bin]; top = c.id; }
+      state.corr = top;
+    }
+    renderCalendar(); renderDay();
+    if (scroll) $('#day').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  }
+  function renderDay() {
+    const d = day();
+    const show = !d.beyond;
+    ['#day-body', '#row-actions', '#row-model', '#heat-card', '#gates-card', '#tl-card'].forEach(s => { $(s).hidden = !show; });
+    if (d.beyond) {
+      $('#day-head').innerHTML = '';
+      $('#notices').innerHTML = `<div class="card refusal"><p class="eyebrow">Outside coverage</p><h2>No forecast for ${esc(longDate(d.date))}</h2>
+        <p>The published cruise schedule ends on ${esc(longDate(M.horizon))}. Without a schedule there are no ship calls to forecast from, so the tool shows nothing rather than a guess. Dates fill in when the next schedule is published.</p>
+        <p><button class="btn btn-primary" id="goto-last">Open ${esc(shortDate(M.horizon))}, the last covered day</button></p></div>`;
+      $('#goto-last').addEventListener('click', () => selectDay(M.horizon, true));
+      return;
+    }
+    const lv = level(uplift(d));
+    $('#day-head').innerHTML = `<div><p class="eyebrow">Day view</p><h2>${esc(longDate(d.date))}</h2></div>
+      <div class="day-stats"><span class="pill lv-${lv.key}">${lv.label}</span><span>Cruise traffic adds <span class="big">${fmt1(uplift(d))}</span> corridor-hours at risk</span><span class="muted"><span class="mono">${fmt1(d.score)}</span> in total, <span class="mono">${fmt1(d.bg_score)}</span> without ships</span></div>`;
+    const notes = [];
+    d.permits.forEach(id => { const p = PERMIT[id]; notes.push(`<div class="notice"><span class="tag">Works</span><span><strong>Permit ${id}:</strong> ${esc(p.what)} on ${esc(CORR[p.corridor] ? CORR[p.corridor].name : p.corridor)}, ${esc(shortDate(p.from))} to ${esc(shortDate(p.to))}. Already included: everyone reroutes around it.${d.whatif.move_permit ? ' <button class="linkbtn" data-scenario="move_permit">See it moved</button>' : ''}</span></div>`); });
+    if (d.match) notes.push(`<div class="notice"><span class="tag">Match</span><span>Home match at St Mary's, kick-off ${d.match}. About 9,000 extra car trips arrive in the 2½ hours before kick-off and leave after the final whistle, from the county gateways and the city's zones.</span></div>`);
+    d.calls.filter(c => c.pax == null).forEach(c => notes.push(`<div class="notice notice-warn"><span class="tag">Missing data</span><span><strong>${esc(c.ship)}</strong> has no published passenger figure. The forecast assumes ${int(M.unknown_pax_range[0])} to ${int(M.unknown_pax_range[1])} passengers, so its gate traffic has a wider range than usual.</span></div>`));
+    const wd = dateOf(d.date).getDay();
+    if (wd >= 1 && wd <= 5 && !d.term) notes.push('<div class="notice"><span class="tag">Half-term</span><span>No school run this week (assumed half-term dates), so the 08:15 and 15:00 peaks are lighter.</span></div>');
+    if (!d.calls.length) notes.push('<div class="notice"><span class="tag">No ships</span><span>No turnarounds today. The map shows everyday traffic only.</span></div>');
+    $('#notices').innerHTML = notes.join('');
+    $('#notices').querySelectorAll('[data-scenario]').forEach(b => b.addEventListener('click', () => setScenario(b.dataset.scenario)));
+    const opts = ['base', 'cruise', 'bg', ...Object.keys(d.whatif)];
+    $('#scenario').innerHTML = opts.map(k => `<option value="${k}"${k === state.scenario ? ' selected' : ''}>${esc(scenLabel(d, k))}</option>`).join('');
+    $('#slider').value = state.bin;
+    segCenters = {};
+    renderTiming(); renderActions(); renderRoutesCard(); renderVisuals();
+  }
+  function renderVisuals() {
+    const d = day();
+    $('#scale-bar').style.background = `linear-gradient(90deg, ${[0, 20, 40, 60, 80, 100].map(heat).join(',')})`;
+    let delta = '';
+    if (state.scenario !== 'base') {
+      const base = d.score, now = scenScore(d, state.scenario), diff = now - base;
+      delta = state.scenario === 'cruise' ? `Cruise traffic adds <span class="mono">${fmt1(now)}</span> of the <span class="mono">${fmt1(base)}</span> corridor-hours at risk.`
+        : `Corridor-hours at risk: <span class="mono">${fmt1(base)}</span> as planned → <span class="mono">${fmt1(now)}</span> (<span class="mono">${diff >= 0 ? '+' : '−'}${fmt1(Math.abs(diff))}</span>)`;
+    } else if (!Object.keys(d.whatif).length && d.calls.length) {
+      delta = '<span class="foot-note">Road closure what-ifs are precomputed for the busiest days and permit days in this demo.</span>';
+    }
+    $('#delta').innerHTML = delta;
+    paintRoads(); placeUI(); renderHeat(); renderInfo(); renderGates(); renderMix(); renderRouteDetail(); renderTimeline();
+  }
+  function setScenario(key) { state.scenario = key; $('#scenario').value = key; renderVisuals(); }
+  function setBin(b) {
+    state.bin = Math.max(0, Math.min(N_BINS - 1, b));
+    if (+$('#slider').value !== state.bin) $('#slider').value = state.bin;
+    paintRoads(); placeUI(); renderHeat(); renderInfo(); renderGates(); renderMix(); renderRouteDetail(); renderTimeline();
+  }
+  $('#scenario').addEventListener('change', e => setScenario(e.target.value));
+  document.querySelectorAll('[data-metric]').forEach(b => b.addEventListener('click', () => {
+    state.metric = b.dataset.metric;
+    document.querySelectorAll('[data-metric]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    $('#scale-label').textContent = state.metric === 'delay' ? 'Expected extra delay, as planned' : 'Chance above 85% of capacity';
+    $('#scale-range').textContent = state.metric === 'delay' ? '0–30+ min' : '0–100%';
+    renderHeat(); renderInfo();
+  }));
+  $('#slider').addEventListener('input', e => setBin(+e.target.value));
+  $('#play').addEventListener('click', () => {
+    if (state.playing) return stopPlay();
+    if (state.bin >= N_BINS - 1) state.bin = 0;
+    $('#play').textContent = 'Pause';
+    state.playing = setInterval(() => { if (state.bin >= N_BINS - 1) return stopPlay(); setBin(state.bin + 1); }, 260);
+  });
+  function stopPlay() { if (state.playing) clearInterval(state.playing); state.playing = null; $('#play').textContent = 'Play'; }
+
+  function onTheme() { readPalette(); if (state.date && !day().beyond) renderVisuals(); }
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', onTheme);
+  new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  readPalette();
   renderMeta();
-  const start = BY_DATE['2026-10-24'] ? '2026-10-24' : DATA.days[0].date;
-  selectDay(start, false);
+  buildMap();
+  selectDay(BY_DATE['2026-10-24'] ? '2026-10-24' : DATA.days[0].date, false);
+  requestAnimationFrame(() => { layout(); zoomTo('docks', false); });
 })();
 </script>
