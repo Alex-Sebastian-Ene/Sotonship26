@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gangway Swarm</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="bar"></header>
+<main class="app">
+  <section class="stage" aria-label="Map of Southampton city centre with walking passengers">
+    <canvas class="map" id="map"></canvas>
+    <div class="hud">
+      <div class="clock" id="clock">08:30</div>
+      <div class="sub" id="sub">Disembarking</div>
+      <div><span class="chip synthetic">Synthetic ship · schematic map</span></div>
+    </div>
+    <div class="map-tools">
+      <button class="btn" id="play" type="button" aria-pressed="true">Pause</button>
+      <button class="btn" id="reset-view" type="button">Fit</button>
+    </div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="section">
+      <h2>One ship comes in</h2>
+      <p>A single turnaround ship berths at 08:00. About a third of its passengers walk into town; each dot finds its way along the street graph to the station, a café or the shops, and slows down where the footway gets crowded.</p>
+    </div>
+
+    <div class="section">
+      <h3>Ship</h3>
+      <div class="controls">
+        <div class="field"><label for="terminal">Terminal</label>
+          <select id="terminal">
+            <option value="T_OCEAN">Ocean Cruise Terminal (46)</option>
+            <option value="T_QE2">QEII Cruise Terminal (38/39)</option>
+            <option value="T_CITY">City Cruise Terminal (101)</option>
+            <option value="T_HOR" selected>Horizon Cruise Terminal (102)</option>
+            <option value="T_MAY">Mayflower Cruise Terminal (106)</option>
+          </select></div>
+        <div class="field"><label for="pax">Passengers aboard</label><output for="pax"></output><input type="range" id="pax" min="1000" max="7000" step="100" value="5400"></div>
+        <div class="field"><label for="walk">Share who walk</label><output for="walk"></output><input type="range" id="walk" min="0.1" max="0.6" step="0.05" value="0.35"></div>
+        <div class="field"><label for="ppa">People per dot</label><output for="ppa"></output><input type="range" id="ppa" min="1" max="8" step="1" value="2"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>Playback and layers</h3>
+      <div class="controls">
+        <div class="field"><label for="speed">Speed</label><output for="speed"></output><input type="range" id="speed" min="10" max="300" step="10" value="90"></div>
+        <div class="field"><label for="temp">Policy randomness</label><output for="temp"></output><input type="range" id="temp" min="0.2" max="2" step="0.1" value="0.7"></div>
+      </div>
+      <div class="row-btns">
+        <button class="btn" type="button" data-layer="flows" aria-pressed="true">Flow arrows</button>
+        <button class="btn" type="button" data-layer="loads" aria-pressed="true">Crowding</button>
+        <button class="btn" type="button" data-layer="heat" aria-pressed="false">Heat</button>
+        <button class="btn" type="button" data-layer="isochrone" aria-pressed="false">Walk times</button>
+        <button class="btn" type="button" data-layer="labels" aria-pressed="true">Labels</button>
+        <button class="btn" type="button" id="congestion" aria-pressed="false">Avoid crowds</button>
+      </div>
+      <div class="row-btns"><button class="btn primary" id="restart" type="button">Restart with these settings</button></div>
+    </div>
+
+    <div class="section">
+      <h3>Right now</h3>
+      <div class="stats">
+        <div class="stat"><div class="label">On the streets</div><div class="value" id="s-walk">0</div></div>
+        <div class="stat"><div class="label">In venues</div><div class="value" id="s-dwell">0</div></div>
+        <div class="stat"><div class="label">Gone onward</div><div class="value" id="s-done">0</div></div>
+        <div class="stat"><div class="label">Turned away (full)</div><div class="value" id="s-away">0</div></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>Venues</h3>
+      <table class="venues" id="venues"></table>
+      <p class="note">Staff = people inside ÷ customers one person can serve, minimum two. Click a row to chart it.</p>
+    </div>
+
+    <div class="section" id="venue-detail" hidden>
+      <h3 id="vd-title">Venue</h3>
+      <canvas class="chart" id="vd-chart"></canvas>
+    </div>
+  </aside>
+
+  <section class="timeline">
+    <div class="head"><h3>People ashore, by minute</h3><span class="legend-inline note" id="tl-legend"></span></div>
+    <canvas id="tl"></canvas>
+  </section>
+</main>
+<script type="module" src="js/sims/swarm.js"></script>
+</body>
+</html>

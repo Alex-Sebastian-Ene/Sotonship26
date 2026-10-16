@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gangway</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+<style>
+  body { height: auto; }
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 28px;
+    align-items: center;
+    padding-block: 32px 24px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    max-width: 1320px;
+    margin: 0 auto;
+  }
+  .hero h1 {
+    margin: 0 0 14px;
+    font: 700 clamp(2.6rem, 6vw, 4.6rem) / 0.92 var(--font-display);
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+    text-wrap: balance;
+  }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .hero p { margin: 0 0 12px; max-width: 56ch; color: var(--ink-2); font-size: var(--step-1); }
+  .hero .live {
+    position: relative;
+    height: min(62vh, 560px);
+    min-height: 340px;
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--map-water);
+  }
+  .hero .live canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .hero .live .hud { left: 12px; top: 10px; }
+  .hero .live .clock { font-size: var(--step-3); }
+  .facts { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 18px 0 0; padding: 0; list-style: none; }
+  .facts li { font: 500 var(--step--1) / 1.3 var(--font-data); color: var(--muted); }
+  .facts b { display: block; font: 600 var(--step-2) / 1.1 var(--font-display); color: var(--ink); letter-spacing: 0.02em; }
+  .sims-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 0;
+    max-width: 1320px;
+    margin: 0 auto;
+    padding-block: 8px 28px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .sim {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 18px 18px 18px 0;
+    border-top: 2px solid var(--ink);
+    margin-right: 18px;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .sim:hover h2, .sim:focus-visible h2 { color: var(--accent); }
+  .sim .kind { font: 600 10.5px / 1.2 var(--font-data); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .sim h2 { margin: 0; font: 700 var(--step-2) / 1 var(--font-display); text-transform: uppercase; letter-spacing: 0.02em; }
+  .sim p { margin: 0; color: var(--ink-2); }
+  .sim .go { margin-top: auto; padding-top: 6px; font: 600 var(--step--1) / 1 var(--font-data); color: var(--accent); }
+  .backend {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding-block: 8px 48px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 28px;
+  }
+  .backend h3 { margin: 0 0 8px; font: 600 var(--step--1) / 1.2 var(--font-data); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .backend p, .backend li { color: var(--ink-2); max-width: 62ch; }
+  .backend pre {
+    margin: 0;
+    padding: 12px;
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius);
+    font: 400 12px / 1.5 var(--font-data);
+  }
+  @media (max-width: 900px) {
+    .hero, .backend { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<header class="bar"></header>
+
+<section class="hero">
+  <div>
+    <h1>Where do <em>9,000 cruise passengers</em> go on a Saturday?</h1>
+    <p>Southampton turns around up to four cruise ships a day. Each one sends a few thousand people on foot through Dock Gates 4, 8 and 10 towards the station, the ferries, the cafés and the shops. Gangway models every walker as an agent on the city's street graph, so each café, pub and shop cluster gets a forecast of how many people will come through the door, hour by hour, and how many staff that needs.</p>
+    <p>Five simulations below show the same agents from different angles. The routing and the choice of where to go next are placeholders that the reinforcement-learning backend replaces.</p>
+    <ul class="facts">
+      <li><b>5</b>cruise terminals</li>
+      <li><b>14</b>venue clusters</li>
+      <li><b>3</b>dock gates</li>
+      <li><b>6</b>passenger types</li>
+    </ul>
+  </div>
+  <div class="live" aria-label="Live preview: a sampled turnaround day">
+    <canvas id="map"></canvas>
+    <div class="hud">
+      <div class="clock" id="clock">09:30</div>
+      <div><span class="chip synthetic">Synthetic schedule · schematic map</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="sims-grid" id="sims" aria-label="Simulations"></section>
+
+<section class="backend">
+  <div>
+    <h3>How the backend plugs in</h3>
+    <p>Every simulation asks one object where a passenger goes next: <code>policy.decide(agent, context)</code>. Today that is a gravity model (bigger, closer, emptier venues win). The RL policy from <code>src/sotonship26/rl</code> replaces it, either live or as a recorded trace that Policy Lens can load and replay.</p>
+    <p>The street graph is hand-placed for now. <code>scripts/export_frontend_graph.py</code> rebuilds it from OpenStreetMap with the same node IDs, so nothing in the frontend changes. Design notes for each simulation are in <code>docs/simulations/</code>.</p>
+  </div>
+  <div>
+    <h3>Trace format, one decision</h3>
+<pre>{ "t": 34320, "at": "V_OX", "choice": "X_RAIL",
+  "probs": { "X_RAIL": 0.61, "V_HIGH": 0.22,
+             "V_TQ": 0.09, "V_GHT": 0.08 } }</pre>
+  </div>
+</section>
+
+<script type="module">
+  import { Graph } from "./js/core/graph.js";
+  import { World } from "./js/core/world.js";
+  import { Renderer } from "./js/core/render.js";
+  import { Rng } from "./js/core/rng.js";
+  import { SAMPLE_DAY, planDay, clock, hhmm } from "./js/core/schedule.js";
+  import { loop } from "./js/core/ui.js";
+  import { mountBar, SIMS } from "./js/core/page.js";
+
+  mountBar("index.html");
+  const kinds = ["Real time", "Whole day + staffing", "Inside the policy", "What if", "Isometric"];
+  document.getElementById("sims").innerHTML = SIMS.map((s, i) =>
+    `<a class="sim" href="${s.href}"><span class="kind">${kinds[i]}</span><h2>${s.label}</h2><p>${s.blurb}</p><span class="go">Open ${s.label} →</span></a>`).join("");
+
+  const graph = new Graph();
+  const renderer = new Renderer(document.getElementById("map"), graph, { labels: false, flows: true });
+  const plan = planDay(SAMPLE_DAY.ships, new Rng(26), { peoplePerAgent: 3 });
+  const world = new World({ graph, plan, start: hhmm("06:00"), end: hhmm("20:00"), peoplePerAgent: 3 });
+  world.advance(hhmm("09:30") - world.start);
+  const l = loop((dt) => {
+    if (!world.done) world.advance(dt * (l.reduced ? 0 : 120));
+    renderer.draw(world);
+    document.getElementById("clock").textContent = clock(world.t);
+  });
+</script>
+</body>
+</html>

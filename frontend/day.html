@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gangway Turnaround Day</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="bar"></header>
+<main class="app">
+  <section class="stage" aria-label="Map of Southampton with a full day of cruise passengers">
+    <canvas class="map" id="map"></canvas>
+    <div class="hud">
+      <div class="clock" id="clock">05:00</div>
+      <div class="sub" id="sub"></div>
+      <div><span class="chip synthetic">Synthetic schedule · schematic map</span></div>
+    </div>
+    <div class="map-tools">
+      <button class="btn" id="play" type="button" aria-pressed="true">Pause</button>
+      <button class="btn" id="reset-view" type="button">Fit</button>
+    </div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="section">
+      <h2>A four-ship Saturday</h2>
+      <p>Three turnaround ships and one port call. Passengers come off in the morning, new ones arrive by train and ferry from late morning to board, and crew take shore leave in between. The forecast for each venue becomes an hourly staffing plan.</p>
+    </div>
+
+    <div class="section">
+      <h3>Day</h3>
+      <div class="controls">
+        <div class="field"><label for="speed">Speed</label><output for="speed"></output><input type="range" id="speed" min="60" max="1200" step="60" value="360"></div>
+        <div class="field"><label for="weather">Weather</label>
+          <select id="weather"><option value="dry">Dry</option><option value="rain">Rain (parks lose out to shops and museums)</option></select></div>
+        <div class="field"><label for="walkshare">Share who walk</label><output for="walkshare"></output><input type="range" id="walkshare" min="0.1" max="0.6" step="0.05" value="0.3"></div>
+      </div>
+      <div class="row-btns" id="jumps">
+        <button class="btn" type="button" data-jump="09:00">Jump to 09:00</button>
+        <button class="btn" type="button" data-jump="12:30">12:30</button>
+        <button class="btn" type="button" data-jump="15:00">15:00</button>
+        <button class="btn" type="button" data-jump="20:00">End of day</button>
+        <button class="btn primary" type="button" id="restart">New sampled day</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>Staffing plan</h3>
+      <div class="field"><label for="venue">Venue</label>
+        <select id="venue"></select></div>
+      <canvas class="chart" id="staff"></canvas>
+      <div class="stats">
+        <div class="stat"><div class="label">Forecast staff-hours</div><div class="value" id="st-fc">0</div></div>
+        <div class="stat"><div class="label">Flat roster staff-hours</div><div class="value" id="st-flat">0</div></div>
+        <div class="stat"><div class="label">Saved so far</div><div class="value" id="st-save">£0</div></div>
+        <div class="stat"><div class="label">Covers turned away</div><div class="value" id="st-away">0</div></div>
+      </div>
+      <p class="note" id="st-note"></p>
+      <canvas class="chart" id="occ"></canvas>
+    </div>
+
+    <div class="section">
+      <h3>All venues today</h3>
+      <table class="venues" id="table"></table>
+      <div class="row-btns"><button class="btn" type="button" id="csv">Download forecast CSV</button></div>
+    </div>
+  </aside>
+
+  <section class="timeline">
+    <div class="head"><h3>Ships alongside</h3><span id="tl-legend"></span></div>
+    <div class="ships" id="ships"></div>
+    <canvas id="tl"></canvas>
+  </section>
+</main>
+<script type="module" src="js/sims/day.js"></script>
+</body>
+</html>

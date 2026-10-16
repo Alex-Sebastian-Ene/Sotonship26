@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gangway Demand Skyline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="bar"></header>
+<main class="app">
+  <section class="stage" aria-label="Isometric city with venue demand as towers">
+    <canvas class="map" id="map"></canvas>
+    <div class="hud">
+      <div class="clock" id="clock">09:00</div>
+      <div class="sub" id="sub"></div>
+      <div><span class="chip synthetic">Synthetic schedule · schematic map</span></div>
+    </div>
+    <div class="map-tools">
+      <button class="btn" id="play" type="button" aria-pressed="true">Pause</button>
+      <button class="btn" id="reset-view" type="button">Fit</button>
+    </div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="section">
+      <h2>Demand skyline</h2>
+      <p>The city tilted on its side. Every venue cluster is a tower that rises with the people inside and changes colour as it fills. The dashed outline above each tower is where it would be full. This is the view to put in front of a restaurant owner.</p>
+    </div>
+    <div class="section">
+      <h3>Towers show</h3>
+      <div class="row-btns" role="group" aria-label="Tower height">
+        <button class="btn" type="button" data-metric="people" aria-pressed="true">People inside</button>
+        <button class="btn" type="button" data-metric="staff" aria-pressed="false">Staff needed</button>
+      </div>
+      <div class="controls">
+        <div class="field"><label for="hscale">Tower scale</label><output for="hscale"></output><input type="range" id="hscale" min="0.05" max="0.6" step="0.01" value="0.22"></div>
+        <div class="field"><label for="speed">Speed</label><output for="speed"></output><input type="range" id="speed" min="60" max="1200" step="60" value="300"></div>
+      </div>
+      <div class="row-btns">
+        <button class="btn" type="button" data-layer="agents" aria-pressed="true">Passengers</button>
+        <button class="btn" type="button" data-layer="heat" aria-pressed="false">Heat</button>
+        <button class="btn" type="button" data-layer="labels" aria-pressed="true">Labels</button>
+      </div>
+      <div class="row-btns" id="fill-key"></div>
+    </div>
+    <div class="section">
+      <h3>Staff needed now</h3>
+      <div class="stats">
+        <div class="stat"><div class="label">Across all venues</div><div class="value" id="staff-now">0</div></div>
+        <div class="stat"><div class="label">Peak so far</div><div class="value" id="staff-peak">0</div></div>
+      </div>
+      <table class="venues" id="table"></table>
+    </div>
+  </aside>
+
+  <section class="timeline">
+    <div class="head"><h3>Staff needed across the city</h3></div>
+    <canvas id="tl"></canvas>
+  </section>
+</main>
+<script type="module" src="js/sims/skyline.js"></script>
+</body>
+</html>

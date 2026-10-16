@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gangway Policy Lens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="bar"></header>
+<main class="app">
+  <section class="stage" aria-label="Map showing one passenger's decisions">
+    <canvas class="map" id="map"></canvas>
+    <div class="hud">
+      <div class="clock" id="clock">08:00</div>
+      <div class="sub" id="sub">Click any dot to follow that passenger</div>
+      <div><span class="chip synthetic" id="policy-chip">Gravity model · placeholder policy</span></div>
+    </div>
+    <div class="map-tools">
+      <button class="btn" id="play" type="button" aria-pressed="true">Pause</button>
+      <button class="btn" id="reset-view" type="button">Fit</button>
+    </div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="section">
+      <h2>What the policy saw</h2>
+      <p>Each time a passenger leaves a ship, a café or a shop, the policy scores every place they could still reach before their train or all-aboard, and samples one. The spokes on the map are those options; thicker means more likely, magenta is the one chosen.</p>
+    </div>
+
+    <div class="section">
+      <h3>Follow</h3>
+      <div class="row-btns">
+        <button class="btn primary" id="random" type="button">Follow a random passenger</button>
+        <button class="btn" id="unfollow" type="button">Stop following</button>
+        <button class="btn" id="stop-at" type="button" aria-pressed="true">Pause at each decision</button>
+      </div>
+      <div class="row-btns" id="persona-filter"></div>
+    </div>
+
+    <div class="section" id="agent-card" hidden>
+      <h3 id="ag-title">Passenger</h3>
+      <div class="stats">
+        <div class="stat"><div class="label">Heading for</div><div class="value" id="ag-sink" style="font-size:var(--step-1)">–</div></div>
+        <div class="stat"><div class="label">Deadline</div><div class="value" id="ag-deadline">–</div></div>
+        <div class="stat"><div class="label">Places visited</div><div class="value" id="ag-visits">0</div></div>
+        <div class="stat"><div class="label">Decisions</div><div class="value" id="ag-dec">0</div></div>
+      </div>
+      <h3>Latest decision</h3>
+      <div class="probs" id="ag-probs"></div>
+      <h3>Decision log</h3>
+      <div class="probs" id="ag-log"></div>
+    </div>
+
+    <div class="section">
+      <h3>Placeholder policy weights</h3>
+      <p class="note">These tune the stand-in gravity model. Moving them re-scores the followed passenger's current options live, so you can see what each term does before the trained policy replaces it.</p>
+      <div class="controls">
+        <div class="field"><label for="w-walk">Walking-time aversion</label><output for="w-walk"></output><input type="range" id="w-walk" min="0" max="0.5" step="0.01" value="0.09"></div>
+        <div class="field"><label for="w-crowd">Crowd aversion</label><output for="w-crowd"></output><input type="range" id="w-crowd" min="0" max="6" step="0.1" value="2.4"></div>
+        <div class="field"><label for="w-size">Pull of big venues</label><output for="w-size"></output><input type="range" id="w-size" min="0" max="2" step="0.05" value="0.6"></div>
+        <div class="field"><label for="w-temp">Randomness (temperature)</label><output for="w-temp"></output><input type="range" id="w-temp" min="0.1" max="2" step="0.05" value="0.7"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>Episode</h3>
+      <div class="stats">
+        <div class="stat"><div class="label">Decisions made</div><div class="value" id="ep-dec">0</div></div>
+        <div class="stat"><div class="label">Covers served</div><div class="value" id="ep-served">0</div></div>
+        <div class="stat"><div class="label">Turned away</div><div class="value" id="ep-away">0</div></div>
+        <div class="stat"><div class="label">Late for ship or train</div><div class="value" id="ep-late">0</div></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>Traces from the backend</h3>
+      <p class="note">Load a <code>sotonship26.trace/1</code> JSON file to replay decisions made by the trained policy; agents fall back to the gravity model once their recorded decisions run out. Export writes this run in the same format.</p>
+      <label class="dropzone" id="drop" for="file">Drop a trace file here or click to choose<input type="file" id="file" accept="application/json,.json" hidden></label>
+      <div class="row-btns">
+        <button class="btn" id="export" type="button">Export this run as a trace</button>
+        <button class="btn" id="live" type="button">Back to the live model</button>
+      </div>
+      <p class="note" id="trace-status"></p>
+    </div>
+  </aside>
+
+  <section class="timeline">
+    <div class="head"><h3>Decisions per minute</h3></div>
+    <canvas id="tl"></canvas>
+  </section>
+</main>
+<script type="module" src="js/sims/policy.js"></script>
+</body>
+</html>

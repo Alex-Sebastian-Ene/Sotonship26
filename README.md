@@ -94,6 +94,28 @@ uv run --extra cu130 pytest
 uv run --extra cu130 ruff check .
 ```
 
+## Frontend: Gangway
+
+[frontend/](frontend/) holds five browser simulations that draw passengers as agents walking a
+geometric node graph of Southampton, from the cruise terminals through the dock gates to the
+station, ferries and venue clusters, ending in an hourly staffing forecast per venue. No build step:
+
+```bash
+python -m http.server -d frontend 8000   # then open http://localhost:8000
+```
+
+| Page | Shows |
+| --- | --- |
+| Swarm | One ship disembarking in real time |
+| Turnaround Day | A four-ship day and the staffing plan it implies |
+| Policy Lens | Every option the policy weighed for one passenger; replays backend traces |
+| Compare | Two scenarios on the same seed (rain, closures, stewards, staggered disembarkation) |
+| Skyline | Isometric view, venues as towers of demand |
+
+The policy is a gravity-model stand-in behind a `decide(agent, ctx)` interface for the RL backend
+to replace. Design decisions for each simulation are in [docs/simulations/](docs/simulations/).
+`scripts/export_frontend_graph.py` rebuilds the frontend graph from OpenStreetMap.
+
 ## Data sources
 
 The `streets` and `water` scenarios that run today are **synthetic test data**, and the CLI says so.
@@ -106,12 +128,15 @@ Fill in the date collected and the licence for every source before submission.
 | OpenStreetMap via osmnx | Walking network around the terminals | TODO | ODbL |
 | Bathymetry + water polygon for Southampton Water | Replace the synthetic lattice | TODO | TODO |
 | Footway widths, pedestrian counts on turnaround days | Calibrate capacities | TODO | TODO |
+| Frontend schematic graph (`frontend/data/southampton.js`) | Node positions of terminals, gates, streets and venue clusters, placed by hand from public knowledge of the layout; venue capacities, dwell, spend and staff ratios are guesses | 2026-10-16 | Own work; replace with the OSM export (ODbL) |
+| Frontend sample schedule (`frontend/js/core/schedule.js`) | **Synthetic** four-ship day for the demos | 2026-10-16 | Own work |
 | Red Funnel / Hythe ferry timetables, leisure-craft activity | Waterway demand | TODO | TODO |
 
 ## Provenance
 
 - **AI-generated:** the project scaffold (`pyproject.toml` backend extras, `src/`, `tests/`,
   `scripts/`, `cluster/`, `configs/`, this README) was generated with Claude Code on
-  Fri 16 Oct 2026.
+  Fri 16 Oct 2026. The frontend (`frontend/`), its design notes (`docs/simulations/`) and
+  `scripts/export_frontend_graph.py` were also generated with Claude Code on Fri 16 Oct 2026.
 - **Existed before the event:** TODO, confirm with the organisers.
 - **Who helped:** TODO.
