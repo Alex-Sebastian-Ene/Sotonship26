@@ -107,11 +107,19 @@ Fill in the date collected and the licence for every source before submission.
 | Bathymetry + water polygon for Southampton Water | Replace the synthetic lattice | TODO | TODO |
 | Footway widths, pedestrian counts on turnaround days | Calibrate capacities | TODO | TODO |
 | Red Funnel / Hythe ferry timetables, leisure-craft activity | Waterway demand | TODO | TODO |
+| ONS Census 2021 ODWP01EW, location of usual residence and place of work (MSOA), [Nomis bulk download](https://www.nomisweb.co.uk/sources/census_2021_od) | Demo: commuters into and out of the study area, where they live or work, which gateway they use (`demo/external_data.py`, `data/cache/census`, not committed). Census day was 21 Mar 2021, in lockdown | 16 Oct 2026 | Open Government Licence v3.0 |
+| ONS Census 2021 method used to travel to work by distance travelled, per local authority ([census API](https://api.beta.ons.gov.uk/v1/population-types/UR/census-observations?area-type=ltla&dimensions=transport_to_workplace_12a,workplace_travel_10a)) | Demo: share of each commuter flow driving a car or van | 16 Oct 2026 | Open Government Licence v3.0 |
+| ONS MSOA (Dec 2021) population-weighted centroids V2, Open Geography Portal | Demo: placing each MSOA inside or outside the study area | 16 Oct 2026 | Open Government Licence v3.0; contains OS data © Crown copyright and database right |
+| DfT road traffic statistics, AADF per count point ([dft_traffic_counts_aadf.zip](https://roadtraffic.dft.gov.uk/downloads), published Jun 2026, 2025 counts) | Demo: traffic crossing each county gateway (count point on the gateway road), less census commuters and visitors, split 30% through traffic and 70% other trips to the area's zones; scale for everything crossing the edge of the area fitted to 10 count points and checked at 2 more (M271, A33 Redbridge Road, A35 Redbridge Causeway, A33 Millbrook Road and The Avenue, Itchen Bridge, Northam Bridge, A335, M27, M3) (`data/cache/dft`, not committed) | 16 Oct 2026 | Open Government Licence v3.0 |
 
 ## Provenance
 
 - **AI-generated:** the project scaffold (`pyproject.toml` backend extras, `src/`, `tests/`,
   `scripts/`, `cluster/`, `configs/`, this README) was generated with Claude Code on
   Fri 16 Oct 2026.
+- **AI-generated:** `demo/external_data.py`, the census commuter gateways (`census_od`), through
+  traffic and other county trips from DfT gateway counts (`cordon_od`), the DfT count fit
+  (`calibrate_external`) and the motorway repairs (`repair_motorways`) in `demo/traffic_model.py`
+  were written with Claude Code on 16-17 Oct 2026.
 - **Existed before the event:** TODO, confirm with the organisers.
 - **Who helped:** TODO.

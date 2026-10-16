@@ -2,9 +2,11 @@
 
 The map and road network are real (OpenStreetMap, built by osm_base.py). The traffic model
 (traffic_model.py) builds zones, county gateways and routes from that geography and allocates
-traffic dynamically every 15 minutes. What is invented: the cruise schedule and ship names, the trip
-totals behind general traffic, capacities per lane, roadworks permits and match fixtures. Nothing
-here is observed traffic.
+traffic dynamically every 15 minutes. What is invented: the cruise schedule and ship names, trip
+totals within the area (scaled to council counts) and of county visitors, capacities per lane,
+roadworks permits and match fixtures. County commuters come from Census 2021 and traffic crossing
+the edge of the area is scaled to DfT counts (external_data.py, run once). Nothing here is observed
+cruise-day traffic.
 
     uv run --no-project --python 3.12 --with osmnx --with scipy python demo/osm_base.py   # once
     uv run --no-project --python 3.12 --with numpy --with scipy --with networkx --with pandas \
@@ -31,7 +33,9 @@ import numpy as np
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "src"))
 sys.path.insert(0, str(HERE))
+import external_data as ext  # noqa: E402
 import traffic_model as tm  # noqa: E402
+
 from sotonship26.demand.passengers import TurnaroundParams  # noqa: E402
 
 CACHE = HERE.parent / "data" / "cache" / "southampton"
@@ -220,9 +224,11 @@ def build_ctx(log=print) -> tuple[Ctx, dict]:
         if east:
             gates["Eastern Docks gate"] = tuple(np.mean(east, axis=0).round().astype(int))
     m = tm.build(CACHE / "network.pkl", gates, log=log)
-    tm.calibrate_external(m, log=log)
+    dft = ext.count_points(log=log)
+    tm.calibrate_external(m, dft["sites"], log=log, grid=(0.6, 0.8, 1.0, 1.25, 1.6))
     calibration = tm.calibrate_to_counts(m, COUNT_SITES, log=log)
-    tm.calibrate_external(m, log=log)
+    near = tuple(round(m.scale_ext * f, 3) for f in (0.85, 0.92, 1.0, 1.08, 1.17))
+    dft_rows = tm.calibrate_external(m, dft["sites"], log=log, grid=near)
     capacity_notes = tm.anchor_counts(m, COUNT_SITES, calibration, log=log)
     for row in calibration:
         if row["period"] != "day" or row["day"] == "weekday":
@@ -282,7 +288,7 @@ def build_ctx(log=print) -> tuple[Ctx, dict]:
               seg_ptr=seg_ptr, gates=gate_ids, terminal_gate=terminal_gate, luts=luts,
               gate_mask=gate_mask, gw_in=gw_in, cruise_ods=cruise_ods,
               extra={"segs": segs, "gateways": gws, "calibration": calibration,
-                     "capacity": capacity_notes})
+                     "capacity": capacity_notes, "dft": {**dft, "rows": dft_rows}})
     return ctx, base
 
 
@@ -770,7 +776,13 @@ def main(argv=None) -> None:
                                 "embark_close": TurnaroundParams().embark_close_before_dep_min},
                  "lane_closed": LANE_CLOSED,
                  "calibration": {"source": COUNT_SOURCE, "rows": ctx.extra["calibration"],
-                                 "day_window_share": tm.DAY_WINDOW_SHARE},
+                                 "day_window_share": tm.DAY_WINDOW_SHARE,
+                                 "dft": {"source": ctx.extra["dft"]["source"],
+                                         "collected": ctx.extra["dft"]["collected"],
+                                         "rows": ctx.extra["dft"]["rows"],
+                                         "day_weights": tm.DAY_WEIGHTS,
+                                         "estimated_weight": tm.ESTIMATED_WEIGHT}},
+                 "census": m.census,
                  "counts": {"zones": sum(c.kind == "zone" for c in m.centroids),
                             "gateways": len(gws), "ods": m.n_od, "routes": len(m.paths),
                             "edges": len(m.t0), "segments": len(segs)},
