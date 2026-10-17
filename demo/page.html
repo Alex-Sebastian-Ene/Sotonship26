@@ -2,6 +2,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Cruise-day traffic forecast</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,750&family=IBM+Plex+Mono:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap">
 <style>
 /* Layout: a duty officer's briefing. Pick a day; its verdict and the things to do come first, then the map and the road timetable; how it works is folded away below. */
 :root {
@@ -23,6 +25,7 @@
   --area-docks: #2A78D6; --area-centre: #EB6834; --area-portswood: #1BAF7A;
   --g-through: #8C9BA5; --g-county: #2F7EA6; --g-outbound: #7FB8D8; --g-internal: #8DB86A;
   --g-visitors: #E3B04B; --g-match: #C2553A; --g-cruise: #6A3FC4; --g-freight: #8A6A4F; --g-school: #C77A12; --g-bus: #11202A;
+  --bus-hi: #0B8577; --glow: rgba(31, 87, 164, 0.18);
   --font-display: Arial, "Helvetica Neue", Helvetica, sans-serif;
   --font-body: Arial, "Helvetica Neue", Helvetica, sans-serif;
   --font-data: Arial, "Helvetica Neue", Helvetica, sans-serif;
@@ -30,7 +33,7 @@
   --radius: 4px;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:not([data-theme="light"]):not([data-theme="chart"]) {
     --bg: #0F151C; --surface: #161E28; --sunk: #1C2632; --ink: #E3E9EF; --muted: #9AA7B5; --line: #283340; --line-strong: #3C4A5A;
     --accent: #86B2EA; --accent-ink: #0F151C; --accent-soft: #1A2B42;
     --warn-bg: #2D2611; --warn-ink: #F1D27C; --warn-line: #5C4A18;
@@ -48,10 +51,11 @@
     --area-docks: #3987E5; --area-centre: #D95926; --area-portswood: #199E70;
     --g-through: #6E7F8B; --g-county: #4FA3CF; --g-outbound: #9CCDE8; --g-internal: #9CCB78;
     --g-visitors: #F0C25E; --g-match: #E07058; --g-cruise: #B894FF; --g-freight: #B89878; --g-school: #F0B04B; --g-bus: #E2E9EE;
+    --bus-hi: #3FD6C6; --glow: rgba(134, 178, 234, 0.25);
     color-scheme: dark;
   }
 }
-:root[data-theme="dark"] {
+:root[data-theme="dark"], :root[data-theme="harbour"], :root[data-theme="signal"] {
   --bg: #0F151C; --surface: #161E28; --sunk: #1C2632; --ink: #E3E9EF; --muted: #9AA7B5; --line: #283340; --line-strong: #3C4A5A;
   --accent: #86B2EA; --accent-ink: #0F151C; --accent-soft: #1A2B42;
   --warn-bg: #2D2611; --warn-ink: #F1D27C; --warn-line: #5C4A18;
@@ -69,7 +73,36 @@
   --area-docks: #3987E5; --area-centre: #D95926; --area-portswood: #199E70;
   --g-through: #6E7F8B; --g-county: #4FA3CF; --g-outbound: #9CCDE8; --g-internal: #9CCB78;
   --g-visitors: #F0C25E; --g-match: #E07058; --g-cruise: #B894FF; --g-freight: #B89878; --g-school: #F0B04B; --g-bus: #E2E9EE;
+  --bus-hi: #3FD6C6; --glow: rgba(134, 178, 234, 0.25);
   color-scheme: dark;
+}
+/* Extra themes: same data colours, different ground, type and accent */
+:root[data-theme="harbour"] {
+  --bg: #06111D; --surface: #0B1A2B; --sunk: #0F2238; --ink: #E4F0FA; --muted: #8DA6BE; --line: #183049; --line-strong: #29486A;
+  --accent: #4CC9F0; --accent-ink: #04121F; --accent-soft: #0E2C44;
+  --land: #08182A; --water: #05223D; --water-ink: #5FB3E6; --mud: #0D1F2C; --green: #0D2422; --wood: #0F2A24;
+  --resi: #0D1D2E; --comm: #12192C; --ind: #0F1A2E; --port: #10203A; --campus: #131A30; --airport: #0E1C2C;
+  --minor: #163049; --casing: #06111D; --road-quiet: #2C4A68;
+  --bus-hi: #5CF2C8; --glow: rgba(76, 201, 240, 0.28);
+  --font-display: "Space Grotesk", "Segoe UI", sans-serif;
+}
+:root[data-theme="signal"] {
+  --bg: #050505; --surface: #0D0D0C; --sunk: #151513; --ink: #FFE6AE; --muted: #B59C6C; --line: #2A2417; --line-strong: #4C3F22;
+  --accent: #FFB21F; --accent-ink: #0B0B0B; --accent-soft: #2B2109;
+  --land: #090909; --water: #0E171C; --water-ink: #8FB4C8; --mud: #121210; --green: #0F140E; --wood: #11170F;
+  --resi: #0E0E0D; --comm: #12100E; --ind: #0F0F11; --port: #111214; --campus: #121011; --airport: #0F1011;
+  --minor: #1E1B15; --casing: #050505; --road-quiet: #3B3427;
+  --bus-hi: #7CF3FF; --glow: rgba(255, 178, 31, 0.25);
+  --font-display: "IBM Plex Mono", Consolas, monospace; --font-data: "IBM Plex Mono", Consolas, monospace;
+}
+:root[data-theme="chart"] {
+  --bg: #F2ECDD; --surface: #FBF7EC; --sunk: #EAE2CF; --ink: #1A2A3A; --muted: #5B6873; --line: #D8CDB3; --line-strong: #B6A887;
+  --accent: #A13131; --accent-ink: #FFFFFF; --accent-soft: #F2DBD3;
+  --land: #F1E8CF; --water: #B9D7DE; --water-ink: #2B6676; --mud: #E3DCC3; --green: #DCE3C2; --wood: #CBD8B2;
+  --resi: #ECE3CB; --comm: #EEDFD0; --ind: #E2DCCB; --port: #DCD9CB; --campus: #EADFD8; --airport: #E5E0D0;
+  --minor: #D4C9AE; --casing: #FBF7EC; --road-quiet: #B3A98F;
+  --bus-hi: #00838F; --glow: rgba(161, 49, 49, 0.16);
+  --font-display: "Fraunces", Georgia, serif;
 }
 
 body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: var(--step-0); line-height: 1.55; }
@@ -378,6 +411,36 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
 .bl-hit { fill: transparent; }
 .bl-zero { stroke: var(--line-strong); stroke-width: 1.5; stroke-dasharray: 4 3; }
 
+/* Themes, motion and the live map */
+.masthead { grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+.masthead > .meta { grid-column: 1; }
+.theme-pick { grid-column: 2; grid-row: 1 / span 2; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: var(--step--1); color: var(--muted); }
+.theme-pick button { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line-strong); padding: 0; cursor: pointer; background: linear-gradient(135deg, var(--a) 0 50%, var(--b) 50% 100%); transition: transform .15s; }
+.theme-pick button:hover { transform: scale(1.12); }
+.theme-pick button[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 2px; }
+h1, h2 { transition: color .3s; }
+body { transition: background-color .35s, color .35s; }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 var(--glow); } 50% { box-shadow: 0 0 0 7px var(--glow); } }
+.cal-intro .cell { animation: rise .5s cubic-bezier(.2, .7, .2, 1) both; animation-delay: calc(var(--i, 0) * 14ms); }
+button.cell { transition: transform .15s, box-shadow .15s, border-color .15s; }
+button.cell:hover { transform: translateY(-3px); box-shadow: 0 8px 18px var(--glow); }
+.day-head.enter, .notices.enter > * { animation: rise .45s cubic-bezier(.2, .7, .2, 1) both; }
+.notices.enter > *:nth-child(2) { animation-delay: 60ms; } .notices.enter > *:nth-child(3) { animation-delay: 120ms; } .notices.enter > *:nth-child(n+4) { animation-delay: 180ms; }
+.sev.lv-severe, .sev.lv-high { animation: pulse 1.8s ease-in-out infinite; }
+.map-card { transition: box-shadow .3s; }
+.map-card:hover { box-shadow: 0 10px 30px var(--glow); }
+.map-hud { position: absolute; left: 12px; top: 12px; pointer-events: none; display: grid; gap: 2px; padding: 8px 12px; border-radius: 6px;
+  background: color-mix(in srgb, var(--surface) 84%, transparent); border: 1px solid var(--line); backdrop-filter: blur(6px); }
+.map-hud[hidden] { display: none; }
+.hud-clock { font-family: var(--font-data); font-variant-numeric: tabular-nums; font-size: 1.7rem; font-weight: 700; line-height: 1; letter-spacing: .02em; }
+.hud-sub { font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.hud-sub b { color: var(--ink); }
+.hud-bus { display: inline-block; width: 9px; height: 9px; border-radius: 2px; background: var(--bus-hi); margin-right: 4px; }
+.veh-row label.check { display: inline-flex; align-items: center; gap: 6px; font-size: var(--step--1); cursor: pointer; }
+@media (max-width: 640px) { .masthead { grid-template-columns: minmax(0, 1fr); } .theme-pick { grid-column: 1; grid-row: auto; } }
+@media (prefers-reduced-motion: reduce) { .cal-intro .cell, .day-head.enter, .notices.enter > *, .sev.lv-severe, .sev.lv-high { animation: none !important; } button.cell:hover { transform: none; } }
+
 @media (max-width: 900px) { .grid2, .sure { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 640px) {
   .cell { min-height: 54px; padding: 5px; }
@@ -402,6 +465,14 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       <div><dt>Schedule</dt><dd id="m-horizon"></dd></div>
       <div><dt>Model</dt><dd id="m-model"></dd></div>
     </dl>
+    <div class="theme-pick" role="group" aria-label="Theme">
+      <span>Theme</span>
+      <button type="button" data-theme-pick="light" title="Light" aria-label="Light theme" style="--a:#F4F6F8;--b:#1F57A4"></button>
+      <button type="button" data-theme-pick="dark" title="Dark" aria-label="Dark theme" style="--a:#0F151C;--b:#86B2EA"></button>
+      <button type="button" data-theme-pick="harbour" title="Harbour night" aria-label="Harbour night theme" style="--a:#06111D;--b:#4CC9F0"></button>
+      <button type="button" data-theme-pick="signal" title="Signal" aria-label="Signal theme" style="--a:#050505;--b:#FFB21F"></button>
+      <button type="button" data-theme-pick="chart" title="Chart paper" aria-label="Chart paper theme" style="--a:#F2ECDD;--b:#A13131"></button>
+    </div>
   </header>
   <p class="provenance" role="note"><strong id="m-banner-label">Real map, synthetic traffic.</strong> <span id="m-banner">Roads, junctions, lanes, speed limits and land use come from OpenStreetMap.</span></p>
 
@@ -442,6 +513,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
         <div class="map-box" id="map-box">
           <svg id="map-svg" role="img" aria-label="Map of Southampton with main roads coloured by how full they are"><g id="zoom"><g id="world"></g></g><g id="ui"></g></svg>
           <canvas class="agent-canvas" id="agent-canvas" aria-hidden="true"></canvas>
+          <div class="map-hud" id="map-hud" hidden><span class="hud-clock" id="hud-clock"></span><span class="hud-sub" id="hud-sub"></span></div>
           <div class="map-tip" id="map-tip" hidden></div>
           <div class="map-ctl">
             <button id="z-in" aria-label="Zoom in">+</button>
@@ -461,6 +533,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
           <button class="btn" id="veh-play">Play vehicles</button>
           <label class="foot-note" for="veh-speed">Speed</label>
           <select id="veh-speed"><option value="2">2 min a second</option><option value="5" selected>5 min a second</option><option value="15">15 min a second</option></select>
+          <label class="check"><input type="checkbox" id="veh-trails" checked> Flow trails</label>
           <span class="clock" id="veh-clock"></span>
           <span class="foot-note" id="veh-count"></span>
         </div>
@@ -496,7 +569,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       <div class="block-head"><h3>Ships today</h3><span class="foot-note" id="m-sched">Synthetic schedule</span></div>
       <div id="ships"></div>
       <div class="timing" id="timing"></div>
-      <p class="foot-note">Arrivals are fixed by tides and pilots. Disembarkation and check-in can move, so these are requests to the cruise line and port.</p>
+      <p class="foot-note">Arrivals are fixed by tides and pilots; disembarkation and check-in can move, so these are requests to the line and port.</p>
     </div>
 
     <div class="block" id="ppo-card" hidden>
@@ -568,12 +641,12 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
         <div class="fold-body">
           <ol class="steps">
             <li><strong>The network is Southampton's.</strong> <span id="m-edges"></span> one-way road links from OpenStreetMap, with lanes and speed limits, from motorways down to unclassified roads.</li>
-            <li><strong>Zones and gateways come from geography.</strong> <span id="m-zones"></span> zones built from OpenStreetMap places. Each zone's homes, jobs and shops come from nearby residential, commercial, industrial, port and retail land. <span id="m-gw"></span> county gateways sit where the M27, M3, A35, A33 and other roads cross into the area. Where cutting the map to the area broke the M27 and M3, and where OpenStreetMap lacks the M3 to M27 eastbound link, the model joins them up.</li>
-            <li><strong>Everyday traffic is generated from data.</strong> Commuters from the county and back, residents working outside, trips between zones (more between big, close zones), through traffic, county visitors to the shops, and lorries to and from the port (fitted to DfT lorry counts on the M271). Each has its own pattern over the day, different at weekends. The school run adds drop-off and pick-up peaks on term-time weekdays (city council half-term 26–30 Oct). Match days add fans to St Mary's.</li>
+            <li><strong>Zones and gateways come from geography.</strong> <span id="m-zones"></span> zones from OpenStreetMap places, sized by nearby homes, jobs, shops and port land; <span id="m-gw"></span> county gateways where the M27, M3, A35, A33 and others enter. M27/M3 links broken at the map edge, and the missing M3 to M27 eastbound link, are joined up.</li>
+            <li><strong>Everyday traffic is generated from data.</strong> County commuters, residents working outside, trips between zones (more between big, close ones), through traffic, county shoppers and port lorries (fitted to DfT lorry counts on the M271), each with its own day and weekend pattern. Term-time weekdays add the school run (half-term 26–30 Oct); match days add fans to St Mary's.</li>
             <li><strong>Counted roads use the counts.</strong> On Portswood Road, Highfield Lane and Bevois Hill, measured peak speeds of 16–20 mph on 30 mph roads show they are at their limit, so the counted peak-hour flow sets their capacity. Local traffic the zones miss is added so flows match the counts, plus <span id="m-uni"></span> for university term, because the counts were taken in July.</li>
             <li><strong>Cruise traffic is added ship by ship.</strong> Car drop-offs, park and cruise, taxis and coaches, timed by disembarkation and boarding and sent to the terminal's nearest dock gate.</li>
             <li><strong>Drivers choose routes as roads fill.</strong> Every 15 minutes each of the <span id="m-ods"></span> origin–destination flows splits over up to three real routes and shifts towards the quickest. Traffic that cannot get through a full road waits for the next 15 minutes, so queues build and clear.</li>
-            <li><strong>Days vary.</strong> Drivers misjudge speeds, and everyone on a road shares the error. Everyday traffic swings by day, by kind of trip, by area and through the day. Passengers on one ship share its delay and travel mix. Wet days and incidents happen at their usual rates, and dates further ahead get wider ranges.</li>
+            <li><strong>Days vary.</strong> Drivers misjudge speeds together; everyday traffic swings by day, trip type, area and hour; each ship's passengers share its delay and travel mix. Wet days and incidents occur at their usual rates, and dates further ahead get wider ranges.</li>
             <li><strong>Many simulated days.</strong> Each date is simulated <span id="m-n2"></span> times. A road's chance of congestion is the share of those days on which it goes over 85% of its capacity. Each simulated day is also run without the ships, so the ships' effect is measured on the same day.</li>
           </ol>
         </div>
@@ -699,7 +772,8 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       groups: Object.fromEntries(GROUP_ORDER.map(g => [g, cs.getPropertyValue(`--g-${g}`).trim()])),
       school: cs.getPropertyValue('--g-school').trim(), bus: cs.getPropertyValue('--g-bus').trim(),
       casing: cs.getPropertyValue('--casing').trim(), accent: cs.getPropertyValue('--accent').trim(),
-      ink: cs.getPropertyValue('--ink').trim(),
+      ink: cs.getPropertyValue('--ink').trim(), busHi: cs.getPropertyValue('--bus-hi').trim(),
+      font: cs.getPropertyValue('--font-data').trim() || 'sans-serif',
     };
   }
   function ramp(stops, x) {
@@ -834,6 +908,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
   }
 
   function renderCalendar() {
+    requestAnimationFrame(() => $('#cal').querySelectorAll('.cell').forEach((c, i) => c.style.setProperty('--i', i)));
     const first = dateOf('2026-10-12');
     const last = dateOf(DATA.days[DATA.days.length - 1].date);
     const cells = [];
@@ -1022,7 +1097,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     if (L === 'cruise') html = `<span><svg width="44" height="10" aria-hidden="true"><line x1="2" y1="5" x2="42" y2="5" stroke="var(--cruise)" stroke-width="2"/></svg> 50</span><span><svg width="44" height="12" aria-hidden="true"><line x1="3" y1="6" x2="41" y2="6" stroke="var(--cruise)" stroke-width="6" stroke-linecap="round"/></svg> 200 cruise vehicles per hour</span>`;
     else html = `<span class="ramp">${[0.3, 0.6, 0.78, 0.92, 1.1, 1.3].map(x => `<i style="background:${loadColor(x)}"></i>`).join('')}</span><span>How full: under 50%, 70%, 85%, full, over capacity</span>`;
     if (L === 'queue') html += '<span><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="5" class="q-dot"/></svg> vehicles waiting at a bottleneck</span>';
-    if (L === 'agents') html += `<span><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="3.5" fill="${PAL.groups.internal}"/></svg> one vehicle agent, coloured by kind of trip (below the map)</span><span><svg width="14" height="14" aria-hidden="true"><rect x="2" y="2" width="10" height="10" fill="${PAL.bus}"/></svg> bus</span><span>Roads: this one simulated day</span>`;
+    if (L === 'agents') html += `<span><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="3.5" fill="${PAL.groups.internal}"/></svg> one vehicle agent, coloured by kind of trip (below the map)</span><span><svg width="14" height="14" aria-hidden="true"><rect x="1" y="2" width="12" height="10" rx="3" fill="${PAL.busHi}"/></svg> bus, labelled with its route; a ring marks one leaving its first stop</span><span>Roads: this one simulated day</span>`;
     html += '<span><svg width="12" height="12" aria-hidden="true"><rect x="1" y="1" width="10" height="10" rx="2" class="mk-gate"/></svg> dock gate</span><span><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="5" class="mk-gw"/></svg> county gateway, vehicles per hour coming in</span>';
     html += '<span class="muted">Drag to move. Pinch, Ctrl + scroll or the buttons to zoom.</span>';
     $('#map-legend').innerHTML = html;
@@ -1498,10 +1573,22 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     for (let k = 0; k < G.xs.length; k++) { const [x, y] = screen(G.xs[k], G.ys[k]); if (k) cx2.lineTo(x, y); else cx2.moveTo(x, y); }
     cx2.stroke();
   }
-  function drawAgents() {
+  const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const trailsOn = () => !REDUCED && $('#veh-trails').checked;
+  function roundRect(x, y, w, h, r) {
+    cx2.beginPath(); cx2.moveTo(x + r, y); cx2.arcTo(x + w, y, x + w, y + h, r); cx2.arcTo(x + w, y + h, x, y + h, r);
+    cx2.arcTo(x, y + h, x, y, r); cx2.arcTo(x, y, x + w, y, r); cx2.closePath();
+  }
+  // fade = true while vehicles play: the last frames fade instead of clearing, so moving dots leave flow trails
+  function drawAgents(fade) {
     const [w, h] = sizeCanvas();
-    cx2.clearRect(0, 0, w, h); drawn = [];
+    if (fade && trailsOn()) {
+      cx2.globalCompositeOperation = 'destination-out'; cx2.fillStyle = 'rgba(0,0,0,0.2)'; cx2.fillRect(0, 0, w, h);
+      cx2.globalCompositeOperation = 'source-over';
+    } else cx2.clearRect(0, 0, w, h);
+    drawn = [];
     const A = state.layer === 'agents' ? agentDay() : null;
+    $('#map-hud').hidden = !A;
     if (!A) return;
     const now = state.minute, rad = Math.max(1.8, Math.min(4.5, 1.4 + Math.log2(Math.max(1, T.k))));
     if (selected) {
@@ -1510,26 +1597,52 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       cx2.strokeStyle = PAL.casing; cx2.lineWidth = 6; tracePath(G);
       cx2.strokeStyle = PAL.accent; cx2.lineWidth = 3; tracePath(G);
     }
-    let na = 0, nb = 0;
+    const tails = !fade || !trailsOn();
+    let na = 0, nb = 0, cruiseOn = 0;
+    cx2.lineCap = 'round';
     for (const a of A.list) {
       if (a.dep > now || a.arr < now) continue;
       na++;
-      const [x, y] = screen(...posAt(geom('a', a.p), a.t, now));
+      const G = geom('a', a.p), [x, y] = screen(...posAt(G, a.t, now));
       if (x < -6 || y < -6 || x > w + 6 || y > h + 6) continue;
-      const P = AG.purposes[a.k];
-      cx2.fillStyle = agentColor(a.k);
+      const P = AG.purposes[a.k], col = agentColor(a.k);
+      if (P.cruise) cruiseOn++;
+      // fade in after leaving and out before arriving, so trips appear and finish rather than blink
+      cx2.globalAlpha = Math.max(0.25, Math.min(1, (now - a.dep) / 1.5, (a.arr - now) / 1.5));
+      if (tails) {
+        const [px, py] = screen(...posAt(G, a.t, Math.max(a.dep, now - 1.2)));
+        cx2.strokeStyle = col; cx2.lineWidth = rad * 0.9; cx2.globalAlpha *= 0.45;
+        cx2.beginPath(); cx2.moveTo(px, py); cx2.lineTo(x, y); cx2.stroke();
+        cx2.globalAlpha /= 0.45;
+      }
+      cx2.fillStyle = col;
       if (P.key === 'cruise_coach') cx2.fillRect(x - rad - 1, y - rad - 1, 2 * rad + 2, 2 * rad + 2);
       else { cx2.beginPath(); cx2.arc(x, y, P.cruise ? rad + 0.8 : rad, 0, 2 * Math.PI); cx2.fill(); }
       drawn.push([x, y, 'a', a.i]);
     }
+    cx2.globalAlpha = 1;
+    let started = 0;
+    const label = T.k >= 1.6;
     for (const b of A.buses) {
+      if (b.start <= now) started++;
       if (b.start > now || b.end < now) continue;
       nb++;
       const [x, y] = screen(...posAt(geom('b', b.p), b.t, now));
-      if (x < -8 || y < -8 || x > w + 8 || y > h + 8) continue;
-      const s = rad + 2.5;
-      cx2.fillStyle = PAL.casing; cx2.fillRect(x - s - 1, y - s - 1, 2 * s + 2, 2 * s + 2);
-      cx2.fillStyle = PAL.bus; cx2.fillRect(x - s, y - s, 2 * s, 2 * s);
+      if (x < -30 || y < -30 || x > w + 30 || y > h + 30) continue;
+      const age = now - b.start, s = rad + 3.4, pop = REDUCED ? 1 : Math.min(1, 0.35 + age / 1.2);
+      if (age < 5 && !REDUCED) {  // spawn: a ring spreading from the first stop
+        const k = age / 5;
+        cx2.strokeStyle = PAL.busHi; cx2.lineWidth = 2.5 * (1 - k) + 0.5; cx2.globalAlpha = 1 - k;
+        cx2.beginPath(); cx2.arc(x, y, s + 3 + k * 22, 0, 2 * Math.PI); cx2.stroke(); cx2.globalAlpha = 1;
+      }
+      const R = AG.bus.routes[b.r], name = R ? String(R.name) : '';
+      const bw = label && name ? Math.max(2 * s, 7 + name.length * s * 0.95) : 2 * s, bh = 2 * s;
+      cx2.fillStyle = PAL.casing; roundRect(x - bw * pop / 2 - 1.5, y - bh * pop / 2 - 1.5, bw * pop + 3, bh * pop + 3, 4); cx2.fill();
+      cx2.fillStyle = PAL.busHi; roundRect(x - bw * pop / 2, y - bh * pop / 2, bw * pop, bh * pop, 3); cx2.fill();
+      if (label && name && pop === 1) {
+        cx2.fillStyle = PAL.casing; cx2.font = `700 ${Math.round(s * 1.15)}px ${PAL.font}`; cx2.textAlign = 'center'; cx2.textBaseline = 'middle';
+        cx2.fillText(name, x, y + 0.5);
+      }
       drawn.push([x, y, 'b', b.i]);
     }
     if (selected) {
@@ -1537,11 +1650,13 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       const t0 = selected.type === 'a' ? it.dep : it.start, t1 = selected.type === 'a' ? it.arr : it.end;
       if (now >= t0 && now <= t1) {
         const [x, y] = screen(...posAt(geom(selected.type, it.p), it.t, now));
-        cx2.strokeStyle = PAL.ink; cx2.lineWidth = 2; cx2.beginPath(); cx2.arc(x, y, rad + 5, 0, 2 * Math.PI); cx2.stroke();
+        cx2.strokeStyle = PAL.ink; cx2.lineWidth = 2; cx2.beginPath(); cx2.arc(x, y, rad + 6, 0, 2 * Math.PI); cx2.stroke();
       }
     }
     $('#veh-clock').textContent = hhmm(now);
-    $('#veh-count').textContent = `${int(na)} agents${A.buses.length ? ` and ${int(nb)} buses` : ''} on the road`;
+    $('#veh-count').textContent = `${int(na)} agents${A.buses.length ? `, ${int(nb)} buses` : ''} on the road`;
+    $('#hud-clock').textContent = hhmm(now);
+    $('#hud-sub').innerHTML = `<b>${int(na)}</b> vehicles · <b>${int(cruiseOn)}</b> cruise${A.buses.length ? ` · <span class="hud-bus"></span><b>${int(nb)}</b> buses (${int(started)} of ${int(A.buses.length)} started)` : ''}`;
   }
   svg.addEventListener('click', e => {
     if (state.layer !== 'agents' || !agentDay()) return;
@@ -1561,7 +1676,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
   const mins = x => `${fmt1(x)} min`;
   function renderJourney() {
     const A = agentDay(), el = $('#journey');
-    if (!A || !selected) { el.innerHTML = '<p class="muted">Turn on the Vehicles layer and click a dot to follow one vehicle: where it came from and is going, its route, when it left and arrived, and how long it queued.</p>'; return; }
+    if (!A || !selected) { el.innerHTML = '<p class="muted">Turn on Vehicles and click a dot or bus to follow it: from, to, route, timings, queueing.</p>'; return; }
     if (selected.type === 'a') {
       const a = A.list[selected.i], P = AG.purposes[a.k], path = AG.paths[a.p];
       const ff = path.ff / 10, total = a.arr - a.dep, slow = Math.max(0, total - ff - a.q);
@@ -1578,7 +1693,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       const b = A.buses[selected.i], R = AG.bus.routes[b.r], pat = AG.bus.patterns[b.p];
       const stops = pat.s.map(i => AG.names[i]);
       const timed = AG.bus.timetable === 'gtfs';
-      el.innerHTML = `<p><span class="sw" style="display:inline-block;width:10px;height:10px;margin-right:6px;background:${PAL.bus}"></span><strong>${esc(R.operator)} ${esc(R.name)}</strong> <span class="muted">${esc(R.long)}</span></p>
+      el.innerHTML = `<p><span class="sw" style="display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;background:${PAL.busHi}"></span><strong>${esc(R.operator)} ${esc(R.name)}</strong> <span class="muted">${esc(R.long)}</span></p>
         <dl><dt>From</dt><dd>${esc(stops[0] || '')}</dd><dt>To</dt><dd>${esc(stops[stops.length - 1] || '')} (${stops.length} stops in the area)</dd>
         <dt>Route</dt><dd>${pat.v.length ? esc(pat.v.map(i => AG.names[i]).join(' → ')) : ''}</dd>
         <dt>${timed ? 'Timetabled' : 'Assumed'} start</dt><dd class="mono">${hhmm(b.dep)}</dd><dt>Modelled end</dt><dd class="mono">${hhmm(b.end)}</dd>
@@ -1619,11 +1734,11 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     const rows = groups.map(g => { const m = D.check[g].model.reduce((s, v) => s + v, 0) / 4, a = D.check[g].agents.reduce((s, v) => s + v, 0) / 4;
       return `<tr><td><span class="sw" style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;background:${PAL.groups[g] || PAL.school}"></span>${esc(M.groups[g] || (g === 'school' ? 'School run' : g))}</td><td class="num">${int(m)}</td><td class="num">${int(a)}</td><td class="num">${m ? Math.round((a / m - 1) * 100) + '%' : ''}</td></tr>`; }).join('');
     $('#veh-note').textContent = `seed ${D.seed.join('-')}`;
-    $('#veh-body').innerHTML = `<p>${int(A.list.length)} agents stand for ${int(vehicles)} vehicle trips on <strong>one sampled day</strong>${D.wet ? ' (wet)' : ''}${D.incident ? ', with an incident on a main road' : ''}. Each everyday agent stands for about ${int(D.weights.everyday)} vehicles and each cruise agent for ${int(D.weights.cruise)}, so cruise traffic is easier to see. In the Vehicles layer the roads are coloured by this same sampled day, so dots and colours are the same traffic; the other layers show the average of ${M.n} sampled days.</p>
-      <div class="veh-legend">${AG.purposes.map((P, k) => counts[k] ? `<span><span class="sw" style="background:${agentColor(k)}"></span>${esc(P.label)} <span class="mono">${int(counts[k])}</span></span>` : '').join('')}${A.buses.length ? `<span><span class="sw" style="border-radius:2px;background:${PAL.bus}"></span>Bus <span class="mono">${int(A.buses.length)}</span></span>` : ''}</div>
+    $('#veh-body').innerHTML = `<p>${int(A.list.length)} agents = ${int(vehicles)} vehicle trips on <strong>one sampled day</strong>${D.wet ? ' (wet)' : ''}${D.incident ? ', with a main-road incident' : ''}. One everyday agent ≈ ${int(D.weights.everyday)} vehicles; one cruise agent ≈ ${int(D.weights.cruise)}, so cruise traffic stands out. Road colours in this layer are the same sampled day; other layers average ${M.n} days.</p>
+      <div class="veh-legend">${AG.purposes.map((P, k) => counts[k] ? `<span><span class="sw" style="background:${agentColor(k)}"></span>${esc(P.label)} <span class="mono">${int(counts[k])}</span></span>` : '').join('')}${A.buses.length ? `<span><span class="sw" style="border-radius:3px;background:${PAL.busHi}"></span>Bus <span class="mono">${int(A.buses.length)}</span></span>` : ''}</div>
       <h3 style="font-size: var(--step-0)">The agents added up</h3>
       <div class="chart"><svg viewBox="0 0 320 106" role="img" aria-label="Trips starting per hour: model flows against agents times their weight">${grid}${bars}${line}${ticks}</svg></div>
-      <p class="foot-note">Line: vehicles per hour the model starts on this sampled day. Bars: the agents times the vehicles each stands for. They differ only by sampling.</p>
+      <p class="foot-note">Line: model trips started per hour. Bars: agents × weight. Any gap is sampling.</p>
       <div class="table-scroll"><table><thead><tr><th>Kind of trip</th><th>Model</th><th>Agents × weight</th><th>Diff</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     renderJourney();
   }
@@ -1682,7 +1797,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     const from = D.collected_from.slice(11, 16), to = D.collected_to.slice(11, 16), W = Math.max(280, Math.floor(el.clientWidth || card.clientWidth || 600));
     const lines = D.day_lines.slice().sort((a, b) => b.n - a.n).slice(0, 16);
     const legend = Object.keys(AREA_NAME).filter(k => D.areas.some(p => p.key === k)).map(k => `<span><i class="bl-f-${AREA_CLS[k]}"></i>${esc(AREA_NAME[k])}</span>`).join('');
-    el.innerHTML = `<p><strong>Observed, not modelled.</strong> Every bus in the city box was read from bustimes.org once a minute from ${from} to ${to} on ${esc(shortDate(state.date))}: ${int(D.journeys)} bus journeys in ${int(D.polls)} readings. Lateness is the delay against the timetable that bustimes.org works out from each bus's position. Each journey counts once per hour.</p>
+    el.innerHTML = `<p><strong>Observed, not modelled.</strong> Every bus in the city box, read from bustimes.org once a minute, ${from}–${to} ${esc(shortDate(state.date))}: ${int(D.journeys)} journeys in ${int(D.polls)} readings. Lateness = bustimes.org's delay against the timetable; one count per journey per hour.</p>
       <div class="bl-legend">${legend}</div>
       <div class="bus-live-chart">${busLiveChart(D, W)}<div class="map-tip bl-tip" hidden></div></div>
       <p class="foot-note">Mean minutes late per hour in each area (boxes drawn by hand round each place). Hover a point for the spread.</p>
@@ -1755,7 +1870,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       const rows = Object.keys(names).filter(k => AB[k]).map(k => `<tr><td>${esc(names[k])}</td><td class="num">${cell(AB[k], 'corridor_hours')}</td><td class="num">${cell(AB[k], 'vehicle_hours')}</td><td class="num">${cell(AB[k], 'marshal_hours')}</td><td class="num">${cell(AB[k], 'cost')}</td></tr>`).join('');
       return `<h3 style="font-size: var(--step-0)">Where PPO's saving comes from</h3><p class="foot-note">The same test days with one lever switched off at a time; differences from doing nothing per day.</p><div class="table-scroll"><table><thead><tr><th></th><th>Congested road-hours</th><th>Delay (veh-h)</th><th>Marshal hours</th><th>Cost</th></tr></thead><tbody>${rows}</tbody></table></div><p class="foot-note">Most of the saving comes from putting marshals at the dock gates, whose effect (25% more gate capacity) is our assumption, not a measurement. Signs move traffic off the busiest corridors at the price of longer routes.</p>`;
     })() : '';
-    $('#ppo-test-body').innerHTML = `<p class="foot-note">Each policy plays the same ${S.nothing.n} sampled days (${PPO.dates.test.length} dates held out of training and ${PPO.dates.seen.length} training dates, with new random draws), so the differences are paired. Mean per day (10th–90th percentile); below it, the difference from doing nothing [95% bootstrap interval]. The rule sets signs where a road went over 85% full in the last 15 minutes and marshals where a gate approach did. The advisor is this page's ship-timing advice, planned from ${PPO.n_advise} of the forecast's own samples per date.</p>
+    $('#ppo-test-body').innerHTML = `<p class="foot-note">Every policy plays the same ${S.nothing.n} sampled days (${PPO.dates.test.length} held-out dates, ${PPO.dates.seen.length} training dates, new draws), so differences are paired. Cell: mean per day (10th–90th percentile), then the change against doing nothing [95% bootstrap interval]. Rule: signs where a road passed 85% in the last 15 minutes, marshals where a gate approach did. Advisor: this page's ship-timing advice, from ${PPO.n_advise} forecast samples per date.</p>
       <div class="table-scroll"><table><thead><tr><th>Policy</th><th>Days</th>${keys.map(k => `<th>${esc(ML[k])}</th>`).join('')}<th>Days cheaper than nothing</th></tr></thead><tbody>${rows}</tbody></table></div>
       <p>Lowest average cost on these days: <strong>${esc(PPO.labels[best])}</strong>.${best !== 'ppo' ? ' PPO does not beat it here.' : ''}</p>
       ${abl}<p class="foot-note">Costs: £${int(C.corridor_hour)} per congested road-hour (one road over 85% full for an hour; a weight for the risk of a road locking up, set by us, not measured), £${int(C.vehicle_hour)} per vehicle-hour of delay (vehicles queuing into the next 15 minutes, plus slow running), £${int(C.held_pax_hour)} per passenger-hour held in a terminal, £${int(C.marshal_hour)} per gate-hour of marshals${C.sign_hour ? `, £${int(C.sign_hour)} per sign location-hour` : ''}. ${C.sign_hour ? 'Check-in moves have' : 'Signs and check-in moves have'} no cost of their own. ${tr.timesteps ? `Trained on ${int(tr.days)} sampled days (${int(tr.timesteps)} steps of 15 minutes) on ${esc(tr.gpu || tr.device)}.` : ''}</p>${curve}`;
@@ -1773,7 +1888,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
       state.minute = Math.min(1200, state.minute + dt * +$('#veh-speed').value);
       const b = Math.min(N_BINS - 1, Math.floor((state.minute - 300) / 15));
-      if (b !== state.bin) setBin(b, true); else drawAgents();
+      if (b !== state.bin) setBin(b, true); else drawAgents(true);
       if (state.minute >= 1200) { stopVehicles(); return; }
       vehAnim = requestAnimationFrame(tick);
     };
@@ -1783,7 +1898,9 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     $('#veh-row').hidden = state.layer !== 'agents';
     if (state.layer !== 'agents') stopVehicles();
     drawAgents();
+    if (state.layer === 'agents' && !vehAnim && !REDUCED && agentDay()) $('#veh-play').click();
   }));
+  $('#veh-trails').addEventListener('change', () => drawAgents());
 
   /* ---------- day ---------- */
   function schedSrc() {
@@ -1825,7 +1942,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     if (d.beyond) {
       $('#day-head').innerHTML = '';
       $('#notices').innerHTML = `<div class="card refusal"><p class="eyebrow">Outside coverage</p><h2>No forecast for ${esc(longDate(d.date))}</h2>
-        <p>The published cruise schedule ends on ${esc(longDate(M.horizon))}. Without a schedule there are no ship calls to forecast from, so the tool shows nothing rather than a guess. Dates fill in when the next schedule is published.</p>
+        <p>The published schedule ends on ${esc(longDate(M.horizon))}. No schedule, no forecast: we show nothing rather than guess.</p>
         <p><button class="btn btn-primary" id="goto-last">Open ${esc(shortDate(M.horizon))}, the last covered day</button></p></div>`;
       $('#goto-last').addEventListener('click', () => selectDay(M.horizon, true));
       return;
@@ -1835,6 +1952,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     for (const c of DATA.corridors) for (let b = 0; b < N_BINS; b++) if (!hit || add[c.id][b] > hit.v) hit = { v: add[c.id][b], b, c };
     const head = $('#day-head');
     head.className = 'day-head';
+    void head.offsetWidth; head.classList.add('enter');
     const verdict = !n ? 'No cruise ships today. The map and timetable show everyday traffic only.'
       : `<span class="sev lv-${lv.key}">${lv.label}</span>${n} ${n === 1 ? 'ship' : 'ships'} turning around. The ships add about <b>${fmt1(uplift(d))}</b> hours of congested road${d.range ? ` (likely ${upRange(d)})` : ''}.${hit && hit.v >= 20 ? ` They hit hardest around <b>${binTime(hit.b)}</b> on ${esc(hit.c.name)}, where they raise the chance of congestion by ${hit.v} points.` : ''}`;
     head.innerHTML = `<h2>${esc(longDate(d.date))}</h2><p class="verdict">${verdict}</p>
@@ -1845,7 +1963,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
         <div><dt>All traffic</dt><dd><b>${fmt1(d.range ? d.range.score[1] : d.score)}</b> h <span class="src">Modelled</span></dd></div>
         <div><dt>Without ships</dt><dd><b>${fmt1(d.range ? d.range.bg[1] : d.bg_score)}</b> h <span class="src">Modelled</span></dd></div>
       </dl>
-      <p class="foot-note">Congested means over 85% of capacity, summed over ${DATA.corridors.length} main roads. The likely range covers 8 days in 10.</p>`;
+      <p class="foot-note">Congested = over 85% of capacity, summed over ${DATA.corridors.length} main roads. Likely range: 8 days in 10.</p>`;
     const notes = [];
     d.permits.forEach(id => { const p = PERMIT[id]; notes.push(`<div class="notice"><span class="tag">Roadworks</span><span><strong>Permit ${id}:</strong> ${esc(p.what)} on ${esc(CORR[p.corridor] ? CORR[p.corridor].name : p.corridor)}, ${esc(shortDate(p.from))} to ${esc(shortDate(p.to))}${p.source ? ` (${esc(p.source)})` : ''}. Already in the forecast: traffic reroutes around it.${d.whatif.move_permit ? ' <button class="linkbtn" data-scenario="move_permit">See it moved</button>' : ''}</span></div>`); });
     const fixture = (DATA.matches || []).find(x => x.date === d.date);
@@ -1856,12 +1974,25 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     if (d.freight) notes.push(`<div class="notice${d.freight.unconfirmed ? ' notice-warn' : ''}"><span class="tag">Port freight</span><span>Port lorries ×${d.freight.factor.toFixed(2)}: ${d.freight.moves} container and ro-ro ship arrivals and departures planned today, against ${d.freight.mean_moves} a day over the days the feed covers (Southampton VTS, ABP). Scaling lorries by ship calls is an assumption, not fitted, so the swing is halved.${d.freight.unconfirmed ? ` ${d.freight.unconfirmed} of today's times are not yet confirmed.` : ''}</span></div>`);
     if (!d.calls.length) notes.push('<div class="notice"><span class="tag">No ships</span><span>No turnarounds today. The map shows everyday traffic only.</span></div>');
     $('#notices').innerHTML = notes.join('');
+    $('#notices').classList.remove('enter'); void $('#notices').offsetWidth; $('#notices').classList.add('enter');
+    if (!REDUCED) head.querySelectorAll('.facts b, .verdict b').forEach(countUp);
     $('#notices').querySelectorAll('[data-scenario]').forEach(b => b.addEventListener('click', () => setScenario(b.dataset.scenario)));
     const opts = ['base', 'cruise', 'bg', ...Object.keys(d.whatif)];
     $('#scenario').innerHTML = opts.map(k => `<option value="${k}"${k === state.scenario ? ' selected' : ''}>${esc(scenLabel(d, k))}</option>`).join('');
     $('#slider').value = state.bin;
     segCenters = {};
     renderTiming(); renderActions(); renderRoutesCard(); renderSure(); renderVehicles(); renderBuses(); renderBusLive(); renderPPO(); renderVisuals();
+  }
+  function countUp(el) {
+    const txt = el.textContent, target = parseFloat(txt.replace(/,/g, ''));
+    if (!isFinite(target) || !/^[\d.,]+$/.test(txt)) return;
+    const dp = (txt.split('.')[1] || '').length, t0 = performance.now();
+    const step = now => {
+      const k = Math.min(1, (now - t0) / 650), v = target * (1 - (1 - k) ** 3);
+      el.textContent = dp ? v.toFixed(dp) : Math.round(v).toLocaleString('en-GB');
+      if (k < 1) requestAnimationFrame(step); else el.textContent = txt;
+    };
+    requestAnimationFrame(step);
   }
   function renderVisuals() {
     const d = day();
@@ -2065,11 +2196,20 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     host.addEventListener('mouseleave', () => { const tip = host.querySelector('.viz-tip'); if (tip) tip.hidden = true; hideX(); });
   }
 
+  function setTheme(t) {
+    if (t === 'light' || t === 'dark' || t === 'harbour' || t === 'signal' || t === 'chart') document.documentElement.dataset.theme = t;
+    else delete document.documentElement.dataset.theme;
+    document.querySelectorAll('[data-theme-pick]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.themePick === t)));
+    try { localStorage.setItem('forecast-theme', t || ''); } catch (err) { /* private mode: theme just isn't remembered */ }
+  }
+  document.querySelectorAll('[data-theme-pick]').forEach(b => b.addEventListener('click', () => setTheme(b.dataset.themePick)));
+  try { const saved = localStorage.getItem('forecast-theme'); if (saved) setTheme(saved); } catch (err) { /* no storage */ }
   function onTheme() { readPalette(); if (state.date && !day().beyond) renderVisuals(); }
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', onTheme);
   new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
   readPalette();
+  $('#cal').classList.add('cal-intro'); setTimeout(() => $('#cal').classList.remove('cal-intro'), 1600);
   renderMeta(); renderPPOTest(); wirePPOViz();
   renderBacktest();
   renderFit();
