@@ -41,20 +41,22 @@ def crop_origin(bgr: np.ndarray) -> tuple[int, int]:
 class StubModel:
     """Returns every vehicle whose centre lies inside the crop, in crop pixels."""
 
-    def __init__(self, vehicles, names, obb: bool):
+    def __init__(self, vehicles, names, obb: bool, scale: float = 1.0):
         self.vehicles = vehicles  # [(cx, cy, class_id, conf)] in full-image pixels
         self.names = names
         self.obb = obb
+        self.scale = scale  # crops arrive enlarged by this factor (see nearest_resize)
         self.calls: list[dict] = []
 
     def predict(self, crop, conf=0.25, imgsz=640, verbose=False):
         h, w = crop.shape[:2]
         x0, y0 = crop_origin(crop)
         self.calls.append({"origin": (x0, y0), "shape": (h, w), "conf": conf, "imgsz": imgsz})
+        k = self.scale
         rows = [
-            (cx - x0, cy - y0, c, p)
+            ((cx - x0) * k, (cy - y0) * k, c, p)
             for cx, cy, c, p in self.vehicles
-            if x0 <= cx < x0 + w and y0 <= cy < y0 + h and p >= conf
+            if x0 <= cx < x0 + w / k and y0 <= cy < y0 + h / k and p >= conf
         ]
         arr = np.array([[x, y, 20.0, 10.0, 0.3] for x, y, _, _ in rows]).reshape(-1, 5)
         cls = np.array([c for *_, c, _ in rows], dtype=float)
@@ -203,9 +205,47 @@ def test_upsample_default_is_native_and_bad_values_raise():
     rgb = np.zeros((60, 100, 3), dtype=np.uint8)
     detect.detect(rgb, model, "aerial")
     assert model.shapes == [(60, 100)]
-    for bad in (0, -1.0):
+    for bad in (0, -1.0, detect.MAX_UPSAMPLE + 0.5, 25):
         with pytest.raises(ValueError, match="upsample"):
             detect.detect(rgb, model, "aerial", upsample=bad)
+
+
+def test_upsample_maps_back_with_the_rounded_size_not_the_factor():
+    # 333 px * 2.5 = 832.5, which rounds to 832: the true ratio is 333/832, not 1/2.5.
+    model = FixedModel([(831.0, 0.0, 10)], DOTA)
+    det = detect.detect(np.zeros((10, 333, 3), dtype=np.uint8), model, "aerial", upsample=2.5)
+    assert model.shapes == [(25, 832)]
+    assert det["cx"].iloc[0] == pytest.approx(831.0 * 333 / 832)
+
+
+def nearest_resize(rgb, factor):
+    """Integer nearest-neighbour enlargement: keeps coord_image's top-left pixel readable."""
+    k = int(factor)
+    return np.repeat(np.repeat(rgb, k, axis=0), k, axis=1)
+
+
+def test_upsample_enlarges_each_crop_and_still_counts_each_vehicle_once(monkeypatch):
+    resized: list[tuple[int, int]] = []
+
+    def recording_resize(rgb, factor):
+        resized.append(rgb.shape[:2])
+        return nearest_resize(rgb, factor)
+
+    monkeypatch.setattr(detect, "_resize", recording_resize)
+    h, w, tile, overlap, k = 700, 600, 512, 128, 4
+    rng = np.random.default_rng(1)
+    vehicles = [(float(x), float(y), 10, 0.8) for x, y in rng.uniform(0, [w, h], (200, 2))]
+    vehicles += [(112.0, 112.0, 9, 0.9)]  # inside a shared strip (crops are 128 px, overlap 32)
+    model = StubModel(vehicles, DOTA, obb=True, scale=k)
+    out = detect.count_vehicles(
+        coord_image(h, w), mode="aerial", model=model, tile=tile, overlap=overlap, upsample=k
+    )
+    # Memory stays at one tile: crops are cut at tile/k and only enlarged one at a time.
+    assert len(model.calls) > 4
+    assert all(c["shape"] == (tile, tile) for c in model.calls)
+    assert resized and all(shape == (tile // k, tile // k) for shape in resized)
+    assert out["cars"].iloc[0] == 200
+    assert out["large_vehicles"].iloc[0] == 1
 
 
 def test_aerial_dota_hyphenated_names_also_map():
