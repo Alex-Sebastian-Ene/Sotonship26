@@ -395,7 +395,7 @@ def base_shares(ctx: Ctx, dtype: int, closed, kick, term=True):
     return _SHARES[key]
 
 
-P_WET = {10: 0.50, 11: 0.55, 12: 0.55}  # share of days with real rain (assumed climatology)
+P_WET = {10: 0.50, 11: 0.55, 12: 0.55, 1: 0.55}  # share of rainy days (assumed climatology)
 WET_CAPACITY = 0.93  # roads carry a little less in the wet
 WET_DEMAND = 1.03  # and a few more people drive
 INCIDENT_P = 0.15  # chance a day has a breakdown or crash on a main road
@@ -413,8 +413,9 @@ def day_multipliers(d: date, wet: bool) -> dict:
     wd = d.weekday()
     commute = {0: 0.97, 1: 1.02, 2: 1.03, 3: 1.02, 4: 0.93}.get(wd, 1.0)
     visitors = {4: 1.06}.get(wd, 1.0)
-    if d >= date(2026, 11, 14):  # Christmas shopping builds week by week
-        visitors *= 1.10 + 0.05 * ((d - date(2026, 11, 14)).days // 7)
+    start, peak = date(d.year, 11, 14), date(d.year, 12, 24)
+    if start <= d <= peak:  # Christmas shopping builds week by week, then drops back in January
+        visitors *= 1.10 + 0.05 * ((d - start).days // 7)
     w = WET_DEMAND if wet else 1.0
     return {"county": commute * w, "outbound": commute * w, "internal": w, "through": 1.0,
             "visitors": visitors * w, "school": w}
