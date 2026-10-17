@@ -7,6 +7,10 @@ Two files for the forecast engine (Seb's lane), because the shared WebTRIS cache
   `(site_id, bin_start)`).
 - `m271_speed_profile.csv`, a small weekday × time-of-day **median-speed prior**
   (use when you want a smooth speed-by-bin baseline instead of the sparse series).
+  Derived from the series by `build_profile.py` here: group by
+  `(site_id, road, direction, local weekday, 15-min-of-day)` then median & 15th-pct
+  mph, median flow, count. The grain/stats are a **default**, not a spec: edit
+  `AGG`/keys in that script and re-run to re-cut (mean, another quantile, term split).
 
 For the five M271 TMU sites on the Western Docks approach.
 
