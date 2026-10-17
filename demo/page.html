@@ -467,7 +467,8 @@ button.cell:hover { transform: translateY(-3px); box-shadow: 0 8px 18px var(--gl
 body[data-view="map"] .wrap { max-width: 1560px; }
 body[data-view="map"] #day { grid-template-columns: minmax(0, 1fr) 360px; align-items: start; }
 body[data-view="map"] #day > #day-head { grid-column: 1 / -1; padding: 12px 18px; }
-body[data-view="map"] #day > #day-head .trust, body[data-view="map"] #day > #day-head .foot-note, body[data-view="map"] #day > #day-head .facts { display: none; }
+body[data-view="map"] #day > #day-head .dayline { display: none; }
+body[data-view="map"] .tile { padding: 8px 12px; } body[data-view="map"] .tile .v { font-size: 1.5rem; }
 body[data-view="map"] #day > #day-body { grid-column: 1; grid-row: 2 / span 3; }
 body[data-view="map"] #day > #ships-block, body[data-view="map"] #day > #row-vehicles, body[data-view="map"] #day > #ppo-card { grid-column: 2; }
 body[data-view="map"] #row-vehicles { grid-template-columns: minmax(0, 1fr); }
@@ -476,6 +477,53 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
 @media (max-width: 1100px) { body[data-view="map"] #day { grid-template-columns: minmax(0, 1fr); } body[data-view="map"] #day > * { grid-column: 1 !important; grid-row: auto !important; } }
 @media (max-width: 760px) { .views { order: 3; width: 100%; justify-content: space-between; } .views button { padding: 7px 10px; } .brand small { display: none; } }
 @media (prefers-reduced-motion: reduce) { .view-enter { animation: none; } }
+
+/* Demo pass: figures over sentences, explanations behind ? */
+#journey > p.muted { display: none; }  /* the block header already says: click a dot or bus */
+.sec-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+#actions .todo { border-top: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 12px; padding: 0; margin: 0; list-style: none; }
+#actions .todo-item { display: flex; justify-content: space-between; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); transition: transform .15s, box-shadow .15s; }
+#actions .todo-item:hover { transform: translateY(-2px); box-shadow: 0 8px 20px var(--glow); }
+#actions .todo-item[data-state="accepted"] { border-color: var(--accent); background: var(--accent-soft); }
+#actions .todo-body { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; align-content: start; }
+#actions .todo-kind { flex-basis: 100%; }
+.todo-time { font-family: var(--font-data); font-variant-numeric: tabular-nums; font-weight: 700; font-size: var(--step--1); padding: 2px 9px; border-radius: 999px; background: var(--sunk); }
+#actions .vms-label { flex-basis: 100%; }
+.veh-legend { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important; }
+.qwrap { position: relative; display: inline-block; vertical-align: middle; }
+.qmark { width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--line-strong); background: var(--surface); color: var(--muted);
+  font-weight: 800; font-size: .8rem; line-height: 1; padding: 0; cursor: pointer; transition: background .15s, color .15s, transform .15s; }
+.qmark:hover { transform: scale(1.1); }
+.qmark:hover, .qwrap.open > .qmark { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.qwrap > .qpop { display: none !important; }
+.qwrap.open > .qpop { display: block !important; position: absolute; z-index: 60; top: 32px; left: 0; width: max-content; max-width: min(440px, 86vw);
+  margin: 0; background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); border-radius: 10px; padding: 10px 12px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .25); font-size: var(--step--1); line-height: 1.5; text-align: left; animation: rise .2s both; }
+.qwrap.right > .qpop { left: auto; right: 0; }
+.masthead .title-block { display: none; }
+.head-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.head-row .sev { font-size: var(--step-1); padding: 2px 12px; border-radius: 999px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.tile { display: grid; gap: 2px; align-content: start; padding: 12px 14px; border-radius: 12px; background: var(--sunk); transition: transform .15s; }
+.tile:hover { transform: translateY(-2px); }
+.tile .k { font-size: .72rem; font-weight: 750; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.tile .v { font-family: var(--font-data); font-size: 2rem; font-weight: 750; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.tile .v small { font-size: .55em; font-weight: 650; margin-left: 2px; }
+.tile .s { font-size: .78rem; color: var(--muted); }
+.tile.hot { background: var(--lv3-bg); color: var(--lv3-ink); } .tile.hot .k, .tile.hot .s { color: inherit; opacity: .85; }
+.tile.warm { background: var(--lv2-bg); color: var(--lv2-ink); } .tile.warm .k, .tile.warm .s { color: inherit; opacity: .85; }
+.dayline { display: grid; gap: 2px; }
+.dayline svg { display: block; width: 100%; height: 64px; cursor: pointer; }
+.dl-area { fill: var(--lv2-bg); opacity: .55; } .dl-line { fill: none; stroke: var(--lv3-bg); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.dl-ph { fill: var(--accent); }
+.dl-axis { display: flex; justify-content: space-between; font-size: .7rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.notices { display: flex; flex-wrap: wrap; gap: 8px; }
+.notices .notice { display: inline-flex; align-items: center; gap: 8px; padding: 5px 6px 5px 14px; border-radius: 999px; }
+.notices .notice > .tag { white-space: nowrap; }
+.ico { width: 15px; height: 12px; vertical-align: -1px; margin-right: 1px; }
+.cell-ships .ico { width: 17px; height: 13px; }
+.cell-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.cell-tags span { display: inline-flex; align-items: center; gap: 3px; }
 
 @media (max-width: 900px) { .grid2, .sure { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 640px) {
@@ -958,6 +1006,11 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
     }).join('');
   }
 
+  const ICON = {
+    ship: '<svg class="ico" viewBox="0 0 17 13" aria-hidden="true"><path fill="currentColor" d="M1 8h15l-2.4 4H3.2zM3.5 7.2V4.5h9v2.7zM6 3.7V1h4v2.7z"/></svg>',
+    cone: '<svg class="ico" viewBox="0 0 12 12" aria-hidden="true"><path fill="currentColor" d="M4.9 1h2.2l3 8.6H1.9zM.8 10.2h10.4V12H.8z"/></svg>',
+    ball: '<svg class="ico" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.8" fill="none" stroke="currentColor" stroke-width="1.6"/><path fill="currentColor" d="M6 3.6 8.2 5.2 7.4 7.8H4.6L3.8 5.2z"/></svg>',
+  };
   function renderCalendar() {
     requestAnimationFrame(() => $('#cal').querySelectorAll('.cell').forEach((c, i) => c.style.setProperty('--i', i)));
     const first = dateOf('2026-10-12');
@@ -976,8 +1029,8 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
       const said = `${longDate(iso)}: ${n ? `${n} ${n === 1 ? 'ship' : 'ships'}, ${lv.label.toLowerCase()} impact, the ships add ${fmt1(uplift(dd))} hours of congested road` : 'no ships'}${tags.length ? '. ' + tags.join(', ') : ''}`;
       cells.push(`<button class="cell lv-${lv.key}" data-date="${iso}" aria-pressed="${pressed}" aria-label="${esc(said)}">
         <span class="cell-top"><span class="dnum">${d.getDate()}</span>${mon}</span>
-        <span class="cell-ships">${n ? `${n} ${n === 1 ? 'ship' : 'ships'}` : 'No ships'}</span>
-        <span class="cell-tags">${esc(tags.join(' · '))}</span><span class="cell-lv">${n ? lv.label : ''}</span></button>`);
+        <span class="cell-ships">${n ? ICON.ship.repeat(Math.min(n, 5)) : ''}</span>
+        <span class="cell-tags">${dd.permits.length ? `<span>${ICON.cone}${dd.permits.length > 1 ? dd.permits.length : ''}</span>` : ''}${dd.match ? `<span>${ICON.ball}${dd.match}</span>` : ''}${dd.calls.some(c => c.pax == null) ? '<span>?pax</span>' : ''}</span><span class="cell-lv">${n ? lv.label : ''}</span></button>`);
     }
     $('#cal').innerHTML = cells.join('');
   }
@@ -1365,7 +1418,7 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
       const key = `${state.date}:${a.id}`, done = decisions[key] === 'accepted';
       const cid = 'todo-' + a.id.replace(/[^A-Za-z0-9_-]/g, '');
       return `<li class="todo-item" data-key="${esc(key)}" data-state="${done ? 'accepted' : 'open'}">
-        <div class="todo-body"><span class="todo-kind">${esc(a.kind)}</span><strong class="todo-title">${esc(a.title)}</strong><p class="todo-detail">${a.detail}</p>
+        <div class="todo-body"><span class="todo-kind">${esc(a.kind)}</span><strong class="todo-title">${esc(a.title)}</strong>${(() => { const tm = String(a.detail).match(/^\s*(\d\d:\d\d–\d\d:\d\d(?:, \d\d:\d\d–\d\d:\d\d)*)/); return tm ? `<span class="todo-time">${tm[1]}</span>` : ''; })()}<p class="todo-detail">${a.detail}</p>
           ${a.scenario ? `<button class="linkbtn" data-scenario="${a.scenario}">Show the forecast with it moved</button>` : ''}
           ${a.vms ? `<span class="vms-label">Suggested sign text</span><div class="vms" role="img" aria-label="${esc('Suggested sign text: ' + a.vms.join(', '))}">${a.vms.map(esc).join('<br>')}</div>` : ''}</div>
         <label class="todo-check" for="${cid}"><input type="checkbox" id="${cid}"${done ? ' checked' : ''}> Arranged</label></li>`;
@@ -1786,11 +1839,11 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
       return `<tr><td><span class="sw" style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;background:${PAL.groups[g] || PAL.school}"></span>${esc(M.groups[g] || (g === 'school' ? 'School run' : g))}</td><td class="num">${int(m)}</td><td class="num">${int(a)}</td><td class="num">${m ? Math.round((a / m - 1) * 100) + '%' : ''}</td></tr>`; }).join('');
     $('#veh-note').textContent = `seed ${D.seed.join('-')}`;
     $('#veh-body').innerHTML = `<p>${int(A.list.length)} agents = ${int(vehicles)} vehicle trips on <strong>one sampled day</strong>${D.wet ? ' (wet)' : ''}${D.incident ? ', with a main-road incident' : ''}. One everyday agent ≈ ${int(D.weights.everyday)} vehicles; one cruise agent ≈ ${int(D.weights.cruise)}, so cruise traffic stands out. Road colours in this layer are the same sampled day; other layers average ${M.n} days.</p>
-      <div class="veh-legend">${AG.purposes.map((P, k) => counts[k] ? `<span><span class="sw" style="background:${agentColor(k)}"></span>${esc(P.label)} <span class="mono">${int(counts[k])}</span></span>` : '').join('')}${A.buses.length ? `<span><span class="sw" style="border-radius:3px;background:${PAL.busHi}"></span>Bus <span class="mono">${int(A.buses.length)}</span></span>` : ''}</div>
-      <h3 style="font-size: var(--step-0)">The agents added up</h3>
+      <div class="veh-legend">${(() => { const gc = {}; AG.purposes.forEach((P, k) => { if (counts[k]) gc[P.group] = (gc[P.group] || 0) + counts[k]; }); return Object.entries(gc).map(([g, c]) => `<span><span class="sw" style="background:${PAL.groups[g] || PAL.school}"></span>${esc(M.groups[g] || (g === 'school' ? 'School run' : g))} <span class="mono">${int(c)}</span></span>`).join(''); })()}${A.buses.length ? `<span><span class="sw" style="border-radius:3px;background:${PAL.busHi}"></span>Bus <span class="mono">${int(A.buses.length)}</span></span>` : ''}</div>
+      <span class="eyebrow">Agents add up to the model's flows</span><div class="agents-check">
       <div class="chart"><svg viewBox="0 0 320 106" role="img" aria-label="Trips starting per hour: model flows against agents times their weight">${grid}${bars}${line}${ticks}</svg></div>
       <p class="foot-note">Line: model trips started per hour. Bars: agents × weight. Any gap is sampling.</p>
-      <div class="table-scroll"><table><thead><tr><th>Kind of trip</th><th>Model</th><th>Agents × weight</th><th>Diff</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      <div class="table-scroll"><table><thead><tr><th>Kind of trip</th><th>Model</th><th>Agents × weight</th><th>Diff</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
     renderJourney();
   }
   function renderBuses() {
@@ -2006,15 +2059,19 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
     void head.offsetWidth; head.classList.add('enter');
     const verdict = !n ? 'No cruise ships today. The map and timetable show everyday traffic only.'
       : `<span class="sev lv-${lv.key}">${lv.label}</span>${n} ${n === 1 ? 'ship' : 'ships'} turning around. The ships add about <b>${fmt1(uplift(d))}</b> hours of congested road${d.range ? ` (likely ${upRange(d)})` : ''}.${hit && hit.v >= 20 ? ` They hit hardest around <b>${binTime(hit.b)}</b> on ${esc(hit.c.name)}, where they raise the chance of congestion by ${hit.v} points.` : ''}`;
-    head.innerHTML = `<h2>${esc(longDate(d.date))}</h2><p class="verdict">${verdict}</p>
-      <p class="trust"><span class="src">Limits</span> ${trustLine()}</p>
-      <dl class="facts">
-        <div><dt>Ships</dt><dd><b>${n}</b> <span class="src">${schedSrc()}</span></dd></div>
-        <div><dt>Added by ships</dt><dd><b>${fmt1(uplift(d))}</b> h <span class="src">Modelled</span></dd></div>
-        <div><dt>All traffic</dt><dd><b>${fmt1(d.range ? d.range.score[1] : d.score)}</b> h <span class="src">Modelled</span></dd></div>
-        <div><dt>Without ships</dt><dd><b>${fmt1(d.range ? d.range.bg[1] : d.bg_score)}</b> h <span class="src">Modelled</span></dd></div>
-      </dl>
-      <p class="foot-note">Congested = over 85% of capacity, summed over ${DATA.corridors.length} main roads. Likely range: 8 days in 10.</p>`;
+    const tileHeat = lv.key === 'severe' ? ' hot' : lv.key === 'high' ? ' warm' : '';
+    head.innerHTML = `<div class="head-row"><h2>${esc(longDate(d.date))}</h2>${n ? `<span class="sev lv-${lv.key}">${lv.label}</span>` : ''}
+        <div class="head-more"><p class="verdict">${verdict}</p><p class="trust"><span class="src">Limits</span> ${trustLine()}</p>
+        <p>Congested = over 85% of capacity, summed over ${DATA.corridors.length} main roads. Likely range: 8 days in 10.</p></div></div>
+      <div class="tiles">
+        <div class="tile"><span class="k">Ships</span><span class="v"><b>${n}</b></span><span class="s">${schedSrc()} VTS schedule</span></div>
+        <div class="tile${tileHeat}"><span class="k">Ships add</span><span class="v"><b>${fmt1(uplift(d))}</b><small>h</small></span><span class="s">${d.range ? `likely ${upRange(d)} · ` : ''}congested road-hours · modelled</span></div>
+        ${hit && hit.v >= 20 ? `<div class="tile"><span class="k">Worst moment</span><span class="v">${binTime(hit.b).slice(0, 5)}</span><span class="s">${esc(hit.c.name)} · +${hit.v} pts</span></div>` : ''}
+        <div class="tile"><span class="k">All traffic</span><span class="v"><b>${fmt1(d.range ? d.range.score[1] : d.score)}</b><small>h</small></span><span class="s"><b>${fmt1(d.range ? d.range.bg[1] : d.bg_score)}</b>h without ships · modelled</span></div>
+      </div>
+      <div class="dayline">${dayline(d)}<div class="dl-axis"><span>05:00</span><span>08:00</span><span>11:00</span><span>14:00</span><span>17:00</span><span>20:00</span></div></div>`;
+    const dl = head.querySelector('.dayline svg');
+    if (dl) dl.addEventListener('click', e => { const r = dl.getBoundingClientRect(); setBin(Math.floor((e.clientX - r.left) / r.width * N_BINS)); });
     const notes = [];
     d.permits.forEach(id => { const p = PERMIT[id]; notes.push(`<div class="notice"><span class="tag">Roadworks</span><span><strong>Permit ${id}:</strong> ${esc(p.what)} on ${esc(CORR[p.corridor] ? CORR[p.corridor].name : p.corridor)}, ${esc(shortDate(p.from))} to ${esc(shortDate(p.to))}${p.source ? ` (${esc(p.source)})` : ''}. Already in the forecast: traffic reroutes around it.${d.whatif.move_permit ? ' <button class="linkbtn" data-scenario="move_permit">See it moved</button>' : ''}</span></div>`); });
     const fixture = (DATA.matches || []).find(x => x.date === d.date);
@@ -2026,7 +2083,7 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
     if (!d.calls.length) notes.push('<div class="notice"><span class="tag">No ships</span><span>No turnarounds today. The map shows everyday traffic only.</span></div>');
     $('#notices').innerHTML = notes.join('');
     $('#notices').classList.remove('enter'); void $('#notices').offsetWidth; $('#notices').classList.add('enter');
-    if (!REDUCED) head.querySelectorAll('.facts b, .verdict b').forEach(countUp);
+    if (!REDUCED) head.querySelectorAll('.tile b').forEach(countUp);
     $('#notices').querySelectorAll('[data-scenario]').forEach(b => b.addEventListener('click', () => setScenario(b.dataset.scenario)));
     const opts = ['base', 'cruise', 'bg', ...Object.keys(d.whatif)];
     $('#scenario').innerHTML = opts.map(k => `<option value="${k}"${k === state.scenario ? ' selected' : ''}>${esc(scenLabel(d, k))}</option>`).join('');
@@ -2050,6 +2107,16 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
     requestAnimationFrame(step);
     setTimeout(finish, 900);  // lands on the real figure even if frames are throttled
   }
+  // share of the main roads likely over 85% full, per 15 minutes, with a playhead at the map's time
+  function dayline(d) {
+    const ids = DATA.corridors.map(c => c.id), ys = [];
+    for (let b = 0; b < N_BINS; b++) ys.push(ids.reduce((s, id) => s + d.p85[id][b], 0) / ids.length / 100);
+    const top = Math.max(0.15, ...ys), X = b => (b + 0.5) / N_BINS * 600, Y = v => 62 - v / top * 56;
+    const pts = ys.map((v, b) => `${X(b).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+    return `<svg viewBox="0 0 600 64" preserveAspectRatio="none" role="img" aria-label="Share of main roads likely congested through the day; click to move the map to that time">
+      <polygon class="dl-area" points="0,64 ${pts} 600,64"/><polyline class="dl-line" points="${pts}"/>
+      <rect class="dl-ph" id="dl-ph" x="${(state.bin / N_BINS * 600).toFixed(1)}" y="0" width="${(600 / N_BINS).toFixed(1)}" height="64" opacity="0.35"/></svg>`;
+  }
   function renderVisuals() {
     const d = day();
     $('#scale-bar').style.background = `linear-gradient(90deg, ${[0, 20, 40, 60, 80, 100].map(heat).join(',')})`;
@@ -2067,6 +2134,7 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
   function setScenario(key) { state.scenario = key; $('#scenario').value = key; renderVisuals(); }
   function setBin(b, keepMinute) {
     state.bin = Math.max(0, Math.min(N_BINS - 1, b));
+    const ph = document.getElementById('dl-ph'); if (ph) ph.setAttribute('x', (state.bin / N_BINS * 600).toFixed(1));
     if (!keepMinute) state.minute = 300 + state.bin * 15 + 7.5;
     if (+$('#slider').value !== state.bin) $('#slider').value = state.bin;
     paintRoads(); placeUI(); renderHeat(); renderInfo(); renderGates(); renderMix(); renderRouteDetail(); renderTimeline();
@@ -2305,6 +2373,31 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
   }
   $('#day-prev').addEventListener('click', () => { const i = DATES.indexOf(state.date); if (i > 0) selectDay(DATES[i - 1], false); });
   $('#day-next').addEventListener('click', () => { const i = DATES.indexOf(state.date); if (i < DATES.length - 1) selectDay(DATES[i + 1], false); });
+
+  /* ---------- explanations behind a ? button ---------- */
+  const TUCK = ['.provenance', '.sec-head > p', 'p.foot-note', 'div.foot-note', '.head-more', '#veh-body > p', '#ppo-body > p',
+    '.ppo-act .foot-note', '#info', '.map-legend > .muted', '.scale > span:last-child', '#bus-body > p', '#bus-live-body > p',
+    '.fold-body > p', '.notice > span:not(.tag)', '.timing > p', '#actions > p.muted', 'p.todo-detail', '.agents-check'].join(', ');
+  function tuck(el) {
+    if (!el.parentElement || el.classList.contains('qwrap') || el.classList.contains('qpop') || el.parentElement.closest('.qwrap') || el.textContent.trim().length < 20) return;
+    const w = document.createElement('span'), b = document.createElement('button');
+    w.className = 'qwrap'; b.type = 'button'; b.className = 'qmark'; b.textContent = '?';
+    b.setAttribute('aria-label', 'More about this'); b.setAttribute('aria-expanded', 'false');
+    el.replaceWith(w); w.append(b, el); el.classList.add('qpop');
+    if (el.classList.contains('provenance')) $('.masthead .meta').append(w);
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      const open = !w.classList.contains('open');
+      closeTucks();
+      if (open) { w.classList.add('open'); b.setAttribute('aria-expanded', 'true'); w.classList.toggle('right', w.getBoundingClientRect().left > innerWidth * 0.55); }
+    });
+  }
+  function closeTucks() { document.querySelectorAll('.qwrap.open').forEach(x => { x.classList.remove('open'); x.firstChild.setAttribute('aria-expanded', 'false'); }); }
+  let tuckQueued = false;
+  const tuckAll = () => { tuckQueued = false; document.querySelectorAll(TUCK).forEach(tuck); };
+  new MutationObserver(() => { if (!tuckQueued) { tuckQueued = true; queueMicrotask(tuckAll); } }).observe(document.body, { childList: true, subtree: true });
+  document.addEventListener('click', e => { if (!e.target.closest('.qwrap')) closeTucks(); });
+  addEventListener('keyup', e => { if (e.key === 'Escape') closeTucks(); });
 
   readPalette();
   $('#cal').classList.add('cal-intro'); setTimeout(() => $('#cal').classList.remove('cal-intro'), 1600);
