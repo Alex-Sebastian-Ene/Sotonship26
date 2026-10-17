@@ -37,6 +37,7 @@ import argparse
 import gzip
 import json
 import math
+import os
 import pickle
 import subprocess
 import sys
@@ -547,11 +548,12 @@ def macro_reference(ctx: sd.Ctx, task: dict, day: daysim.SampledDay, Dc: np.ndar
 
 
 def git_head() -> str:
+    """The commit the code came from: git, or GIT_COMMIT for a copy without .git (Iridis)."""
     try:
         return subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT,
                               capture_output=True, text=True, check=True).stdout.strip()
-    except Exception:  # noqa: BLE001  (a copy without .git)
-        return "unknown"
+    except Exception:  # noqa: BLE001
+        return os.environ.get("GIT_COMMIT", "unknown")
 
 
 def page_cruise_fit(path: Path) -> dict | None:

@@ -9,6 +9,7 @@ keeping OSM's lanes, one-ways, speed limits and traffic signals. UK traffic driv
     fetch   download the roads from Overpass (needs internet: a login node on Iridis)
             -> data/cache/sumo/southampton.osm.xml + osm.source.json (OSM data timestamp)
     build   netconvert -> data/cache/sumo/southampton.net.xml.gz + net.summary.json
+    no-ring-signals   the same network without the signals on roundabouts (a sensitivity test)
 
 SUMO's tools run from the official container on Iridis (the eclipse-sumo wheels crash on its
 RHEL 8 nodes): set SUMO_CONTAINER to an Apptainer image or sandbox, or SUMO_HOME, or have them
@@ -36,6 +37,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "cache" / "sumo"
 OSM = OUT / "southampton.osm.xml"
 NET = OUT / "southampton.net.xml.gz"
+NET_NO_RING_SIGNALS = OUT / "southampton_no_ring_signals.net.xml.gz"
 TYPES = OUT / "uk_roads.typ.xml"
 BBOX = (-1.53, 50.855, -1.29, 50.975)  # synthetic_demo.BBOX: west, south, east, north
 UA = "sotonship26-sumo/0.1 (SotonShip 2026 hackathon, non-commercial research)"
@@ -189,11 +191,46 @@ def build(log=print) -> dict:
     return info
 
 
+def roundabout_signals(net_path: Path) -> list[str]:
+    """Junctions run by traffic lights that control only roundabout junctions. OSM marks some big
+    interchanges (M27 junction 3 at Rownhams, for one) as signalised roundabouts; netconvert gives
+    each entry its own signal with SUMO's default plan, unlinked to the others, and the ring
+    jams, which the real linked signals do not do."""
+    import sumolib
+
+    net = sumolib.net.readNet(str(net_path), withInternal=False)
+    ring = {n for r in net.getRoundabouts() for n in r.getNodes()}
+    out = []
+    for tls in net.getTrafficLights():
+        nodes = {c[0].getEdge().getToNode().getID() for c in tls.getConnections()}
+        if nodes and nodes <= ring:
+            out += nodes
+    return sorted(set(out))
+
+
+def build_without_roundabout_signals(log=print) -> Path:
+    """A variant network with the roundabout signals removed (give way to the ring instead),
+    to see how much of SUMO's congestion comes from those unlinked default signal plans."""
+    if not NET.exists():
+        build(log)
+    ids = roundabout_signals(NET)
+    out = NET_NO_RING_SIGNALS
+    run(tool("netconvert") + ["-s", str(NET), "--tls.unset", ",".join(ids), "-o", str(out),
+                              "--log", str(OUT / "netconvert_no_ring_signals.log")], log)
+    log(f"wrote {out}: {len(ids)} roundabout signals removed")
+    info = json.loads((OUT / "net.summary.json").read_text(encoding="utf-8"))
+    info["variant"] = {"roundabout_signals_removed": ids, **summary(out)}
+    (OUT / "net_no_ring_signals.summary.json").write_text(json.dumps(info, indent=1),
+                                                          encoding="utf-8")
+    return out
+
+
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("step", choices=["fetch", "build"])
+    ap.add_argument("step", choices=["fetch", "build", "no-ring-signals"])
     args = ap.parse_args(argv)
-    fetch() if args.step == "fetch" else build()
+    {"fetch": fetch, "build": build, "no-ring-signals": build_without_roundabout_signals}[
+        args.step]()
 
 
 if __name__ == "__main__":

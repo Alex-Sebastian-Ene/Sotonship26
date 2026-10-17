@@ -31,13 +31,14 @@ DAYS=(${DAYS:-2026-11-16 2026-11-07})
 DAY=${DAYS[${SLURM_ARRAY_TASK_ID:-0}]}
 SCALE=${SCALE:-1.0}
 OUT=${OUT:-runs/sumo}
+NET=${NET:-data/cache/sumo/southampton.net.xml.gz}  # or southampton_no_ring_signals.net.xml.gz
 MODES=${MODES:-"micro meso"}
-SIM_THREADS=${SIM_THREADS:-1}  # micro: SUMO's parallel simulation (--threads)
+SIM_THREADS=${SIM_THREADS:-1}  # micro: SUMO's parallel simulation; 16 threads segfaulted once
 SUMO="apptainer exec -B /scratch,/iridisfs $SUMO_CONTAINER sumo"
 
 echo "== demand $DAY scale $SCALE $(date +%T)"
 $PY -u demo/sumo_demand.py --date "$DAY" --scale "$SCALE" --out "$OUT" --threads 8 \
-    --sim-threads "$SIM_THREADS"
+    --sim-threads "$SIM_THREADS" --net "$NET"
 R=$OUT/$DAY
 echo "== SUMO $MODES $(date +%T)"
 for M in $MODES; do
@@ -50,5 +51,5 @@ for M in $MODES; do
     tail -25 $R/$M.out
 done
 echo "== compare $(date +%T)"
-$PY -u demo/sumo_compare.py --date "$DAY" --out "$OUT" --modes "${MODES// /,}"
+$PY -u demo/sumo_compare.py --date "$DAY" --out "$OUT" --modes "${MODES// /,}" --net "$NET"
 echo "== done $(date +%T)"

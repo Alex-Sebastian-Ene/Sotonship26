@@ -42,6 +42,10 @@ import sumo_demand as sdm  # noqa: E402
 BINS = 60
 PERIODS = {"am": (8, 20), "inter": (20, 44), "pm": (44, 56)}  # 07-10, 10-16, 16-19
 WANT = 0.92  # mean wanted speed as a share of the limit (sumo_demand.VTYPES)
+MILE = 1.609344
+# council count sites (synthetic_demo.COUNT_SITES, July 2024 mean speeds) -> corridor
+SPEED_SITES = {"Portswood Road": "portswood", "Highfield Lane": "highfield",
+               "St Denys Road": "stdenys", "Bevois Hill": "bevois"}
 COUNCIL_LATE_MIN = (0.4, 4.37)  # buses.COUNCIL_RANGE_MIN
 
 
@@ -49,35 +53,57 @@ def opener(path: Path):
     return gzip.open(path, "rb") if path.suffix == ".gz" else open(path, "rb")
 
 
-def edgedata(path: Path, ids: set[str] | None = None) -> dict[str, np.ndarray]:
+def edgedata(path: Path, ids: set[str] | None = None):
     """Per edge and 15-minute bin: entered, left, traveltime, waitingTime, timeLoss,
-    sampledSeconds (SUMO meanData)."""
+    sampledSeconds (SUMO meanData). A run that stopped early leaves a cut-off file: the bins
+    before the cut are kept and the rest stay NaN."""
     keys = ("entered", "left", "traveltime", "waitingTime", "timeLoss", "sampledSeconds",
             "departed", "arrived")
     out: dict[str, np.ndarray] = {}
     b = -1
     with opener(path) as f:
-        for ev, el in ET.iterparse(f, events=("start", "end")):
-            if ev == "start" and el.tag == "interval":
-                b = int(round((float(el.get("begin")) - sdm.DAY_START_S) / 900))
-            elif ev == "end" and el.tag == "edge":
-                eid = el.get("id")
-                if (ids is None or eid in ids) and 0 <= b < BINS:
-                    row = out.setdefault(eid, np.full((BINS, len(keys)), np.nan))
-                    for i, k in enumerate(keys):
-                        v = el.get(k)
-                        if v is not None:
-                            row[b, i] = float(v)
-                el.clear()
-            elif ev == "end" and el.tag == "interval":
-                el.clear()
-    return {k: v for k, v in out.items()}, keys
+        try:
+            for ev, el in ET.iterparse(f, events=("start", "end")):
+                if ev == "start" and el.tag == "interval":
+                    b = int(round((float(el.get("begin")) - sdm.DAY_START_S) / 900))
+                elif ev == "end" and el.tag == "edge":
+                    eid = el.get("id")
+                    if (ids is None or eid in ids) and 0 <= b < BINS:
+                        row = out.setdefault(eid, np.full((BINS, len(keys)), np.nan))
+                        for i, k in enumerate(keys):
+                            v = el.get(k)
+                            if v is not None:
+                                row[b, i] = float(v)
+                    el.clear()
+                elif ev == "end" and el.tag == "interval":
+                    el.clear()
+        except (ET.ParseError, EOFError) as exc:
+            print(f"{path}: cut off in bin {b} ({exc}); bins from there on are missing")
+            for row in out.values():
+                row[max(b, 0):] = np.nan
+            return out, keys, max(b, 0)
+    return out, keys, BINS
+
+
+def elements(path: Path, tag: str):
+    """The ``tag`` elements of a SUMO output, stopping quietly where a cut-off file ends."""
+    if not path.exists():
+        return
+    with opener(path) as f:
+        try:
+            for _, el in ET.iterparse(f):
+                if el.tag == tag:
+                    yield el
+                    el.clear()
+        except (ET.ParseError, EOFError):
+            print(f"{path}: cut off; read up to there")
 
 
 def stats(path: Path) -> dict:
-    if not path.exists():
+    try:
+        root = ET.parse(path).getroot()
+    except (OSError, ET.ParseError):  # missing or cut off: the run did not finish
         return {}
-    root = ET.parse(path).getroot()
     return {child.tag: dict(child.attrib) for child in root}
 
 
@@ -85,17 +111,13 @@ def tripinfo(path: Path) -> dict:
     """Trip counts and mean minutes (duration, time loss, departure delay) per kind of trip."""
     acc = defaultdict(lambda: np.zeros(5))
     unfinished = defaultdict(int)
-    with opener(path) as f:
-        for _, el in ET.iterparse(f):
-            if el.tag != "tripinfo":
-                continue
-            key = el.get("id").split(".")[0]
-            if float(el.get("arrival", -1)) < 0:
-                unfinished[key] += 1
-            else:
-                acc[key] += [1, float(el.get("duration")), float(el.get("timeLoss")),
-                             float(el.get("departDelay")), float(el.get("routeLength"))]
-            el.clear()
+    for el in elements(path, "tripinfo"):
+        key = el.get("id").split(".")[0]
+        if float(el.get("arrival", -1)) < 0:
+            unfinished[key] += 1
+        else:
+            acc[key] += [1, float(el.get("duration")), float(el.get("timeLoss")),
+                         float(el.get("departDelay")), float(el.get("routeLength"))]
     rows = {}
     for k, a in sorted(acc.items()):
         n = a[0]
@@ -109,16 +131,12 @@ def tripinfo(path: Path) -> dict:
 def summary_series(path: Path) -> dict:
     """Vehicles running, waiting to enter and standing, per 15 minutes (means of 1-min steps)."""
     run, wait, halt = (defaultdict(list) for _ in range(3))
-    if not path.exists():
-        return {}
-    for _, el in ET.iterparse(str(path)):
-        if el.tag == "step":
-            b = int((float(el.get("time")) - sdm.DAY_START_S) // 900)
-            if 0 <= b < BINS:
-                run[b].append(float(el.get("running")))
-                wait[b].append(float(el.get("waiting")))
-                halt[b].append(float(el.get("halting", 0)))
-            el.clear()
+    for el in elements(path, "step"):
+        b = int((float(el.get("time")) - sdm.DAY_START_S) // 900)
+        if 0 <= b < BINS:
+            run[b].append(float(el.get("running")))
+            wait[b].append(float(el.get("waiting")))
+            halt[b].append(float(el.get("halting", 0)))
     return {k: [round(float(np.mean(d[b])), 1) if d[b] else None for b in range(BINS)]
             for k, d in (("running", run), ("waiting", wait), ("halting", halt))}
 
@@ -136,9 +154,14 @@ def macro_corridor(mac, edges, north_of):
         xc = x[:, ks]
         vc = xc.max(axis=1)
         run = (t0[ks] * 0.15 * np.minimum(xc, 1.5) ** 4).sum(axis=1) / 60.0
+        free = float(t0[ks].sum() / 60.0)
+        km = float(mac["length"][ks].sum() / 1000)
+        wait = 15.0 * np.maximum(vc - 1.0, 0.0)
         out[d] = {"vc": vc, "flow": np.median(np.minimum(xc, 1.0) * cap[ks], axis=1),
                   "demand": np.median(xc * cap[ks], axis=1),
-                  "delay": run + 15.0 * np.maximum(vc - 1.0, 0.0),
+                  "delay": run + wait,
+                  "mph_running": km / ((free + run) / 60.0) / MILE,
+                  "mph": km / ((free + run + wait) / 60.0) / MILE,
                   "free": float(t0[ks].sum() / 60.0), "queue": q[:, ks].max(axis=1),
                   "km": float(mac["length"][ks].sum() / 1000), "links": len(ks)}
     return out
@@ -170,6 +193,7 @@ def sumo_corridor(ed, keys, net, mapped, north_of):
         delay = np.maximum(ttf - tff[None, :], 0.0).sum(axis=1) / 60.0
         out[d] = {"flow": np.median(flow, axis=1), "delay": delay,
                   "speed_ratio": tff.sum() / ttf.sum(axis=1), "queue": wait.sum(axis=1) / 900.0,
+                  "mph": L.sum() / ttf.sum(axis=1) * 3.6 / MILE,
                   "free": float(tff.sum() / 60.0), "km": float(L.sum() / 1000), "links": len(es),
                   "seen": seen.any(axis=1)}
     return out
@@ -196,9 +220,11 @@ def spearman(a, b) -> float | None:
     return round(float(np.corrcoef(ra, rb)[0, 1]), 2)
 
 
-def period_mean(a, per) -> float:
+def period_mean(a, per, nd: int = 2, n_ok: int = BINS):
+    """Mean over a period's bins that the run covered (None if it covered none)."""
     lo, hi = PERIODS[per]
-    return float(np.mean(a[lo:hi]))
+    v = np.asarray(a[lo:min(hi, n_ok)], float)
+    return round(float(v.mean()), nd) if len(v) else None
 
 
 # --- M271 against WebTRIS --------------------------------------------------------------------
@@ -234,14 +260,10 @@ def webtris_reference(d: date) -> dict | None:
 
 def stop_events(path: Path) -> dict[str, list]:
     out = defaultdict(list)
-    if not path.exists():
-        return out
-    with opener(path) as f:
-        for _, el in ET.iterparse(f):
-            if el.tag == "stopinfo" and el.get("id", "").startswith("bus."):
-                out[el.get("id")].append((el.get("busStop"), float(el.get("started")),
-                                          float(el.get("ended"))))
-            el.clear()
+    for el in elements(path, "stopinfo"):
+        if el.get("id", "").startswith("bus."):
+            out[el.get("id")].append((el.get("busStop"), float(el.get("started")),
+                                      float(el.get("ended"))))
     return out
 
 
@@ -296,7 +318,7 @@ def fmt(v, nd=1):
     return "-" if v is None or (isinstance(v, float) and np.isnan(v)) else f"{v:.{nd}f}"
 
 
-def corridor_rows(emap, mac, ed_all, keys, net):
+def corridor_rows(emap, mac, ed_all, keys, net, n_ok: int = BINS):
     """Peak means per corridor and direction, the per-bin series, and the (V/C, speed ratio)
     and (macro delay, SUMO delay) pairs for every corridor-direction-bin from 06:00."""
     rows, pairs, delays, series = [], [], [], {}
@@ -307,28 +329,50 @@ def corridor_rows(emap, mac, ed_all, keys, net):
             if dirn not in mc or dirn not in sc:
                 continue
             a, b = mc[dirn], sc[dirn]
-            for t in range(4, BINS):  # SUMO starts with empty roads at 05:00
+            for t in range(4, n_ok):  # SUMO starts with empty roads at 05:00
                 pairs.append((a["vc"][t], b["speed_ratio"][t]))
                 delays.append((a["delay"][t], b["delay"][t]))
             row = {"corridor": cid, "label": c["label"], "dir": dirn,
                    "macro_km": round(a["km"], 2), "sumo_km": round(b["km"], 2),
                    "macro_free_min": round(a["free"], 1), "sumo_free_min": round(b["free"], 1)}
             for per in ("am", "inter", "pm"):
-                row[per] = {"macro_vc": round(period_mean(a["vc"], per), 2),
-                            "macro_flow": round(period_mean(a["flow"], per)),
-                            "macro_demand": round(period_mean(a["demand"], per)),
-                            "sumo_flow": round(period_mean(b["flow"], per)),
-                            "macro_delay": round(period_mean(a["delay"], per), 2),
-                            "sumo_delay": round(period_mean(b["delay"], per), 2),
-                            "macro_queue": round(period_mean(a["queue"], per), 1),
-                            "sumo_queue": round(period_mean(b["queue"], per), 1),
-                            "sumo_speed": round(period_mean(b["speed_ratio"], per), 2)}
+                row[per] = {f"{who}_{k}": period_mean(src[k2], per, nd, n_ok)
+                            for who, src, k, k2, nd in (
+                                ("macro", a, "vc", "vc", 2), ("macro", a, "flow", "flow", 0),
+                                ("macro", a, "demand", "demand", 0),
+                                ("sumo", b, "flow", "flow", 0),
+                                ("macro", a, "delay", "delay", 2),
+                                ("sumo", b, "delay", "delay", 2),
+                                ("macro", a, "queue", "queue", 1),
+                                ("sumo", b, "queue", "queue", 1),
+                                ("sumo", b, "speed", "speed_ratio", 2),
+                                ("macro", a, "mph_running", "mph_running", 1),
+                                ("macro", a, "mph", "mph", 1), ("sumo", b, "mph", "mph", 1))}
             rows.append(row)
             s = {k: np.round(a[k], 3).tolist() for k in ("vc", "flow", "delay", "queue")}
             s.update({f"sumo_{k}": np.round(b[k], 3).tolist()
                       for k in ("flow", "delay", "queue", "speed_ratio")})
             series[f"{cid}_{dirn}"] = s
     return rows, pairs, delays, series
+
+
+def site_speeds(rows) -> list[dict]:
+    """Mean speeds the council's counters measured (July 2024 peaks) next to both models' mean
+    corridor speeds (macro: running only, and with its queue wait)."""
+    by = {(r["corridor"], r["dir"]): r for r in rows}
+    out = []
+    for site in sdm.sd.COUNT_SITES:
+        cid = next((c for n, c in SPEED_SITES.items() if site["label"].startswith(n)), None)
+        for i, dirn in enumerate(("NB", "SB")):
+            r = by.get((cid, dirn))
+            if r is None or "speed" not in site:
+                continue
+            for per in ("am", "pm"):
+                out.append({"road": site["label"], "dir": dirn, "period": per,
+                            "observed_mph": site["speed"][per][i],
+                            "macro_mph_running": r[per]["macro_mph_running"],
+                            "macro_mph": r[per]["macro_mph"], "sumo_mph": r[per]["sumo_mph"]})
+    return out
 
 
 def m271_flows(emap, mac, ed_all, keys, wt) -> dict:
@@ -361,6 +405,10 @@ def markdown(mode, res, macro_vh, mp, d) -> list[str]:
           f"roads plus {res['depart_delay_veh_h']:,} waiting to enter; macro "
           f"{macro_vh['running']:,} slower running plus {macro_vh['queues']:,} in point queues "
           f"(car-equivalents).\n"]
+    if res["bins_covered"] < BINS:
+        h = sdm.DAY_START_S / 3600 + res["bins_covered"] / 4
+        md.append(f"**The run stopped at {int(h):02d}:{int(h % 1 * 60):02d}**; later bins are "
+                  "left out of both models' figures below.\n")
     for per, name in (("am", "07:00-10:00"), ("pm", "16:00-19:00")):
         md += [f"\n{name}, means of the 15-minute values:\n",
                "| corridor | dir | macro V/C | macro demand | flow veh/h macro / SUMO "
@@ -371,7 +419,7 @@ def markdown(mode, res, macro_vh, mp, d) -> list[str]:
             md.append(f"| {r['label']} | {r['dir']} | {a['macro_vc']} | {a['macro_demand']} | "
                       f"{a['macro_flow']} / {a['sumo_flow']} | {a['macro_delay']} / "
                       f"{a['sumo_delay']} | {a['macro_queue']} / {a['sumo_queue']} | "
-                      f"{round(a['sumo_speed'] * 100)} |")
+                      f"{'-' if a['sumo_speed'] is None else round(a['sumo_speed'] * 100)} |")
     md += [f"\nCorridor-direction-bins 06:00-20:00: {res['n_pairs']}; Spearman rank correlation "
            f"of delay {res['spearman_delay']}.\n",
            "| class | both | macro only | SUMO only | neither |", "|---|---|---|---|---|"]
@@ -392,6 +440,13 @@ def markdown(mode, res, macro_vh, mp, d) -> list[str]:
             md.append(f"| {h:02d}:00 | {obs[0]:.0f} ({obs[1]:.0f}-{obs[2]:.0f}) | "
                       f"{np.mean(m271['macro'][sl]):.0f} ({np.mean(m271['macro_demand'][sl]):.0f})"
                       f" | {np.mean(m271['sumo'][sl]):.0f} |")
+    md += ["\nMean speeds, mph: the council's counters (July 2024, spot speeds at the count "
+           "sites) against each model's mean speed along the whole corridor:\n",
+           "| road | dir | peak | observed | macro running (with queue wait) | SUMO |",
+           "|---|---|---|---|---|---|"]
+    for r in res["site_speeds"]:
+        md.append(f"| {r['road']} | {r['dir']} | {r['period']} | {r['observed_mph']} | "
+                  f"{r['macro_mph_running']} ({r['macro_mph']}) | {r['sumo_mph']} |")
     md += ["\nBuses on Portswood Road, minutes late at the first stop past the section "
            f"(council, July 2024 peaks: {COUNCIL_LATE_MIN[0]:.1f} to {COUNCIL_LATE_MIN[1]:.1f}):\n",
            "| route | dir | peak | SUMO buses | SUMO late | macro buses | macro late |",
@@ -451,14 +506,15 @@ def main(argv=None) -> None:
         if not edf.exists():
             md.append(f"\n{mode}: no edge data (the run did not finish)\n")
             continue
-        ed_all, keys = edgedata(edf)
+        ed_all, keys, n_ok = edgedata(edf)
         lost = keys.index("timeLoss")
-        rows, pairs, delays, series = corridor_rows(emap, mac, ed_all, keys, net)
+        rows, pairs, delays, series = corridor_rows(emap, mac, ed_all, keys, net, n_ok)
         tip = R / f"{mode}.tripinfo.xml.gz"
         res = {"stats": stats(R / f"{mode}.stats.xml"),
                "delay_veh_h": round(sum(float(np.nansum(r[:, lost])) for r in ed_all.values())
                                     / 3600),
                "corridors": rows, "agreement": agreement(pairs), "n_pairs": len(pairs),
+               "site_speeds": site_speeds(rows), "bins_covered": n_ok,
                "spearman_delay": spearman([a for a, _ in delays], [b for _, b in delays]),
                "series": series, "m271": m271_flows(emap, mac, ed_all, keys, wt),
                "buses": portswood_buses(bus, stop_events(R / f"{mode}.stops.xml.gz"), ps_dir),
