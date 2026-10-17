@@ -100,3 +100,27 @@ def test_tiles_grouped_by_capture_date_and_mosaicked(tmp_path):
     with rasterio.open(out) as src:
         data = src.read(1)
     assert set(np.unique(data)) == {10, 20}  # the clip spans both tiles of that date
+
+
+def test_digimap_jpeg_world_file_tiles(tmp_path):
+    # Digimap Aerial downloads are JPEG + .jgw with no CRS; they are read as British National Grid
+    from PIL import Image
+    from pyproj import Transformer
+
+    for e0, val in ((440000, 60), (441000, 200)):
+        name = f"2023-06-04_SU{e0 // 1000 % 100:02d}11"
+        Image.fromarray(np.full((40, 40, 3), val, np.uint8)).save(tmp_path / f"{name}.jpg")
+        (tmp_path / f"{name}.jgw").write_text(f"25\n0\n0\n-25\n{e0 + 12.5}\n{112000 - 12.5}\n")
+    (scene,) = LocalGeoTiffProvider(tmp_path).search()
+    assert scene.extra["tiles"] == 2 and scene.gsd_m == 25
+    to_ll = Transformer.from_crs("EPSG:27700", "EPSG:4326", always_xy=True)
+    ring = [
+        to_ll.transform(e, n)
+        for e, n in ((440500, 111200), (441500, 111200), (441500, 111800), (440500, 111800))
+    ]
+    aoi = {"type": "Polygon", "coordinates": [[*ring, ring[0]]]}
+    out = LocalGeoTiffProvider(tmp_path).fetch(scene, aoi, tmp_path / "clip.tif")
+    with rasterio.open(out) as src:
+        assert src.crs.to_epsg() == 27700
+        values = set(np.unique(src.read(1)))
+    assert any(v < 100 for v in values) and any(v > 150 for v in values)  # both tiles (JPEG-lossy)

@@ -17,10 +17,12 @@ account and a licence:
   be shown, credited "Getmapping via EDINA Digimap". The council's APGB photography (Public Sector
   Geospatial Agreement) or marketplace scenes work the same way.
 
-  Digimap delivers 1 km tiles, and tiles can come from different flights. Tiles are grouped by
-  capture date (from the file name or a ``capture_dates.csv`` next to them), and each date is one
-  scene, mosaicked on fetch: one occupancy observation per date. ``order_tiles()`` lists the
-  tiles that cover the docks.
+  Digimap delivers 1 km JPEG tiles with world files (``.jpg`` + ``.jgw``, no CRS; read as
+  British National Grid), and tiles can come from different flights; each year is a separate
+  download. Tiles are grouped by capture date (from the file name or a ``capture_dates.csv``
+  next to them; dates come from Aerial Roam's Information tool), and each date is one scene,
+  mosaicked on fetch: one occupancy observation per date. ``order_tiles()`` lists the tiles that
+  cover the docks.
 
 Tiles from Google, Bing, Esri or Mapbox basemaps are deliberately not supported: their terms
 forbid downloading them for automated analysis. Keys come from the environment, never git.
@@ -76,9 +78,29 @@ def order_tiles(bbox=(50.885, -1.475, 50.915, -1.380)) -> list[str]:
     return out
 
 
-def clip_to_geotiff(src_path, aoi_lonlat, out: Path, target_gsd: float | None = None) -> Path:
+IMAGE_SUFFIXES = (".tif", ".tiff", ".jpg", ".jpeg")
+
+
+def open_raster(path, assume_crs: str | None = None):
+    """Open a raster; a tile without a CRS (JPEG + world file) is read as ``assume_crs``."""
+    import rasterio
+    from rasterio.crs import CRS
+    from rasterio.vrt import WarpedVRT
+
+    src = rasterio.open(path)
+    if src.crs is None and assume_crs:
+        crs = CRS.from_user_input(assume_crs)
+        return WarpedVRT(
+            src, src_crs=crs, crs=crs, transform=src.transform, width=src.width, height=src.height
+        )
+    return src
+
+
+def clip_to_geotiff(
+    src_path, aoi_lonlat, out: Path, target_gsd: float | None = None, assume_crs: str | None = None
+) -> Path:
     """Read the AOI window of a raster (local path, COG URL, or a list of tiles to mosaic) and
-    write it as a GeoTIFF."""
+    write it as a GeoTIFF. Tiles without a CRS are read as ``assume_crs``."""
     import rasterio
     from pyproj import Transformer
     from rasterio.windows import from_bounds
@@ -89,12 +111,15 @@ def clip_to_geotiff(src_path, aoi_lonlat, out: Path, target_gsd: float | None = 
         if len(src_path) > 1:
             from rasterio.merge import merge
 
-            srcs = [rasterio.open(x) for x in src_path]
+            srcs = [open_raster(x, assume_crs) for x in src_path]
             try:
                 to_src = Transformer.from_crs("EPSG:4326", srcs[0].crs, always_xy=True).transform
                 geom = shape(aoi_lonlat) if isinstance(aoi_lonlat, dict) else aoi_lonlat
                 data, tr = merge(srcs, bounds=shp_transform(to_src, geom).bounds)
-                profile = srcs[0].profile | {
+                profile = {
+                    "count": srcs[0].count,
+                    "dtype": srcs[0].dtypes[0],
+                    "crs": srcs[0].crs,
                     "driver": "GTiff",
                     "height": data.shape[1],
                     "width": data.shape[2],
@@ -114,7 +139,7 @@ def clip_to_geotiff(src_path, aoi_lonlat, out: Path, target_gsd: float | None = 
         else:
             src_path = src_path[0]
 
-    with rasterio.open(src_path) as src:
+    with open_raster(src_path, assume_crs) as src:
         geom = shape(aoi_lonlat) if isinstance(aoi_lonlat, dict) else aoi_lonlat
         if src.crs and src.crs.is_geographic and target_gsd:
             return _warp_metric(src, geom, out, target_gsd)
@@ -129,7 +154,10 @@ def clip_to_geotiff(src_path, aoi_lonlat, out: Path, target_gsd: float | None = 
         tr = src.window_transform(win) * src.window_transform(win).scale(
             win.width / w, win.height / h
         )
-        profile = src.profile | {
+        profile = {
+            "count": src.count,
+            "dtype": src.dtypes[0],
+            "crs": src.crs,
             "driver": "GTiff",
             "height": h,
             "width": w,
@@ -338,7 +366,7 @@ class PlanetProvider:
 
 
 class LocalGeoTiffProvider:
-    """GeoTIFF tiles in a folder, one scene per capture date.
+    """Image tiles in a folder (GeoTIFF, or JPEG + world file), one scene per capture date.
 
     The date comes from ``capture_dates.csv`` in the folder (columns ``file,date`` and optional
     ``time`` HH:MM, copied from Digimap's tile metadata), else from a YYYY-MM-DD[THHMM] in the
@@ -350,9 +378,12 @@ class LocalGeoTiffProvider:
     STAMP = re.compile(r"(\d{4}-\d{2}-\d{2})(?:[T_](\d{2})(\d{2}))?")
 
     def __init__(
-        self, folder: Path, licence: str = DIGIMAP_CREDIT + " (analysis only, not for display)"
+        self,
+        folder: Path,
+        licence: str = DIGIMAP_CREDIT + " (analysis only, not for display)",
+        assume_crs: str = "EPSG:27700",
     ):
-        self.folder, self.licence = Path(folder), licence
+        self.folder, self.licence, self.assume_crs = Path(folder), licence, assume_crs
 
     def dates(self) -> dict[str, datetime]:
         out = {}
@@ -364,7 +395,9 @@ class LocalGeoTiffProvider:
                 for r in csv.DictReader(f):
                     t = (r.get("time") or "11:00").strip()
                     out[r["file"]] = datetime.fromisoformat(f"{r['date'].strip()}T{t}")
-        for p in self.folder.glob("*.tif"):
+        for p in sorted(self.folder.iterdir()):
+            if p.suffix.lower() not in IMAGE_SUFFIXES:
+                continue
             m = self.STAMP.search(p.name)
             if p.name not in out and m:
                 out[p.name] = datetime.fromisoformat(
@@ -373,8 +406,6 @@ class LocalGeoTiffProvider:
         return out
 
     def search(self, aoi=None, start: str = "0000", end: str = "9999") -> list[Scene]:
-        import rasterio
-
         by_date: dict[datetime, list[Path]] = {}
         for name, when in self.dates().items():
             p = self.folder / name
@@ -382,7 +413,7 @@ class LocalGeoTiffProvider:
                 by_date.setdefault(when, []).append(p)
         out = []
         for when, files in sorted(by_date.items()):
-            with rasterio.open(files[0]) as src:
+            with open_raster(files[0], self.assume_crs) as src:
                 gsd = abs(src.transform.a) if src.crs and src.crs.is_projected else None
             out.append(
                 Scene(
@@ -400,7 +431,7 @@ class LocalGeoTiffProvider:
         return out
 
     def fetch(self, scene: Scene, aoi, out: Path, target_gsd: float | None = None) -> Path:
-        return clip_to_geotiff(scene.assets["files"], aoi, out, target_gsd)
+        return clip_to_geotiff(scene.assets["files"], aoi, out, target_gsd, self.assume_crs)
 
 
 def provider_from_env():
