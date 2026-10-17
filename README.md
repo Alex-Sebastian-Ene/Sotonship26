@@ -236,6 +236,12 @@ data improves it by about 4% a day (not significant) and 2% per 15 minutes.
   `tests/test_bus_lateness.py` and the "Buses observed on the day" fold of `demo/page.html` were
   written by Claude Code (Edward's session) on Sat 17 Oct 2026, porting the bustimes.org pipeline
   from the parked Gangway branch (`claude/wizardly-thompson-ybdvds`, b8a77c4) onto main.
+- **AI-generated (app UI and images):** the app shell, themes (including Steamship), action cards,
+  `?` pop-ups and live-map styling in `demo/page.html`, and `demo/ui_variants.py` (the Story app
+  with its landing page, plus the Focus, Officer and Wallboard layouts) were written by Claude Code
+  (Edward's session) on Sat 17 Oct 2026. The cruise icons in `demo/assets/` (ship, life ring,
+  anchor, wheel, seagull, lighthouse, captain's hat) were made with Canva's AI image generator on
+  Sat 17 Oct 2026 and cut out of their white backgrounds by script.
 - **AI-assisted research:** `notes/local-evidence.md` (local evidence, scale and business numbers)
   was compiled by Claude Code (Edward's session, with a research subagent) on Sat 17 Oct 2026 from
   the public sources cited on each line.
