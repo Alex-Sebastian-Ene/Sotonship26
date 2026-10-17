@@ -96,7 +96,7 @@ def fused_actuals(rows: list[dict]) -> dict[tuple[str, int], float]:
     return out
 
 
-def index_by_link(
+def _index_by_link(
     actuals: dict[tuple[str, int], float],
 ) -> dict[str, list[tuple[int, float]]]:
     """Group fused actuals by link so matching is O(actuals-on-this-link), not O(all)."""
@@ -126,7 +126,7 @@ def build_pairs(rows: list[dict]) -> list[dict]:
 
     Returns dicts: link_id, target_ms, lead_min, predicted, actual, abs_err, err.
     """
-    by_link = index_by_link(fused_actuals(rows))
+    by_link = _index_by_link(fused_actuals(rows))
     # Collapse restart re-snapshots: keep the max lead seen for each (link,target,value).
     best_lead: dict[tuple[str, int, float], float] = {}
     for r in rows:
