@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections import defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -78,7 +79,9 @@ def _captured_wall_minutes(captured_at: str) -> float:
     matching the frame the feed's bucket is in."""
     dt = datetime.fromisoformat(captured_at)
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
+        # The logger writes offset-aware timestamps; a naive one is corruption, not UTC.
+        # Silently assuming UTC would shift the lead by up to an hour, so fail loudly.
+        raise ValueError(f"captured_at must be timezone-aware, got naive {captured_at!r}")
     wall = dt.astimezone(LONDON).replace(tzinfo=None)
     return wall.replace(tzinfo=UTC).timestamp() / 60.0
 
@@ -93,15 +96,24 @@ def fused_actuals(rows: list[dict]) -> dict[tuple[str, int], float]:
     return out
 
 
+def _index_by_link(
+    actuals: dict[tuple[str, int], float],
+) -> dict[str, list[tuple[int, float]]]:
+    """Group fused actuals by link so matching is O(actuals-on-this-link), not O(all)."""
+    by_link: dict[str, list[tuple[int, float]]] = defaultdict(list)
+    for (lnk, bkt), val in actuals.items():
+        by_link[lnk].append((bkt, val))
+    return by_link
+
+
 def _nearest_actual(
-    actuals: dict[tuple[str, int], float], link: str, target_ms: int
+    by_link: dict[str, list[tuple[int, float]]], link: str, target_ms: int
 ) -> float | None:
-    """Nearest fused actual to a predicted target, within MATCH_TOL_MIN."""
+    """Nearest fused actual to a predicted target, within MATCH_TOL_MIN. On an exact
+    distance tie the first-seen actual wins (insertion order), which is deterministic."""
     tol_ms = MATCH_TOL_MIN * 60_000
     best: tuple[float, float] | None = None  # (abs_dist_ms, value)
-    for (lnk, bkt), val in actuals.items():
-        if lnk != link:
-            continue
+    for bkt, val in by_link.get(link, ()):
         dist = abs(bkt - target_ms)
         if dist <= tol_ms and (best is None or dist < best[0]):
             best = (dist, val)
@@ -114,7 +126,7 @@ def build_pairs(rows: list[dict]) -> list[dict]:
 
     Returns dicts: link_id, target_ms, lead_min, predicted, actual, abs_err, err.
     """
-    actuals = fused_actuals(rows)
+    by_link = _index_by_link(fused_actuals(rows))
     # Collapse restart re-snapshots: keep the max lead seen for each (link,target,value).
     best_lead: dict[tuple[str, int, float], float] = {}
     for r in rows:
@@ -130,7 +142,7 @@ def build_pairs(rows: list[dict]) -> list[dict]:
 
     pairs: list[dict] = []
     for (link, target_ms, pred), lead in best_lead.items():
-        actual = _nearest_actual(actuals, link, target_ms)
+        actual = _nearest_actual(by_link, link, target_ms)
         if actual is None:
             continue
         pairs.append({
