@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en" data-theme="harbour">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Does the AI help: one ship per test day</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@600;700&family=Fredoka:wght@500;600;700&display=swap" media="print" onload="this.media='all'">
+<style>
+/* Embedded overview: transparent page sized to its content, themed from <html data-theme> (harbour by default). */
+:root {
+  --surface: #0B1A2B; --sunk: #0F2238; --ink: #E4F0FA; --muted: #8DA6BE; --line: #1E3A57; --accent: #4CC9F0; --hi: #FFD166;
+  --ppo: #3987E5; --rule: #D95926; --advisor: #199E70; --none: #8DA6BE;
+  --ok: #3FB27F; --warn: #E8A33D; --bad: #F0605D;
+  --q0: #3A2A14; --q1: #6B4416; --q2: #A8621A; --q3: #E08A2C; --q4: #FFC066; --on-q: #06111D;
+  --display: "Space Grotesk", "Segoe UI", sans-serif; --body: "Space Grotesk", "Segoe UI", sans-serif; --data: "IBM Plex Mono", Consolas, monospace;
+  --radius: 14px; --edge: 1px solid var(--line); --shadow: 0 10px 30px rgba(0, 0, 0, .25);
+  color-scheme: dark;
+}
+:root[data-theme="steam"], :root[data-theme="light"], :root[data-theme="chart"] {
+  --surface: #FFFBF1; --sunk: #EFE5CD; --ink: #1D2B45; --muted: #5B6476; --line: #1D2B45; --accent: #D8473A; --hi: #D8473A;
+  --ppo: #2A78D6; --rule: #EB6834; --advisor: #1BAF7A; --none: #5B6476;
+  --ok: #1A7F55; --warn: #B26B00; --bad: #C0362C;
+  --q0: #F7E9CF; --q1: #F2C48E; --q2: #E8914F; --q3: #D8573A; --q4: #9E2A22; --on-q: #1D2B45;
+  --display: "Fredoka", "Trebuchet MS", sans-serif;
+  --radius: 16px; --edge: 2px solid #1D2B45; --shadow: 4px 4px 0 #1D2B45;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: transparent; }
+body { color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.45; overflow-x: hidden; }
+.emb { display: grid; gap: 16px; padding: 4px 2px 8px; max-width: 1300px; margin: 0 auto; }
+.kicker { font: 700 .74rem var(--data); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.kicker .pill { padding: 2px 9px; border-radius: 999px; border: var(--edge); }
+h2.head { margin: 0; font-family: var(--display); font-weight: 700; font-size: clamp(1.5rem, 3.6vw, 2.5rem); line-height: 1.1; letter-spacing: -.01em; text-wrap: balance; }
+h2.head em { font-style: normal; color: var(--hi); }
+.sub { margin: -6px 0 0; color: var(--muted); font-size: 1rem; }
+.card { background: var(--surface); border: var(--edge); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 10px; }
+.take { display: grid; gap: 0; padding: 10px 14px; border-radius: 12px; background: var(--sunk); border: var(--edge); min-width: 150px; flex: 1 1 180px; }
+.take b { font: 700 1.35rem var(--data); line-height: 1.15; }
+.take span { font-size: .82rem; color: var(--muted); }
+.cav { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cav button { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 11px; border-radius: 999px; border: 1px dashed var(--muted); background: transparent; color: var(--muted);
+  font: 600 .8rem var(--body); cursor: pointer; }
+.cav button i { font-style: normal; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid currentColor; font-size: .7rem; font-weight: 800; }
+.cav button[aria-expanded="true"], .cav button:hover { color: var(--ink); border-color: var(--ink); }
+.cav-note { font-size: .85rem; color: var(--ink); padding: 8px 12px; border-radius: 10px; background: var(--sunk); border-left: 3px solid var(--accent); }
+.cav-note[hidden] { display: none; }
+.seg { display: inline-flex; border: var(--edge); border-radius: 999px; overflow: hidden; }
+.seg button { border: 0; background: transparent; color: var(--muted); font: 700 .82rem var(--body); padding: 6px 14px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--surface); }
+.tip { position: fixed; z-index: 9; pointer-events: none; padding: 6px 10px; border-radius: 8px; background: var(--ink); color: var(--surface); font-size: .8rem; line-height: 1.35; max-width: 240px; box-shadow: 0 6px 18px rgba(0,0,0,.3); }
+.tip[hidden] { display: none; }
+.num { font-family: var(--data); font-variant-numeric: tabular-nums; }
+svg text { font-family: var(--body); }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* Isotype: one little ship per simulated test day, grouped by date; a filled ship is a day the learned plan won. */
+.fleet { display: grid; gap: 14px; padding: 18px 16px 14px; }
+.fleet-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
+.tally { font: 700 clamp(1.8rem, 5vw, 3rem) var(--data); line-height: 1; }
+.tally small { font: 600 .85rem var(--body); color: var(--muted); margin-left: 8px; }
+.dates { display: grid; grid-template-columns: repeat(auto-fill, minmax(164px, 1fr)); gap: 10px; }
+.date { display: grid; gap: 4px; padding: 8px 8px 6px; border-radius: 10px; background: var(--sunk); border: 1px solid transparent; }
+.date.held { border: 1.5px dashed var(--accent); }
+.date-l { font: 700 .72rem var(--data); color: var(--muted); letter-spacing: .04em; }
+.ships { display: flex; gap: 4px; flex-wrap: nowrap; }
+.ship { width: 34px; height: 26px; transform: translateY(0); transition: transform .5s cubic-bezier(.3, 1.5, .5, 1), opacity .4s; }
+.fleet:not(.shown) .ship { transform: translateY(10px); opacity: 0; }
+.ship path { stroke: var(--ink); stroke-width: 1.4; stroke-linejoin: round; }
+.ship.won path.h { fill: var(--ppo); } .ship.lost path.h { fill: transparent; } .ship path.f { fill: var(--muted); }
+.key { display: flex; flex-wrap: wrap; gap: 14px; font-size: .8rem; color: var(--muted); align-items: center; }
+.key .ship { opacity: 1; transform: none; vertical-align: middle; margin-right: 4px; width: 24px; height: 18px; }
+@media (max-width: 420px) { .dates { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ship { width: 26px; height: 20px; } }
+.key i { display: inline-block; width: 22px; height: 14px; border: 1.5px dashed var(--accent); border-radius: 4px; vertical-align: middle; margin-right: 4px; }
+</style>
+</head>
+<body>
+<main class="emb">
+  <div class="kicker"><span class="pill">Simulated test days</span><span>One ship per day</span></div>
+  <h2 class="head" id="head"></h2>
+  <p class="sub" id="sub"></p>
+  <section class="card fleet" id="fl" aria-label="Each simulated test day as a ship, filled when the learned plan was cheaper">
+    <div class="fleet-top"><div class="tally" id="tally"></div>
+      <div class="seg" role="group" aria-label="Compared with"><button data-v="nothing" aria-pressed="true">vs doing nothing</button><button data-v="rule" aria-pressed="false">vs the rule</button><button data-v="advisor" aria-pressed="false">vs the advisor</button></div></div>
+    <div class="dates" id="dates"></div>
+    <div class="key" id="key"></div>
+  </section>
+  <div class="chips" id="takes"></div>
+  <div id="cav"></div>
+</main>
+<script id="data" type="application/json">{"made":"2026-10-17T20:45","costs":{"corridor_hour":5000.0,"vehicle_hour":15.0,"held_pax_hour":15.0,"marshal_hour":120.0,"sign_hour":25.0},"marshal_cap":1.25,"train":{"timesteps":8000000,"days":133376,"seconds":2632,"gpu":"NVIDIA A100 80GB PCIe"},"dates":{"test":["2026-10-20","2026-10-25","2026-10-31","2026-11-06","2026-11-11","2026-11-20","2026-11-27"],"seen":["2026-10-18","2026-10-23","2026-10-27","2026-11-03","2026-11-08","2026-11-16"]},"summary":{"all":{"nothing":{"n":52,"better":null,"cost":{"mean":1719797.83,"diff":0.0,"diff_lo":0.0,"diff_hi":0.0},"corridor_hours":{"mean":70.49,"diff":0.0,"diff_lo":0.0,"diff_hi":0.0},"vehicle_hours":{"mean":91158.0,"diff":0.0,"diff_lo":0.0,"diff_hi":0.0},"marshal_hours":{"mean":0.0,"diff":0.0,"diff_lo":0.0,"diff_hi":0.0}},"rule":{"n":52,"better":0.23076923076923078,"cost":{"mean":1729065.87,"diff":9268.03,"diff_lo":6447.79,"diff_hi":11922.53},"corridor_hours":{"mean":70.44,"diff":-0.04,"diff_lo":-0.42,"diff_hi":0.33},"vehicle_hours":{"mean":91704.13,"diff":546.13,"diff_lo":456.35,"diff_hi":637.38},"marshal_hours":{"mean":5.66,"diff":5.66,"diff_lo":4.84,"diff_hi":6.42}},"advisor":{"n":52,"better":0.4807692307692308,"cost":{"mean":1718702.6,"diff":-1095.23,"diff_lo":-2492.52,"diff_hi":432.09},"corridor_hours":{"mean":70.3,"diff":-0.19,"diff_lo":-0.45,"diff_hi":0.07},"vehicle_hours":{"mean":91147.48,"diff":-10.52,"diff_lo":-61.17,"diff_hi":51.51},"marshal_hours":{"mean":0.0,"diff":0.0,"diff_lo":0.0,"diff_hi":0.0}},"ppo":{"n":52,"better":0.9615384615384616,"cost":{"mean":1700214.0,"diff":-19583.84,"diff_lo":-23197.04,"diff_hi":-16246.89},"corridor_hours":{"mean":66.5,"diff":-3.99,"diff_lo":-4.57,"diff_hi":-3.37},"vehicle_hours":{"mean":91010.59,"diff":-147.4,"diff_lo":-199.27,"diff_hi":-97.75},"marshal_hours":{"mean":14.19,"diff":14.19,"diff_lo":13.37,"diff_hi":15.0}}},"held_out":{"nothing":{"n":28,"better":null,"cost":{"mean":1878728.69,"diff":0.0,"diff_lo":0.0,"diff_hi":0.0},"corridor_hours":{"mean":79.67,"diff":0.0,"diff_lo":0.0,"diff_hi":0.0},"vehicle_hours":{"mean":98692.03,"diff":0.0,"diff_lo":0.0,"diff_hi":0.0},"marshal_hours":{"mean":0.0,"diff":0.0,"diff_lo":0.0,"diff_hi":0.0}},"rule":{"n":28,"better":0.14285714285714285,"cost":{"mean":1889165.89,"diff":10437.2,"diff_lo":7244.26,"diff_hi":13931.67},"corridor_hours":{"mean":79.66,"diff":-0.01,"diff_lo":-0.43,"diff_hi":0.47},"vehicle_hours":{"mean":99294.91,"diff":602.88,"diff_lo":478.14,"diff_hi":715.43},"marshal_hours":{"mean":6.38,"diff":6.38,"diff_lo":5.35,"diff_hi":7.31}},"advisor":{"n":28,"better":0.6428571428571429,"cost":{"mean":1877045.75,"diff":-1682.94,"diff_lo":-3603.02,"diff_hi":877.49},"corridor_hours":{"mean":79.29,"diff":-0.38,"diff_lo":-0.81,"diff_hi":0.03},"vehicle_hours":{"mean":98707.81,"diff":15.78,"diff_lo":-74.94,"diff_hi":130.71},"marshal_hours":{"mean":0.0,"diff":0.0,"diff_lo":0.0,"diff_hi":0.0}},"ppo":{"n":28,"better":0.9642857142857143,"cost":{"mean":1858229.86,"diff":-20498.83,"diff_lo":-25176.23,"diff_hi":-16099.99},"corridor_hours":{"mean":75.44,"diff":-4.23,"diff_lo":-4.98,"diff_hi":-3.46},"vehicle_hours":{"mean":98554.3,"diff":-137.73,"diff_lo":-215.51,"diff_hi":-60.9},"marshal_hours":{"mean":15.23,"diff":15.23,"diff_lo":14.14,"diff_hi":16.22}}},"seen":{"nothing":{"n":24,"better":null,"cost":{"mean":1534378.5,"diff":0.0,"diff_lo":0.0,"diff_hi":0.0},"corridor_hours":{"mean":59.77,"diff":0.0,"diff_lo":0.0,"diff_hi":0.0},"vehicle_hours":{"mean":82368.29,"diff":0.0,"diff_lo":0.0,"diff_hi":0.0},"marshal_hours":{"mean":0.0,"diff":0.0,"diff_lo":0.0,"diff_hi":0.0}},"rule":{"n":24,"better":0.3333333333333333,"cost":{"mean":1542282.5,"diff":7904.0,"diff_lo":3465.67,"diff_hi":12244.26},"corridor_hours":{"mean":59.69,"diff":-0.08,"diff_lo":-0.67,"diff_hi":0.55},"vehicle_hours":{"mean":82848.22,"diff":479.93,"diff_lo":342.95,"diff_hi":611.67},"marshal_hours":{"mean":4.82,"diff":4.82,"diff_lo":3.62,"diff_hi":5.97}},"advisor":{"n":24,"better":0.2916666666666667,"cost":{"mean":1533968.93,"diff":-409.57,"diff_lo":-2047.73,"diff_hi":1321.15},"corridor_hours":{"mean":59.81,"diff":0.04,"diff_lo":-0.25,"diff_hi":0.35},"vehicle_hours":{"mean":82327.1,"diff":-41.19,"diff_lo":-81.49,"diff_hi":-4.01},"marshal_hours":{"mean":0.0,"diff":0.0,"diff_lo":0.0,"diff_hi":0.0}},"ppo":{"n":24,"better":0.9583333333333334,"cost":{"mean":1515862.16,"diff":-18516.34,"diff_lo":-24008.92,"diff_hi":-13459.17},"corridor_hours":{"mean":56.06,"diff":-3.71,"diff_lo":-4.67,"diff_hi":-2.78},"vehicle_hours":{"mean":82209.61,"diff":-158.68,"diff_lo":-219.55,"diff_hi":-96.81},"marshal_hours":{"mean":12.98,"diff":12.98,"diff_lo":11.77,"diff_hi":14.03}}}},"days":[{"date":"2026-10-18","seed":0,"held_out":false},{"date":"2026-10-18","seed":1,"held_out":false},{"date":"2026-10-18","seed":2,"held_out":false},{"date":"2026-10-18","seed":3,"held_out":false},{"date":"2026-10-20","seed":0,"held_out":true},{"date":"2026-10-20","seed":1,"held_out":true},{"date":"2026-10-20","seed":2,"held_out":true},{"date":"2026-10-20","seed":3,"held_out":true},{"date":"2026-10-23","seed":0,"held_out":false},{"date":"2026-10-23","seed":1,"held_out":false},{"date":"2026-10-23","seed":2,"held_out":false},{"date":"2026-10-23","seed":3,"held_out":false},{"date":"2026-10-25","seed":0,"held_out":true},{"date":"2026-10-25","seed":1,"held_out":true},{"date":"2026-10-25","seed":2,"held_out":true},{"date":"2026-10-25","seed":3,"held_out":true},{"date":"2026-10-27","seed":0,"held_out":false},{"date":"2026-10-27","seed":1,"held_out":false},{"date":"2026-10-27","seed":2,"held_out":false},{"date":"2026-10-27","seed":3,"held_out":false},{"date":"2026-10-31","seed":0,"held_out":true},{"date":"2026-10-31","seed":1,"held_out":true},{"date":"2026-10-31","seed":2,"held_out":true},{"date":"2026-10-31","seed":3,"held_out":true},{"date":"2026-11-03","seed":0,"held_out":false},{"date":"2026-11-03","seed":1,"held_out":false},{"date":"2026-11-03","seed":2,"held_out":false},{"date":"2026-11-03","seed":3,"held_out":false},{"date":"2026-11-06","seed":0,"held_out":true},{"date":"2026-11-06","seed":1,"held_out":true},{"date":"2026-11-06","seed":2,"held_out":true},{"date":"2026-11-06","seed":3,"held_out":true},{"date":"2026-11-08","seed":0,"held_out":false},{"date":"2026-11-08","seed":1,"held_out":false},{"date":"2026-11-08","seed":2,"held_out":false},{"date":"2026-11-08","seed":3,"held_out":false},{"date":"2026-11-11","seed":0,"held_out":true},{"date":"2026-11-11","seed":1,"held_out":true},{"date":"2026-11-11","seed":2,"held_out":true},{"date":"2026-11-11","seed":3,"held_out":true},{"date":"2026-11-16","seed":0,"held_out":false},{"date":"2026-11-16","seed":1,"held_out":false},{"date":"2026-11-16","seed":2,"held_out":false},{"date":"2026-11-16","seed":3,"held_out":false},{"date":"2026-11-20","seed":0,"held_out":true},{"date":"2026-11-20","seed":1,"held_out":true},{"date":"2026-11-20","seed":2,"held_out":true},{"date":"2026-11-20","seed":3,"held_out":true},{"date":"2026-11-27","seed":0,"held_out":true},{"date":"2026-11-27","seed":1,"held_out":true},{"date":"2026-11-27","seed":2,"held_out":true},{"date":"2026-11-27","seed":3,"held_out":true}],"heldInTrain":7,"diff":{"rule":{"cost":[-3498.19,-9955.58,-152.61,-12317.29,13070.08,10865.89,2489.77,14398.73,21429.81,12081.64,15323.22,12933.47,-990.93,-5703.89,-458.95,-1088.35,30266.51,9134.32,1853.52,7055.92,37.12,10790.74,8304.15,1084.16,19154.76,14761.12,-5961.59,8655.94,12328.58,9062.68,8836.65,6842.13,7221.55,-1877.13,-938.84,-319.13,9961.89,10579.99,881.54,11063.16,26041.0,12043.18,19163.24,7597.14,28731.38,16601.72,10264.05,14494.44,21834.54,30276.5,28885.26,18798.64]},"advisor":{"cost":[-5563.25,-240.78,-3744.46,-5733.32,0.0,0.0,0.0,0.0,1757.5,-10323.03,7543.17,-5993.2,-5709.58,-8106.11,-2914.05,2311.64,0.0,0.0,0.0,0.0,-6000.67,-6361.87,23322.95,-6046.38,9176.64,4981.47,-3273.23,1582.88,-32.06,-5804.6,-6636.85,-7188.92,0.0,0.0,0.0,0.0,-3183.81,2196.17,-2985.53,6053.19,0.0,0.0,0.0,0.0,-2815.39,-5087.98,-2241.65,1399.79,1782.83,-2454.64,-9818.5,-800.37]},"ppo":{"cost":[-11177.53,-26116.82,-5334.24,-23150.84,-28991.35,-37450.58,-43070.04,-38081.57,-19010.18,-33924.03,-27178.05,-37405.48,-25950.73,-24504.12,-6610.27,-9502.3,-8452.37,-17596.87,-22940.1,-13617.85,-9720.09,1116.11,-3027.89,-4774.81,-25601.05,-30199.78,-49306.82,-32047.71,-30706.43,-33316.39,-39786.87,-38248.54,-5287.53,-3307.78,-1240.12,1565.5,-13482.48,-25858.02,-18220.51,-9808.16,-14912.47,-21820.86,-4093.49,-12235.69,-16274.17,-19338.69,-18847.43,-5739.98,-11238.31,-21263.53,-19307.09,-21963.17]}},"head_to_head":{"rule":{"mean":-28851.86913493743,"lo":-33141.79497369364,"hi":-24324.836457385292,"ppo_cheaper":0.9807692307692307,"n":52},"advisor":{"mean":-18488.606281425014,"lo":-21893.559915482594,"hi":-15082.79658761225,"ppo_cheaper":0.9423076923076923,"n":52}},"ablation":{"nothing":{"cost":0.0,"n":39},"ppo":{"cost":-19829.46,"n":39},"ppo_no_meter":{"cost":-19853.84,"n":39},"ppo_no_checkin":{"cost":-19084.03,"n":39},"ppo_no_signs":{"cost":-12619.51,"n":39},"ppo_no_marshals":{"cost":-7648.58,"n":39},"marshal_rule":{"cost":-6420.98,"n":39}}}</script>
+<script>
+// Shared by the embedded overviews: theme follows <html data-theme>, height is posted to the parent,
+// caveat chips open one note, numbers count up, a small tooltip.
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const k1 = v => `£${(Math.abs(v) / 1000).toFixed(1)}k`;
+function postH() { try { parent.postMessage({ embedH: document.documentElement.scrollHeight, id: location.hash.slice(1) }, '*'); } catch (e) { /* not embedded */ } }
+addEventListener('load', postH); addEventListener('resize', postH);
+new ResizeObserver(postH).observe(document.documentElement);
+new MutationObserver(() => { if (window.redraw) window.redraw(); postH(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+function caveats(host, items) {
+  host.innerHTML = `<div class="cav">${items.map((c, i) => `<button type="button" data-i="${i}" aria-expanded="false">${esc(c[0])}<i aria-hidden="true">?</i></button>`).join('')}</div><p class="cav-note" hidden></p>`;
+  const note = host.querySelector('.cav-note');
+  host.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    const open = b.getAttribute('aria-expanded') !== 'true';
+    host.querySelectorAll('button').forEach(x => x.setAttribute('aria-expanded', 'false'));
+    b.setAttribute('aria-expanded', String(open)); note.hidden = !open; note.textContent = open ? items[+b.dataset.i][1] : ''; postH();
+  }));
+}
+function countUp(el, to, fmt, ms = 1100) {
+  if (REDUCED) { el.textContent = fmt(to); return; }
+  const t0 = performance.now();
+  const step = t => { const p = Math.min(1, (t - t0) / ms), e = 1 - Math.pow(1 - p, 3); el.textContent = fmt(to * e); if (p < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+const tip = document.createElement('div'); tip.className = 'tip'; tip.hidden = true; document.body.append(tip);
+function tipOn(host) {
+  host.addEventListener('pointermove', e => {
+    const t = e.target.closest('[data-tip]'); if (!t) { tip.hidden = true; return; }
+    tip.innerHTML = t.dataset.tip; tip.hidden = false;
+    const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 6), y = e.clientY + 16 + tip.offsetHeight > innerHeight ? e.clientY - tip.offsetHeight - 10 : e.clientY + 16;
+    tip.style.left = `${Math.max(6, x)}px`; tip.style.top = `${Math.max(4, y)}px`;
+  });
+  host.addEventListener('pointerleave', () => { tip.hidden = true; });
+}
+// run fn once the visual scrolls into view (the parent only shows it on the last step)
+function whenSeen(el, fn) {
+  if (REDUCED || !('IntersectionObserver' in window)) return fn();
+  const io = new IntersectionObserver(es => { if (es.some(x => x.isIntersecting)) { io.disconnect(); fn(); } }, { threshold: .2 });
+  io.observe(el);
+}
+
+const D = JSON.parse($('#data').textContent), S = D.summary.all, days = D.days, n = days.length;
+// AI overviews only: the delay caveat follows the data (earlier runs had the ship-timing advisor ahead on delay).
+function delayCaveat(S) {
+  const p = -S.ppo.vehicle_hours.diff, a = -S.advisor.vehicle_hours.diff, base = S.nothing.vehicle_hours.mean;
+  if (a > p) return ['Advisor cuts delay more', `Moving the ships cuts vehicle delay more (${Math.round(a)} vehicle-hours a day against ${Math.round(p)}); the learned plan wins on cost and congested road-hours.`];
+  return ['Delay barely moves', `The learned plan cuts about ${Math.round(p)} of ${Math.round(base).toLocaleString()} vehicle-hours of delay a day (${(p / base * 100).toFixed(1)}%); the ship-timing advisor cuts ${Math.round(a)}. Earlier runs had the advisor ahead on delay.`];
+}
+
+const SHIP = cls => `<svg class="ship ${cls}" viewBox="0 0 24 18" aria-hidden="true"><path class="f" d="M8 2h3v5H8zM13 3h3v4h-3z"/><path class="h" d="M2 9h20l-3 6H5z"/><path d="M6 7h12v2H6z" style="fill:var(--surface)"/></svg>`;
+// saving of the learned plan against the chosen alternative, per test day (negative cost difference = cheaper)
+const vs = v => days.map((_, i) => v === 'nothing' ? D.diff.ppo.cost[i] : D.diff.ppo.cost[i] - D.diff[v].cost[i]);
+const NAME = { nothing: 'doing nothing', rule: 'the simple rule', advisor: 'the ship-timing advisor' };
+let cur = 'nothing';
+function draw(animate) {
+  const d = vs(cur), won = d.filter(x => x < 0).length, by = {};
+  days.forEach((x, i) => { (by[x.date] = by[x.date] || { held: x.held_out, i: [] }).i.push(i); });
+  $('#tally').innerHTML = `${won}<small>of ${n} days cheaper than ${NAME[cur]}</small>`;
+  $('#dates').innerHTML = Object.entries(by).sort().map(([date, g]) => {
+    const dt = new Date(date + 'T12:00:00'), lab = dt.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+    return `<div class="date${g.held ? ' held' : ''}"><span class="date-l">${esc(lab)}</span><div class="ships">${g.i.map(i => {
+      const s = -d[i], t = `<b>${esc(lab)}</b>, draw ${days[i].seed + 1}<br>${s >= 0 ? `saved ${k1(s)}` : `cost ${k1(s)} more`} than ${NAME[cur]}${g.held ? '<br>held-out date' : ''}`;
+      return `<span data-tip="${esc(t)}">${SHIP(s >= 0 ? 'won' : 'lost')}</span>`;
+    }).join('')}</div></div>`;
+  }).join('');
+  $('#key').innerHTML = `<span>${SHIP('won')}cheaper</span><span>${SHIP('lost')}cost more</span><span><i></i>date held out from training</span>`;
+  const run = () => $('#fl').classList.add('shown');
+  if (animate) { $('#fl').classList.remove('shown'); $('#dates').querySelectorAll('.ship').forEach((s, k) => { s.style.transitionDelay = `${k * 18}ms`; }); requestAnimationFrame(() => requestAnimationFrame(run)); } else run();
+  postH();
+}
+$('#fl').querySelectorAll('[data-v]').forEach(b => b.addEventListener('click', () => {
+  cur = b.dataset.v; $('#fl').querySelectorAll('[data-v]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); draw(!REDUCED);
+}));
+draw(false);
+if (!REDUCED) whenSeen($('#fl'), () => draw(true));
+window.redraw = () => draw(false);
+tipOn($('#fl'));
+const wins = Math.round(S.ppo.better * S.ppo.n), heldWins = vs('nothing').filter((x, i) => x < 0 && days[i].held_out).length, held = days.filter(x => x.held_out).length;
+$('#head').innerHTML = `<em>${wins} of ${S.ppo.n}</em> ships came home cheaper with the learned plan`;
+$('#sub').textContent = 'Each ship is one simulated cruise day, run once with the plan and once without.';
+$('#takes').innerHTML = [[k1(-S.ppo.cost.diff), 'saved on an average day'], [`${heldWins} of ${held}`, 'held-out days won (never seen in training)'], [`${Math.round(D.head_to_head.rule.ppo_cheaper * 100)}%`, 'of days cheaper than the simple rule']]
+  .map(([b, s]) => `<div class="take"><b>${esc(b)}</b><span>${esc(s)}</span></div>`).join('');
+const marsh = D.ablation.ppo.cost - D.ablation.ppo_no_marshals.cost;
+caveats($('#cav'), [
+  ['Simulated days', `The model's own sampled cruise days (${D.dates.test.length} held-out and ${D.dates.seen.length} training dates, several draws each), not observed traffic.`],
+  ['Marshals are assumed', `About ${k1(-marsh)} of the saving needs dock-gate marshals, whose +${Math.round((D.marshal_cap - 1) * 100)}% gate capacity is our assumption.`],
+  delayCaveat(S),
+  ['Our cost weights', `"Cheaper" uses weights we set (£${D.costs.corridor_hour.toLocaleString()} per congested road-hour, £${D.costs.marshal_hour} per marshal gate-hour). The council should set its own.`],
+]);
+</script>
+</body>
+</html>
