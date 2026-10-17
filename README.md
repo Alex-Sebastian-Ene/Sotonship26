@@ -231,5 +231,6 @@ data improves it by about 4% a day (not significant) and 2% per 15 minutes.
 - **AI-assisted research:** `notes/local-evidence.md` (local evidence, scale and business numbers)
   was compiled by Claude Code (Edward's session, with a research subagent) on Sat 17 Oct 2026 from
   the public sources cited on each line.
+- **AI-generated (queues at bottlenecks):** the counted-road capacity and local-traffic change in `demo/traffic_model.py` (`COUNT_HEADROOM`, per-link top-up in `anchor_counts`), `demo/bus_check.py`, `demo/queue_report.py`, `cluster/iridis/bus_check.slurm`, `tests/test_demo_queues.py` and `docs/queues.md` were written with Claude Code on Sat 17 Oct 2026. The headroom is fitted to the council's July 2024 bus run times on Portswood Road (Portswood Project Baseline Data Report, Table 3-5) and its peak speeds (Table 3-10).
 - **Existed before the event:** TODO, confirm with the organisers.
 - **Who helped:** TODO.
