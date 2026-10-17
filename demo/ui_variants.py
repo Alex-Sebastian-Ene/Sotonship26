@@ -583,9 +583,71 @@ for tag_ in ("demo-data", "extra-data"):
     tpl = re.sub(rf'(<script id="{tag_}" type="application/json">)(.*?)(</script>)', lambda k: k[1] + m[2] + k[3], tpl, count=1, flags=re.S)
 assert tpl.count(INIT) == 1 and tpl.count("</style>") == 1
 TITLES = {"focus": "Forecast · Focus", "story": "Cruise-day traffic", "officer": "Forecast · Officer", "wall": "Forecast · Wallboard"}
+
+# Story with a friendly "Does the AI help?" overview: two embedded designs (one on the learned policy, one on the
+# buses observed) and an Advanced view switch that brings back every statistic. The designs are standalone pages
+# (optional 4th argument: a folder holding viz-ai/emb-*.html and viz-bus/emb-*.html), shown in srcdoc iframes.
+AI_CSS = """
+.ai-simple { display: grid; gap: 22px; }
+.ai-frame { width: 100%; border: 0; display: block; min-height: 320px; background: transparent; color-scheme: normal; }
+.ai-card { border-radius: 18px; overflow: hidden; border: 1px solid var(--line); background: var(--surface); }
+:root[data-theme="steam"] .ai-card { border: 2px solid #1D2B45; box-shadow: 4px 4px 0 #1D2B45; }
+.ai-mode { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--sunk); border: 1px solid var(--line); }
+.ai-mode button { border: 0; background: transparent; color: var(--muted); padding: 8px 18px; border-radius: 999px; font-weight: 750; cursor: pointer; }
+.ai-mode button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.ai-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.ai-bar h2 { font-size: var(--step-2); }
+body:not(.ai-adv) .adv-only { display: none !important; }
+body.ai-adv .simple-only { display: none !important; }
+"""
+AI_JS = r"""
+  /* Does the AI help?: an overview of two designs, and an Advanced view with every statistic */
+  const AI_EMBEDS = __EMBEDS__;
+  const aiSec = document.createElement('section'); aiSec.className = 'sec ai-simple';
+  aiSec.innerHTML = `<div class="ai-bar"><h2>The learned plan, and the buses on the day</h2>
+    <div class="ai-mode" role="group" aria-label="View"><button type="button" data-ai="simple" aria-pressed="true">Overview</button><button type="button" data-ai="adv" aria-pressed="false">Advanced view</button></div></div>
+    ${AI_EMBEDS.map((e, i) => `<div class="ai-card simple-only"><iframe class="ai-frame" title="${esc(e.title)}" id="ai-f${i}"></iframe></div>`).join('')}`;
+  $('#day').before(aiSec);   // top of the step, above the observed buses fold that lives in the day section
+  aiSec.dataset.views = 'step4';
+  [methodSec, '#ppo-viz', '#bus-live'].forEach(x => { const el = typeof x === 'string' ? $(x) : x; if (el) el.classList.add('adv-only'); });
+  // the switch also sits at the top of the advanced statistics, so it is always in reach
+  const advBar = aiSec.querySelector('.ai-mode');
+  function aiMode(adv) {
+    document.body.classList.toggle('ai-adv', adv);
+    advBar.querySelectorAll('[data-ai]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.ai === 'adv') === adv)));
+    aiSec.querySelector('h2').textContent = adv ? 'Every statistic behind the answer' : 'The learned plan, and the buses on the day';
+    if (adv) { const v = $('#ppo-viz'); if (v && !v.open) { v.open = true; v.dispatchEvent(new Event('toggle')); } const b = $('#bus-live'); if (b && !b.open) b.open = true; }
+    else sizeFrames();
+  }
+  advBar.addEventListener('click', e => { const b = e.target.closest('[data-ai]'); if (b) aiMode(b.dataset.ai === 'adv'); });
+  aiSec.querySelector('.ai-bar').classList.remove('simple-only');
+  const frames = AI_EMBEDS.map((e, i) => { const f = $('#ai-f' + i); f.srcdoc = e.html; return f; });
+  const themeOf = () => document.documentElement.dataset.theme || 'harbour';
+  function sizeFrames() {
+    frames.forEach(f => { try { const d = f.contentDocument; if (!d || !d.documentElement) return; d.documentElement.dataset.theme = themeOf(); const h = d.documentElement.scrollHeight; if (h > 40) f.style.height = h + 'px'; } catch (err) { /* not ready */ } });
+  }
+  frames.forEach(f => f.addEventListener('load', () => {
+    sizeFrames();
+    try { new ResizeObserver(sizeFrames).observe(f.contentDocument.body); } catch (err) { /* sized on messages instead */ }
+  }));
+  addEventListener('message', e => { const f = frames.find(x => x.contentWindow === e.source); if (f && e.data && e.data.embedH) f.style.height = e.data.embedH + 'px'; });
+  new MutationObserver(sizeFrames).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  addEventListener('resize', () => setTimeout(sizeFrames, 50));
+  showStep(step);
+"""
+AI_PAIRS = {"race": ("policy-race", "map"), "days": ("every-test-day", "ladder"), "saves": ("where-ppo-saves", "board")}
+EMBEDS = Path(sys.argv[4]) if len(sys.argv) > 4 else None
+if EMBEDS:
+    for key, (ai, bus) in AI_PAIRS.items():
+        pages = [(EMBEDS / "viz-ai" / f"emb-{ai}.html", "Does the AI help?"), (EMBEDS / "viz-bus" / f"emb-{bus}.html", "Buses observed on the day")]
+        if all(f.exists() for f, _ in pages):
+            emb = json.dumps([{"title": t, "html": f.read_text(encoding="utf-8")} for f, t in pages]).replace("</", r"<\/")
+            VARIANTS["story-" + key] = (VARIANTS["story"][0] + AI_CSS, VARIANTS["story"][1] + AI_JS.replace("__EMBEDS__", emb))
+            TITLES["story-" + key] = "Cruise-day traffic"
 for name, (css, js) in VARIANTS.items():
-    page = tpl.replace("</style>", COMMON_CSS + (ICON_CSS if name == "story" else "") + css + "</style>", 1)
-    page = page.replace(INIT, COMMON_JS.replace("__VARIANT__", repr(name)) + js, 1)
+    base = "story" if name.startswith("story") else name
+    page = tpl.replace("</style>", COMMON_CSS + (ICON_CSS if base == "story" else "") + css + "</style>", 1)
+    page = page.replace(INIT, COMMON_JS.replace("__VARIANT__", repr(base)) + js, 1)
     page = page.replace("<title>Cruise-day traffic forecast</title>", f"<title>{TITLES[name]}</title>", 1)
     (OUT / f"ui-{name}.html").write_text(page, encoding="utf-8")
     print(name, round(len(page.encode()) / 1e6, 1), "MB")
