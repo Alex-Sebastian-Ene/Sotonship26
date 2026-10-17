@@ -196,6 +196,11 @@ total cost, and the paired difference from doing nothing with a 95% bootstrap in
 
 ### Results (17 Oct 2026, Iridis A100)
 
+All numbers here (agents, buses, PPO) were computed on the model as it was at commit b4a8c0b
+(old 8b1e291), before port freight and the cruise assumptions fitted to the M271 reached main. The
+code follows both, and the tests pass against them, but the runs have not been repeated on that
+model: rerun part 1 and part 2 (Commands) to refresh the figures.
+
 Each policy played the same 260 sampled days: 7 held-out dates and 6 training dates, 20 new
 random draws each. Mean per sampled day; the difference is paired against doing nothing on the
 same day (95% bootstrap intervals and percentiles in the generated files). Signs were free in
