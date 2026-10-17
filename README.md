@@ -118,6 +118,9 @@ Fill in the date collected and the licence for every source before submission.
 | ONS Census 2021 method used to travel to work by distance travelled, per local authority ([census API](https://api.beta.ons.gov.uk/v1/population-types/UR/census-observations?area-type=ltla&dimensions=transport_to_workplace_12a,workplace_travel_10a)) | Demo: share of each commuter flow driving a car or van | 16 Oct 2026 | Open Government Licence v3.0 |
 | ONS MSOA (Dec 2021) population-weighted centroids V2, Open Geography Portal | Demo: placing each MSOA inside or outside the study area | 16 Oct 2026 | Open Government Licence v3.0; contains OS data © Crown copyright and database right |
 | DfT road traffic statistics, AADF per count point ([dft_traffic_counts_aadf.zip](https://roadtraffic.dft.gov.uk/downloads), published Jun 2026, 2025 counts) | Demo: traffic crossing each county gateway (count point on the gateway road), less census commuters and visitors, split 30% through traffic and 70% other trips to the area's zones; scale for everything crossing the edge of the area fitted to 10 count points and checked at 2 more (M271, A33 Redbridge Road, A35 Redbridge Causeway, A33 Millbrook Road and The Avenue, Itchen Bridge, Northam Bridge, A335, M27, M3) (`data/cache/dft`, not committed) | 16 Oct 2026 | Open Government Licence v3.0 |
+| National Highways [WebTRIS](https://webtris.nationalhighways.co.uk/api/swagger/ui/index) 15-minute counts, M271 (sites 19974, 19796, 20313, 20605, 7588) and M3 J14 (20025) | Observed traffic for the everyday forecast and its backtest (`data/observed.py`, `flow_forecast.py`), cached in `data/raw/webtris/`, not committed | 16–17 Oct 2026; counts 2024-01-01 to 2026-06-30 (about 3.5 months publication lag) | Open Government Licence v3.0 (contains National Highways information) |
+| Southampton City Council [school term dates](https://www.southampton.gov.uk/schools-learning/school-information/school-term-dates/), 2024-25 to 2026-27 live pages, 2023-24 from the [Wayback Machine copy](https://web.archive.org/web/20240303065857/https://www.southampton.gov.uk/schools-learning/school-information/school-term-dates/school-year-calendar-2023-24/) | `SCHOOL_HOLIDAYS` feature in `flow_forecast.py` | 17 Oct 2026 | Facts (dates) with the source cited in the code |
+| GOV.UK [bank holidays](https://www.gov.uk/bank-holidays), England and Wales 2024–2026 | `BANK_HOLIDAYS` in `uplift.py` | 16 Oct 2026 | Open Government Licence v3.0 |
 
 **ABP attribution.** Cruise schedule data, current and archived, © Associated British Ports
 (Southampton VTS). It is used for personal reference with ABP acknowledged, as ABP's terms allow.
@@ -159,5 +162,11 @@ data improves it by about 4% a day (not significant) and 2% per 15 minutes.
   desk compiled `ship_capacity.csv` from the public sources cited on each row.
 - **AI-generated:** `src/sotonship26/data/dft.py` and `tests/test_dft.py` were written by Claude
   Code (Edward's session) on Fri 16 Oct 2026.
+- **AI-generated:** the learning and evaluation code (`src/sotonship26/data/observed.py`,
+  `data/cruise_history.py`, `uplift.py`, `uplift_model.py`, `backtest.py`, `run_backtest.py`,
+  `flow_forecast.py`, `scripts/plot_flow_forecast.py`, `scripts/observed_noise.py`, their tests
+  and everything in `notes/`)
+  was written with Claude Code in Keanu's session on Fri 16 and Sat 17 Oct 2026. Keanu reviewed
+  the method and the honest-baseline corrections (`notes/ml-walkthrough.md`).
 - **Existed before the event:** TODO, confirm with the organisers.
 - **Who helped:** TODO.
