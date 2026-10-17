@@ -31,7 +31,10 @@ NAME = sys.argv[3]
 GSDS = [float(x) for x in os.environ.get("GSDS", "0.25,0.125").split(",")]
 UP = int(os.environ.get("UP", "2"))
 CONF = float(os.environ.get("CONF", "0.25"))
-WEIGHTS = SAT / "data" / "cache" / "models" / "yolo11n-obb.pt"
+MODEL = os.environ.get("MODEL", "yolo11n-obb.pt")
+WEIGHTS = SAT / "data" / "cache" / "models" / MODEL
+# optional box (x0,y0,x1,y1 in 25 cm pixels) whose cars were counted by eye, scored separately
+PATCH25 = [float(x) for x in os.environ["PATCH25"].split(",")] if os.environ.get("PATCH25") else None
 OUT = SAT / "data" / "raw" / "oam_sample"
 OUT.mkdir(parents=True, exist_ok=True)
 aoi = {"type": "Polygon", "coordinates": [[[w, s], [e, s], [e, n], [w, n], [w, s]]]}
@@ -40,7 +43,7 @@ import rasterio  # noqa: E402
 from PIL import Image, ImageDraw  # noqa: E402
 from ultralytics import YOLO  # noqa: E402
 
-model = YOLO(str(WEIGHTS) if WEIGHTS.exists() else "yolo11n-obb.pt")
+model = YOLO(str(WEIGHTS) if WEIGHTS.exists() else MODEL)
 T, OV = 640, 64  # tile and overlap, pixels; a car is about 18 x 7 px at 25 cm
 
 for gsd in GSDS:
@@ -80,6 +83,13 @@ for gsd in GSDS:
                 confs.append(float(c))
                 cls.append(model.names[int(k)])
     cars = [c for c, k in zip(confs, cls, strict=True) if k == "small vehicle"]
+    if PATCH25:
+        x0p, y0p, x1p, y1p = (v * 0.25 / gsd for v in PATCH25)
+        in_patch = sum(
+            k == "small vehicle" and x0p <= p[:, 0].mean() < x1p and y0p <= p[:, 1].mean() < y1p
+            for p, k in zip(polys, cls, strict=True)
+        )
+        print(f"  small vehicles in the hand-counted patch: {in_patch}")
     print(
         f"  detections: {dict(Counter(cls))}; small vehicles {len(cars)}, mean confidence "
         f"{np.mean(cars) if cars else 0:.2f}"
@@ -92,6 +102,6 @@ for gsd in GSDS:
             outline=(255, 0, 0) if k == "small vehicle" else (0, 160, 255),
             width=2,
         )
-    prev = OUT / f"{NAME}_{int(gsd * 1000)}mm_up{UP}_detections.png"
+    prev = OUT / f"{NAME}_{int(gsd * 1000)}mm_up{UP}_{Path(MODEL).stem}_detections.png"
     img.save(prev)
     print("  overlay:", prev)
