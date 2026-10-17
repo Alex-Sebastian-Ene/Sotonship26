@@ -1,6 +1,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Cruise-day traffic forecast</title>
+<script>try { document.documentElement.dataset.theme = localStorage.getItem('forecast-theme') || 'harbour'; } catch (e) { document.documentElement.dataset.theme = 'harbour'; }</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,750&family=IBM+Plex+Mono:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap">
@@ -2327,7 +2328,9 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
     try { localStorage.setItem('forecast-theme', t || ''); } catch (err) { /* private mode: theme just isn't remembered */ }
   }
   document.querySelectorAll('[data-theme-pick]').forEach(b => b.addEventListener('click', () => setTheme(b.dataset.themePick)));
-  try { const saved = localStorage.getItem('forecast-theme'); if (saved) setTheme(saved); } catch (err) { /* no storage */ }
+  let savedTheme = null;
+  try { savedTheme = localStorage.getItem('forecast-theme'); } catch (err) { /* no storage */ }
+  setTheme(savedTheme || 'harbour');  // Harbour night unless the viewer picked another
   function onTheme() { readPalette(); if (state.date && !day().beyond) renderVisuals(); }
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', onTheme);
   new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
