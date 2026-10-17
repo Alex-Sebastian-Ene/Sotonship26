@@ -284,8 +284,8 @@ class CruiseDayEnv(gym.Env):
         self.marshals = act["marshals"].copy()
         if self.marshals.any():
             cap = cap.copy() if cap is day.cap else cap
-            for k in np.flatnonzero(self.marshals):
-                cap[self.gate_edges[k]] *= MARSHAL_CAP
+            on = np.unique(np.concatenate([self.gate_edges[k] for k in np.flatnonzero(self.marshals)]))
+            cap[on] *= MARSHAL_CAP  # once per link, even where two gates share one
         self.signs = act["signs"].copy()
         noise = day.noise
         if self.signs.any():
