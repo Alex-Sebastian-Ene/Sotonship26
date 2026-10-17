@@ -1,0 +1,26 @@
+name: Tests
+
+# Lint and the test suite on every pull request and on main. CPU-only torch; tests that need
+# downloaded data (data/cache, data/raw are gitignored) skip themselves.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: astral-sh/setup-uv@v6.1.0
+        with:
+          python-version: "3.12"
+      - name: Lint
+        run: uv run --extra cpu ruff check .
+      - name: Tests
+        run: uv run --extra cpu pytest -q
