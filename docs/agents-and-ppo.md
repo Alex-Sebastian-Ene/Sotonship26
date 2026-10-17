@@ -16,8 +16,9 @@ up. The test file `tests/test_demo_agents_ppo.py` checks that the pieces add bac
 model's own matrices and link loads, to the last bit, on a small network.
 
 The PPO results are summarised under [Results](#results-17-oct-2026-iridis-a100); the full generated
-tables are [ppo-results.md](ppo-results.md) (run A), [ppo-results-gpu.md](ppo-results-gpu.md)
-(run B) and [ppo-results-gpu2.md](ppo-results-gpu2.md) (run C).
+tables are [ppo-results.md](ppo-results.md) (run C re-scored on the current simulator: the
+page's numbers), [ppo-results-gpu.md](ppo-results-gpu.md) (run B) and
+[ppo-results-gpu2.md](ppo-results-gpu2.md) (run C on the earlier model).
 
 ## 1. Agents
 
@@ -159,12 +160,14 @@ per terminal the cruise traffic due in the next 30 minutes and the passengers he
 | Signs, per sign location (the page's five) | on or off | drivers see that location's corridor links as 30% slower when choosing routes (assumed); travel times do not change | council traffic team |
 | Marshals, per dock gate in use | on or off | 25% more capacity on the gate's access links (assumed) | the port, with the council |
 
-**Reward.** Cost per 15 minutes, in pounds, minus the cost of doing nothing on the same sampled
-day in the same 15 minutes, divided by 10,000:
+**Reward.** A weighted cost score per 15 minutes, in pounds, minus the score of doing nothing on
+the same sampled day in the same 15 minutes, divided by 10,000. Every value below is assumed: none
+is measured or taken from a published table (such as the DfT TAG data book), and the congestion
+weight is not money at all:
 
 | Cost | Value | Basis |
 | --- | --- | --- |
-| Corridor-hour above 85% of capacity | £5,000 | a weight, not a measured cost: it stands for the risk that a road at its limit locks up, which average delay misses. Chosen so that on a busy day it counts about as much as delay (a busy Saturday has about 110 corridor-hours above 85% and about 57,000 vehicle-hours in queues). The traffic team should set it. |
+| Corridor-hour above 85% of capacity | £5,000 | assumed; a weight, not a measured cost: it stands for the risk that a road at its limit locks up, which average delay misses. Chosen so that on a busy day it counts about as much as delay (a busy Saturday has about 110 corridor-hours above 85% and about 57,000 vehicle-hours in queues). The traffic team should set it. |
 | Vehicle-hour of delay | £15 | close to an average car value of time per vehicle (assumed). Delay = vehicles the model's point queue carries into the next 15 minutes (each waits 15 minutes) plus slower running of the traffic that gets through each link (the BPR curve, load capped at 1.5). |
 | Passenger-hour held in a terminal | £15 | the same value of time per person (assumed) |
 | Marshal gate-hour | £120 | four marshals at £30 an hour (assumed) |
@@ -211,10 +214,54 @@ total cost, and the paired difference from doing nothing with a 95% bootstrap in
 
 ### Results (17 Oct 2026, Iridis A100)
 
-All numbers here (agents, buses, PPO) were computed on the model as it was at commit b4a8c0b
-(old 8b1e291), before port freight and the cruise assumptions fitted to the M271 reached main. The
-code follows both, and the tests pass against them, but the runs have not been repeated on that
-model: rerun part 1 and part 2 (Commands) to refresh the figures.
+**Current numbers: run C re-scored on the current simulator.** These are the page's figures.
+Run C (`models/ppo/1889084`) was re-scored by `train_ppo.py evaluate` on Iridis (job 1892582, main
+32fe052, 17 Oct 18:40) on the model with port freight, the fitted cruise assumptions and the
+queues; [ppo-results.md](ppo-results.md) has the full tables. Every policy played the same 260
+sampled days (7 held-out dates and 6 training dates, 20 new draws each). The page's test table and
+charts show the **held-out dates** (140 days), which PPO never saw in training:
+
+| Policy | Corridor-hours above 85% | Delay (vehicle-hours) | Weighted cost score per day | Money only per day | Lower score than doing nothing |
+| --- | --- | --- | --- | --- | --- |
+| Do nothing | 60.19 | 82,018 | £1,531,203 | £1,230,274 | |
+| Rule (signs and marshals at 85%) | −1.48 [−1.69, −1.25] | +1,241 [1,141, 1,336] | +£12,545 | +£19,964 | 18% of days |
+| Ship-timing advisor | −0.34 [−0.48, −0.20] | −15 [−41, 10] | −£1,901 | −£223 | 53% of days |
+| PPO | −5.01 [−5.28, −4.73] | −33 [−82, 19] | −£22,976 | +£2,069 | 99% of days |
+
+- **Congested road-hours:** PPO cuts them by 5.0 a day on the held-out dates (8.3% of doing
+  nothing's 60.2). Its change in delay is not significant there. On all 260 test days the figures
+  are −4.64 [−4.89, −4.39] and −54 [−87, −21]; they are pooled with training dates, so the page
+  does not lead with them.
+- **The weighted cost score is not money.** It prices each congested road-hour at £5,000, a weight
+  we set (see Reward). Counting money only (delay, held passengers, marshals and signs at the
+  assumed rates, without that weight), PPO costs **£2,069 a day more** than doing nothing on the
+  held-out dates (+£1,586 on all test days): about £1,708 of marshals and £804 of signs against
+  £495 less delay. The ship-timing advisor is the only policy that saves money (−£223). PPO's case
+  rests on how much a congested road-hour is worth to the traffic team, which they should set.
+- **The intervals are narrow.** The bootstrap resamples the 140 sampled days as if they were
+  independent, but they are 20 draws on each of 7 dates, so the intervals show simulation noise,
+  not how well the result carries to other dates.
+
+**Where the score saving comes from** (re-scored run C with one lever switched off at a time, all
+260 test days, `train_ppo.py ablation`, 17 Oct 18:42):
+
+| | Corridor-hours | Delay (veh-h) | Marshal gate-hours | Weighted score per day |
+| --- | --- | --- | --- | --- |
+| PPO, all levers | −4.64 | −54 | 13.6 | −£21,635 |
+| without metering | −4.64 | −54 | 13.6 | −£21,676 |
+| without its check-in move | −4.60 | −57 | 13.7 | −£21,474 |
+| without signs | −3.31 | +6 | 14.1 | −£14,723 |
+| without marshals | −1.51 | −151 | 0.0 | −£8,955 |
+| marshals-only rule (at 85%, no PPO) | −1.75 | −4 | 5.8 | −£8,083 |
+
+As before, marshals (whose 25% extra gate capacity is assumed) and signs carry the score saving;
+metering and the check-in move add nothing.
+
+The runs below are the earlier history, kept for the record.
+
+The agents, buses and PPO runs A to C below were computed on the model as it was at commit
+b4a8c0b (old 8b1e291), before port freight and the cruise assumptions fitted to the M271 reached
+main. Only run C has been re-scored on the current model (above).
 
 Each policy played the same 260 sampled days: 7 held-out dates and 6 training dates, 20 new
 random draws each. Mean per sampled day; the difference is paired against doing nothing on the
@@ -229,7 +276,7 @@ these two runs.
 | PPO run A (simulator on CPU cores, 1M steps, 68 min) | −2.31 | +137 | −£7,272 | 84% of days |
 | PPO run B (simulator on the GPU, 5M steps, 26 min) | −2.76 | +173 | −£9,769 | 91% of days |
 
-Files: [ppo-results.md](ppo-results.md) (run A, also on the page until run C) and
+Files: run A's tables were in ppo-results.md until the re-score replaced them (see its history);
 [ppo-results-gpu.md](ppo-results-gpu.md) (run B). On the held-out dates alone, run B saves
 £10,596 a day and 3.1 corridor-hours, about as much as on the training dates, so it is not
 memorising dates.
@@ -280,7 +327,8 @@ Run C is the best of the three runs on corridor-hours and cost, with fewer marsh
 day against 12) and about the same sign hours (21 against 24: at £25 an hour signs still pay when
 a corridor-hour is weighted at £5,000). Its ablation tells the same story as run B's: without
 marshals it saves £2,408 a day, without signs £7,722, without metering or its check-in moves about
-the same as with them. The page shows run C, with the ablation under its test table.
+the same as with them. The page shows run C re-scored on the current model (above), with the
+ablation under its test table.
 
 Its plan on the page is shown as windows of at least 30 minutes, joining gaps of 15 minutes
 (`train_ppo.py rewindow`): the policy itself switches signs on and off from one 15 minutes to the
@@ -288,7 +336,9 @@ next, which no operator would follow. The per-bin shares behind the windows are 
 JSON.
 
 **On the page.** The page shows run C, chosen before testing as the longest-trained policy under
-the final costs. For the days with agents it is run on eight more sampled days and turned into
+the final costs, re-scored on the current model: the test table and the charts default to the
+held-out dates, the £ figures are labelled a weighted cost score with assumed weights, and a
+money-only figure (without the congestion weight) sits beside them. For the days with agents it is run on eight more sampled days and turned into
 actions with times (a lever is recommended in the 15 minutes where PPO used it on at least half of
 those days; metering only while passengers are waiting), each with its owner and Approve / Decline
 buttons. Nothing is applied automatically: the port and the cruise lines own disembarkation and
