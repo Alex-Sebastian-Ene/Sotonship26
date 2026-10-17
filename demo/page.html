@@ -4,7 +4,7 @@
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('forecast-theme') || 'harbour'; } catch (e) { document.documentElement.dataset.theme = 'harbour'; }</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,750&family=IBM+Plex+Mono:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,750&family=Fredoka:wght@500;600;700&family=IBM+Plex+Mono:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap">
 <style>
 /* Layout: a duty officer's briefing. Pick a day; its verdict and the things to do come first, then the map and the road timetable; how it works is folded away below. */
 :root {
@@ -34,7 +34,7 @@
   --radius: 4px;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]):not([data-theme="chart"]) {
+  :root:not([data-theme="light"]):not([data-theme="chart"]):not([data-theme="steam"]) {
     --bg: #0F151C; --surface: #161E28; --sunk: #1C2632; --ink: #E3E9EF; --muted: #9AA7B5; --line: #283340; --line-strong: #3C4A5A;
     --accent: #86B2EA; --accent-ink: #0F151C; --accent-soft: #1A2B42;
     --warn-bg: #2D2611; --warn-ink: #F1D27C; --warn-line: #5C4A18;
@@ -104,6 +104,15 @@
   --minor: #D4C9AE; --casing: #FBF7EC; --road-quiet: #B3A98F;
   --bus-hi: #00838F; --glow: rgba(161, 49, 49, 0.16);
   --font-display: "Fraunces", Georgia, serif;
+}
+:root[data-theme="steam"] {
+  --bg: #F5EEDC; --surface: #FFFBF1; --sunk: #EFE5CD; --ink: #1D2B45; --muted: #5B6476; --line: #E0D2B2; --line-strong: #1D2B45;
+  --accent: #D8473A; --accent-ink: #FFFFFF; --accent-soft: #FADFD7;
+  --land: #F2EAD3; --water: #A9D9D3; --water-ink: #1E6E73; --mud: #E5DCC2; --green: #DCE6C3; --wood: #C9D9AF;
+  --resi: #EDE4CB; --comm: #F0E0CF; --ind: #E4DDCA; --port: #DED9C8; --campus: #ECDFD6; --airport: #E6E0CF;
+  --minor: #D6CAAB; --casing: #FFFBF1; --road-quiet: #B5AA8C;
+  --bus-hi: #127C80; --glow: rgba(29, 43, 69, 0.16);
+  --font-display: "Fredoka", "Trebuchet MS", sans-serif; --radius: 14px;
 }
 
 body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: var(--step-0); line-height: 1.55; }
@@ -358,6 +367,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
    browser shows it at that larger size on scaled displays and the vehicles drift off the roads */
 .agent-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 #ppo-test .fold-body, #bus-card .fold-body, #ppo-card, #row-vehicles > .block { grid-template-columns: minmax(0, 1fr); }
+#ppo-body { display: grid; gap: 14px; }
 .veh-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 16px; border-top: 1px solid var(--line); }
 .veh-row[hidden] { display: none; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -482,12 +492,59 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
 /* Demo pass: figures over sentences, explanations behind ? */
 #journey > p.muted { display: none; }  /* the block header already says: click a dot or bus */
 .sec-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
-#actions .todo { border-top: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 12px; padding: 0; margin: 0; list-style: none; }
-#actions .todo-item { display: flex; justify-content: space-between; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); transition: transform .15s, box-shadow .15s; }
-#actions .todo-item:hover { transform: translateY(-2px); box-shadow: 0 8px 20px var(--glow); }
-#actions .todo-item[data-state="accepted"] { border-color: var(--accent); background: var(--accent-soft); }
-#actions .todo-body { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; align-content: start; }
-#actions .todo-kind { flex-basis: 100%; }
+/* action cards: icon, what and where, when (with its ? beside the time), then tick or cross */
+.acts { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); gap: 14px; }
+.act { --ok: #1A9E6E; --no: #C8462D; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 1fr auto; gap: 14px; padding: 16px;
+  border: 1px solid var(--line); border-radius: 16px; background: var(--surface); transition: transform .15s, box-shadow .15s, border-color .2s, opacity .2s; }
+.act:hover { transform: translateY(-2px); box-shadow: 0 10px 24px var(--glow); }
+.act-ico { width: 52px; height: 52px; border-radius: 15px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+.act-ico svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.act-body { display: grid; gap: 3px; align-content: start; justify-items: start; min-width: 0; }
+.act-kind { font-size: .72rem; font-weight: 750; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.act-title { font-family: var(--font-display); font-size: 1.2rem; line-height: 1.2; }
+.act-title::first-letter { text-transform: uppercase; }
+.acts.clamped > .act:nth-child(n+5) { display: none; }
+.v-more { justify-self: start; border: 1px solid var(--line-strong); background: var(--surface); border-radius: 999px; padding: 8px 18px; font-weight: 700; cursor: pointer; }
+:root[data-theme="steam"] .v-more { border: 2px solid #1D2B45; box-shadow: 3px 3px 0 #1D2B45; }
+.act-meta { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.act-meta .todo-time { min-width: 0; }
+.act-meta .qwrap { flex: none; }
+.act-owner { font-size: .78rem; font-weight: 650; color: var(--muted); }
+.act .vms { margin-top: 8px; padding: 6px 14px; font-size: .75rem; }
+.act .linkbtn { margin-top: 4px; }
+.decide { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.dec { height: 46px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--sunk); color: var(--muted); display: grid; place-items: center; padding: 0; cursor: pointer; transition: background .15s, color .15s, border-color .15s, transform .15s; }
+.dec svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; }
+.dec:hover { transform: translateY(-1px); }
+.dec-yes:hover { color: var(--ok); border-color: var(--ok); }
+.dec-no:hover { color: var(--no); border-color: var(--no); }
+.dec-yes[aria-pressed="true"] { background: var(--ok); border-color: var(--ok); color: #fff; }
+.dec-no[aria-pressed="true"] { background: var(--no); border-color: var(--no); color: #fff; }
+.act[data-state="accepted"], .act[data-state="approved"] { border-color: var(--ok); box-shadow: inset 0 0 0 1px var(--ok); }
+.act[data-state="declined"] { opacity: .5; }
+.act[data-state="declined"] .act-title { text-decoration: line-through; }
+.fx-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.fx { display: grid; gap: 1px; padding: 8px 14px; border-radius: 12px; background: var(--sunk); }
+.fx .k { font-size: .7rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.fx .v { font-family: var(--font-data); font-variant-numeric: tabular-nums; font-weight: 700; font-size: 1.05rem; }
+.fx .v i { font-style: normal; color: var(--muted); margin: 0 4px; }
+/* steamship theme: navy bar, sticker cards, life-ring ? buttons */
+:root[data-theme="steam"] .appbar { background: #1D2B45; color: #FFF8EA; border-bottom: 4px solid #D8473A; }
+:root[data-theme="steam"] .appbar .brand small { color: #C9D3E3; }
+:root[data-theme="steam"] .stepper button, :root[data-theme="steam"] .day-chip { color: #1D2B45; border-color: #FFF8EA; }
+:root[data-theme="steam"] .views { background: #2B3C5C; border-color: #2B3C5C; }
+:root[data-theme="steam"] .views button { color: #C9D3E3; }
+:root[data-theme="steam"] .views button[aria-selected="true"] { background: #D8473A; color: #fff; }
+:root[data-theme="steam"] .act, :root[data-theme="steam"] .card, :root[data-theme="steam"] .tile, :root[data-theme="steam"] button.cell, :root[data-theme="steam"] .fold, :root[data-theme="steam"] .day-head {
+  border: 2px solid #1D2B45; box-shadow: 3px 3px 0 #1D2B45; }
+:root[data-theme="steam"] .act:hover, :root[data-theme="steam"] button.cell:hover { box-shadow: 5px 5px 0 #1D2B45; }
+:root[data-theme="steam"] .act-ico { background: #A9D9D3; color: #1D2B45; border: 2px solid #1D2B45; }
+:root[data-theme="steam"] .dec { border: 2px solid #1D2B45; }
+:root[data-theme="steam"] h2, :root[data-theme="steam"] h3, :root[data-theme="steam"] .act-title { font-weight: 600; letter-spacing: 0; }
+:root[data-theme="steam"] .qmark { border: 4px solid transparent; color: #1D2B45; width: 28px; height: 28px;
+  background: linear-gradient(#FFFBF1, #FFFBF1) padding-box, conic-gradient(#D8473A 0 25%, #FFFBF1 0 50%, #D8473A 0 75%, #FFFBF1 0) border-box; box-shadow: 0 0 0 1.5px #1D2B45, inset 0 0 0 1.5px #1D2B45; }
+:root[data-theme="steam"] .qmark:hover, :root[data-theme="steam"] .qwrap.open > .qmark { color: #fff; background: linear-gradient(#D8473A, #D8473A) padding-box, conic-gradient(#1D2B45 0 25%, #FFFBF1 0 50%, #1D2B45 0 75%, #FFFBF1 0) border-box; }
+:root[data-theme="steam"] #qlayer > .qpop { border: 2px solid #1D2B45; box-shadow: 4px 4px 0 #1D2B45; }
 .todo-time { font-family: var(--font-data); font-variant-numeric: tabular-nums; font-weight: 700; font-size: var(--step--1); padding: 2px 9px; border-radius: 999px; background: var(--sunk); }
 #actions .vms-label { flex-basis: 100%; }
 .veh-legend { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important; }
@@ -497,10 +554,14 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
 .qmark:hover { transform: scale(1.1); }
 .qmark:hover, .qwrap.open > .qmark { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .qwrap > .qpop { display: none !important; }
-.qwrap.open > .qpop { display: block !important; position: absolute; z-index: 60; top: 32px; left: 0; width: max-content; max-width: min(440px, 86vw);
-  margin: 0; background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); border-radius: 10px; padding: 10px 12px;
-  box-shadow: 0 14px 34px rgba(0, 0, 0, .25); font-size: var(--step--1); line-height: 1.5; text-align: left; animation: rise .2s both; }
-.qwrap.right > .qpop { left: auto; right: 0; }
+/* an open explanation moves to a fixed layer above everything, so no card, map or sticky bar can cover or clip it */
+#qlayer { position: fixed; inset: 0; z-index: 2147483000; pointer-events: none; }
+#qlayer > .qpop { display: block !important; position: fixed; pointer-events: auto; width: max-content; max-width: min(360px, calc(100vw - 16px));
+  margin: 0; background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); border-radius: 12px; padding: 10px 14px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, .3); font-size: var(--step--1); line-height: 1.5; text-align: left; animation: rise .2s both; }
+#qlayer > .qpop * { color: inherit; }
+.q-more { border: 0; background: none; padding: 0; margin-left: 2px; color: var(--accent) !important; font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.block-head > .qwrap, .sec-head > .qwrap { margin-right: auto; }
 .masthead .title-block { display: none; }
 .head-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .head-row .sev { font-size: var(--step-1); padding: 2px 12px; border-radius: 999px; }
@@ -572,6 +633,7 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
       <button type="button" data-theme-pick="harbour" title="Harbour night" aria-label="Harbour night theme" style="--a:#06111D;--b:#4CC9F0"></button>
       <button type="button" data-theme-pick="signal" title="Signal" aria-label="Signal theme" style="--a:#050505;--b:#FFB21F"></button>
       <button type="button" data-theme-pick="chart" title="Chart paper" aria-label="Chart paper theme" style="--a:#F2ECDD;--b:#A13131"></button>
+      <button type="button" data-theme-pick="steam" title="Steamship" aria-label="Steamship theme" style="--a:#F5EEDC;--b:#D8473A"></button>
     </div>
   </header>
   <p class="provenance" role="note"><strong id="m-banner-label">Real map, synthetic traffic.</strong> <span id="m-banner">Roads, junctions, lanes, speed limits and land use come from OpenStreetMap.</span></p>
@@ -593,7 +655,7 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
     <div class="notices" id="notices"></div>
 
     <div class="block" id="row-actions">
-      <div class="block-head"><h3>What to do</h3><span class="foot-note">Tick an item once it is arranged.</span></div>
+      <div class="block-head"><h3>What to do</h3><p class="foot-note">Suggestions only: the duty officer decides. Tick when arranged, cross when not needed.</p></div>
       <div id="actions"></div>
     </div>
 
@@ -673,7 +735,7 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
     </div>
 
     <div class="block" id="ppo-card" hidden>
-      <div class="block-head"><h3>Plan from the learned policy</h3><span class="foot-note">Each step needs approval from whoever owns it.</span></div>
+      <div class="block-head"><h3>Plan from the learned policy</h3><p class="foot-note" id="ppo-why">Each step needs approval from whoever owns it.</p></div>
       <div id="ppo-body"></div>
     </div>
 
@@ -1374,11 +1436,28 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
   }
 
   /* ---------- actions ---------- */
+  const ACT_ICON = {
+    Marshals: '<circle cx="12" cy="5" r="2.4"/><path d="M8 21v-6.5L5.5 11 9 8h6l3.5 3-2.5 3.5V21M9 12.5h6"/>',
+    'Sign message': '<rect x="3" y="3.5" width="18" height="10.5" rx="1.5"/><path d="M7 8.75h10M12 14v7M8.5 21h7"/>',
+    Diversion: '<path d="M7 21V12a5 5 0 0 1 5-5h7M16 4l3 3-3 3M7 12V3"/>',
+    'Ship timing': '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+    'Check-in time': '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+    Roadworks: '<path d="M10 3h4l4.5 15h-13zM8.2 9h7.6M6.8 13.5h10.4M3 21h18"/>',
+    Event: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.6l4 2.9-1.5 4.6h-5L8 10.5z"/>',
+    'Meter disembarkation': '<path d="M4 21V4h9v17M13 12.5h7M17 9.5l3 3-3 3"/>',
+  };
+  const actIcon = k => `<span class="act-ico" aria-hidden="true"><svg viewBox="0 0 24 24">${ACT_ICON[k] || ACT_ICON.Event}</svg></span>`;
+  const timeChips = ts => ts.length ? `<span class="todo-time">${ts.join(' · ')}</span>` : '';
+  function decideBtns(st, yes, yesLabel, noLabel) {
+    return `<div class="decide" role="group" aria-label="Decision">
+      <button type="button" class="dec dec-yes" data-dec="${yes}" aria-pressed="${st === yes}" aria-label="${yesLabel}" title="${yesLabel}"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+      <button type="button" class="dec dec-no" data-dec="declined" aria-pressed="${st === 'declined'}" aria-label="${noLabel}" title="${noLabel}"><svg viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></button></div>`;
+  }
   function renderActions() {
     const d = day(), p = added(d), acts = [];
     for (const c of DATA.corridors.filter(c => c.group === 'Dock gates')) {
       const ws = runs(p[c.id], 40);
-      if (ws.length) acts.push({ id: 'm-' + c.id, kind: 'Marshals', title: `Put marshals at the ${c.name.replace(' access', '')}`, detail: `${windowsText(ws)}. The ships make the gate approach congested on up to <span class="mono">${Math.max(...ws.map(w => w[2]))}%</span> more of the simulated days.` });
+      if (ws.length) acts.push({ id: 'm-' + c.id, kind: 'Marshals', title: c.name.replace(' access', ''), times: windowsText(ws).split(', '), detail: `Ships make this gate approach congested on up to <span class="mono">${Math.max(...ws.map(w => w[2]))}%</span> more simulated days.` });
     }
     const groups = [...new Set(DATA.corridors.map(c => c.group))].filter(g => SIGNS[g]);
     for (const g of groups) {
@@ -1386,49 +1465,50 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
       const series = Array.from({ length: N_BINS }, (_, b) => Math.max(...cs.map(c => p[c.id][b])));
       const ws = runs(series, 50); if (!ws.length) continue;
       const roads = cs.filter(c => runs(p[c.id], 50).length).map(c => c.name);
-      acts.push({ id: 'sign-' + g, kind: 'Sign message', title: `Set signs on the ${SIGNS[g].where}`,
-        detail: `${windowsText(ws.map(([a, b, pk]) => [Math.max(0, a - 2), b, pk]))}, starting 30 minutes before congestion is likely. The ships raise the chance of congestion on ${esc(roads.join(', '))} by up to <span class="mono">${Math.max(...ws.map(w => w[2]))}</span> points.`, vms: SIGNS[g].lines });
+      acts.push({ id: 'sign-' + g, kind: 'Sign message', title: SIGNS[g].where, times: windowsText(ws.map(([a, b, pk]) => [Math.max(0, a - 2), b, pk])).split(', '),
+        detail: `Starts 30 minutes early; ships add up to <span class="mono">${Math.max(...ws.map(w => w[2]))}</span> points of congestion risk on ${esc(roads.join(', '))}.`, vms: SIGNS[g].lines });
     }
     for (const od of d.routes) {
       if (od.routes.length < 2) continue;
       const alt = od.routes.slice(1).map((r, i) => ({ r, i: i + 1, ws: runs(r.share, 35, 2) })).filter(x => x.ws.length);
       if (!alt.length) continue;
       const a = alt[0];
-      acts.push({ id: 'div-' + od.from + od.to, kind: 'Diversion', title: `Expect traffic from ${od.from} to ${od.to} to divert`,
-        detail: `Up to <span class="mono">${Math.max(...a.ws.map(w => w[2]))}%</span> take route ${'ABC'[a.i]} (${esc(a.r.via.join(', then ') || 'local roads')}) ${windowsText(a.ws)} as the main route fills. Check that route can take it.` });
+      acts.push({ id: 'div-' + od.from + od.to, kind: 'Diversion', title: `${od.from} → ${od.to}`, times: windowsText(a.ws).split(', '),
+        detail: `Up to <span class="mono">${Math.max(...a.ws.map(w => w[2]))}%</span> switch to route ${'ABC'[a.i]} (${esc(a.r.via.join(', then ') || 'local roads')}) as the main route fills.` });
     }
     if (d.timing && d.timing.best < d.timing.base - 0.15) {
       const moves = d.timing.shifts.map((sh, i) => [sh, d.calls[i]]).filter(([sh]) => sh[0] || sh[1]);
-      acts.push({ id: 'timing', kind: 'Ship timing', title: `Ask the port to move ${moves.length === 1 ? 'one ship\'s' : moves.length + ' ships\''} disembarkation or check-in`,
-        detail: `${moves.map(([sh, c]) => esc(c.ship) + (sh[0] ? ` disembarkation ${sh[0] > 0 ? '+' : '−'}${Math.abs(sh[0])} min` : '') + (sh[1] ? ` check-in ${sh[1] > 0 ? '+' : '−'}${Math.abs(sh[1])} min` : '')).join('; ')}. Congested road-hours fall from <span class="mono">${fmt1(d.timing.base)}</span> to <span class="mono">${fmt1(d.timing.best)}</span>.` });
+      acts.push({ id: 'timing', kind: 'Ship timing', title: `Retime ${moves.length === 1 ? 'one ship' : moves.length + ' ships'}`, times: [],
+        detail: `${moves.map(([sh, c]) => esc(c.ship) + (sh[0] ? ` off ${sh[0] > 0 ? '+' : '−'}${Math.abs(sh[0])} min` : '') + (sh[1] ? ` check-in ${sh[1] > 0 ? '+' : '−'}${Math.abs(sh[1])} min` : '')).join(', ')}: congested road-hours <span class="mono">${fmt1(d.timing.base)}</span> → <span class="mono">${fmt1(d.timing.best)}</span>.` });
     }
     for (const id of d.permits) {
       const pm = PERMIT[id], moved = d.whatif.move_permit;
       const ws = CORR[pm.corridor] ? runs(d.p85[pm.corridor], 30, 1) : [];
-      let detail = `${esc(pm.what)} on ${esc(CORR[pm.corridor] ? CORR[pm.corridor].name : pm.corridor)} overlaps today's turnarounds${ws.length ? `, with that road at risk ${windowsText(ws)}` : ''}.`;
-      if (moved) detail += ` Moving it cuts congested road-hours from <span class="mono">${fmt1(d.score)}</span> to <span class="mono">${fmt1(moved.score)}</span>.`;
-      acts.push({ id: 'p-' + id, kind: 'Roadworks', title: `Ask the works promoter to move permit ${id}`, detail, scenario: moved ? 'move_permit' : null });
+      const road = CORR[pm.corridor] ? CORR[pm.corridor].name : pm.corridor;
+      const detail = `${esc(pm.what)} (permit ${esc(id)})${moved ? `; moving it takes congested road-hours from <span class="mono">${fmt1(d.score)}</span> to <span class="mono">${fmt1(moved.score)}</span>` : ''}.`;
+      acts.push({ id: 'p-' + id, kind: 'Roadworks', title: `Move works on ${road}`, times: ws.length ? windowsText(ws).split(', ') : [], detail, scenario: moved ? 'move_permit' : null });
     }
     if (d.match) {
       const hits = DATA.corridors.filter(c => c.group === 'North and east' && runs(p[c.id], 40).length);
-      if (hits.length) acts.push({ id: 'match', kind: 'Event', title: "Agree a joint plan with the club's match-day traffic team", detail: `Kick-off ${d.match}. At risk: ${esc(hits.map(h => h.name).join(', '))}.` });
+      if (hits.length) acts.push({ id: 'match', kind: 'Event', title: 'Match-day plan with the club', times: [`Kick-off ${d.match}`], detail: `Roads at risk: ${esc(hits.map(h => h.name).join(', '))}.` });
     }
     const el = $('#actions');
     if (!acts.length) { el.innerHTML = '<p class="muted">Nothing to arrange. The ships do not make any main road congested for 30 minutes or more on most simulated days.</p>'; return; }
-    el.innerHTML = `<ul class="todo">${acts.map(a => {
-      const key = `${state.date}:${a.id}`, done = decisions[key] === 'accepted';
-      const cid = 'todo-' + a.id.replace(/[^A-Za-z0-9_-]/g, '');
-      return `<li class="todo-item" data-key="${esc(key)}" data-state="${done ? 'accepted' : 'open'}">
-        <div class="todo-body"><span class="todo-kind">${esc(a.kind)}</span><strong class="todo-title">${esc(a.title)}</strong>${(() => { const tm = String(a.detail).match(/^\s*(\d\d:\d\d–\d\d:\d\d(?:, \d\d:\d\d–\d\d:\d\d)*)/); return tm ? `<span class="todo-time">${tm[1]}</span>` : ''; })()}<p class="todo-detail">${a.detail}</p>
-          ${a.scenario ? `<button class="linkbtn" data-scenario="${a.scenario}">Show the forecast with it moved</button>` : ''}
-          ${a.vms ? `<span class="vms-label">Suggested sign text</span><div class="vms" role="img" aria-label="${esc('Suggested sign text: ' + a.vms.join(', '))}">${a.vms.map(esc).join('<br>')}</div>` : ''}</div>
-        <label class="todo-check" for="${cid}"><input type="checkbox" id="${cid}"${done ? ' checked' : ''}> Arranged</label></li>`;
-    }).join('')}</ul><p class="foot-note">Suggestions only. The duty officer decides.</p>`;
+    el.innerHTML = `<ul class="acts">${acts.map(a => {
+      const key = `${state.date}:${a.id}`, st = decisions[key] || 'open';
+      return `<li class="act" data-key="${esc(key)}" data-state="${st}">${actIcon(a.kind)}
+        <div class="act-body"><span class="act-kind">${esc(a.kind)}</span><strong class="act-title">${esc(a.title)}</strong>
+          <div class="act-meta">${timeChips(a.times)}<p class="todo-detail">${a.detail}</p></div>
+          ${a.scenario ? `<button class="linkbtn" data-scenario="${a.scenario}">See it moved</button>` : ''}
+          ${a.vms ? `<div class="vms" role="img" aria-label="${esc('Suggested sign text: ' + a.vms.join(', '))}">${a.vms.map(esc).join('<br>')}</div>` : ''}</div>
+        ${decideBtns(st, 'accepted', 'Arranged', 'Not needed')}</li>`;
+    }).join('')}</ul>`;
     el.querySelectorAll('[data-scenario]').forEach(b => b.addEventListener('click', () => setScenario(b.dataset.scenario)));
-    el.querySelectorAll('.todo-check input').forEach(cb => cb.addEventListener('change', () => {
-      const li = cb.closest('.todo-item');
-      decisions[li.dataset.key] = cb.checked ? 'accepted' : 'open';
+    el.querySelectorAll('[data-dec]').forEach(b => b.addEventListener('click', () => {
+      const li = b.closest('.act'), want = b.dataset.dec;
+      decisions[li.dataset.key] = decisions[li.dataset.key] === want ? 'open' : want;
       li.dataset.state = decisions[li.dataset.key];
+      li.querySelectorAll('[data-dec]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.dec === li.dataset.state)));
     }));
   }
 
@@ -1919,11 +1999,12 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
     host.addEventListener('mouseleave', () => { tip.hidden = true; });
   }
   const PPO_KIND = { meter: 'Meter disembarkation', checkin: 'Check-in time', signs: 'Sign message', marshals: 'Marshals' };
+  // [title, time chips, one-sentence note]
   function ppoText(a) {
-    if (a.kind === 'meter') return [`Meter disembarkation at ${a.terminal} (${a.ships})`, `${a.from}–${a.to}: let ${Math.round(a.release * 100)}% of the passengers waiting to leave go each 15 minutes; the rest wait in the terminal (never more than ${PPO.levers.max_hold_min} minutes). Their pick-ups, taxis and coaches leave later with them.`];
-    if (a.kind === 'checkin') return [`Open check-in at ${a.terminal} ${Math.abs(a.shift)} minutes ${a.shift < 0 ? 'earlier' : 'later'} (${a.ships})`, `${a.new} instead of ${a.planned}; closing time unchanged, so drop-offs spread over a ${a.shift < 0 ? 'longer' : 'shorter'} window.`];
-    if (a.kind === 'signs') return [`Set signs on the ${SIGNS[a.group] ? SIGNS[a.group].where : a.group}`, `${a.from}–${a.to}, to steer drivers off the ${esc(a.group)} corridors.`];
-    return [`Marshals at ${a.gate}`, `${a.from}–${a.to}, to keep the gate approach moving (assumed +${Math.round((PPO.levers.marshal_cap - 1) * 100)}% capacity, £${int(PPO.costs.marshal_hour)} an hour).`];
+    if (a.kind === 'meter') return [`${a.terminal} terminal`, [`${a.from}–${a.to}`], `${esc(a.ships)}: let ${Math.round(a.release * 100)}% of waiting passengers off each 15 minutes, holding none longer than ${PPO.levers.max_hold_min} minutes`];
+    if (a.kind === 'checkin') return [`${a.terminal}: ${Math.abs(a.shift)} min ${a.shift < 0 ? 'earlier' : 'later'}`, [`Opens ${a.new}`], `${esc(a.ships)} opens at ${a.new}, not ${a.planned}, and closes as planned`];
+    if (a.kind === 'signs') return [SIGNS[a.group] ? SIGNS[a.group].where : a.group, [`${a.from}–${a.to}`], `Steers drivers off the ${esc(a.group)} corridors`];
+    return [a.gate, [`${a.from}–${a.to}`], `Assumed +${Math.round((PPO.levers.marshal_cap - 1) * 100)}% gate capacity at £${int(PPO.costs.marshal_hour)} an hour`];
   }
   function renderPPO() {
     $('#ppo-card').hidden = !PPO;
@@ -1931,11 +2012,12 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
     const R = PPO.days[state.date], el = $('#ppo-body');
     if (!R) { el.innerHTML = `<p class="muted">The learned plan is worked out for ${chips(Object.keys(PPO.days))}</p>`; wireChips(el); return; }
     const E = R.effect, acts = R.actions.map((a, i) => {
-      const [title, detail] = ppoText(a), key = `ppo:${state.date}:${i}`, st = decisions[key] || 'open';
-      return `<div class="ppo-act" data-key="${esc(key)}" data-state="${st}"><div class="action-body"><span class="eyebrow action-kind">${esc(PPO_KIND[a.kind])}${st !== 'open' ? ` · ${st === 'approved' ? 'Approved' : 'Declined'}` : ''}</span>
-        <strong>${esc(title)}</strong><span class="foot-note" style="color: var(--ink)">${detail} PPO chose this on ${Math.round(a.share * 100)}% of ${R.k} sampled days.</span>
-        <span class="owner">Needs approval: ${esc(a.owner)}</span>${a.kind === 'signs' && SIGNS[a.group] ? `<div class="vms" aria-label="Suggested sign text">${SIGNS[a.group].lines.map(esc).join('<br>')}</div>` : ''}</div>
-        <div class="action-btns"><button class="btn ${st === 'approved' ? '' : 'btn-primary'}" data-ppo="approved">${st === 'approved' ? 'Undo' : 'Approve'}</button><button class="btn" data-ppo="declined">${st === 'declined' ? 'Undo' : 'Decline'}</button></div></div>`;
+      const [title, times, note] = ppoText(a), key = `ppo:${state.date}:${i}`, st = decisions[key] || 'open';
+      return `<li class="act" data-key="${esc(key)}" data-state="${st}">${actIcon(PPO_KIND[a.kind])}
+        <div class="act-body"><span class="act-kind">${esc(PPO_KIND[a.kind])}</span><strong class="act-title">${esc(title)}</strong>
+          <div class="act-meta">${timeChips(times)}<p class="todo-detail">${note}; PPO chose it on ${Math.round(a.share * 100)}% of ${R.k} sampled days.</p></div>
+          <span class="act-owner">Owner: ${esc(a.owner)}</span></div>
+        ${decideBtns(st, 'approved', 'Approve', 'Decline')}</li>`;
     }).join('');
     const S = PPO.summary.all;
     let verdict = '';
@@ -1946,11 +2028,17 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
       verdict += '.';
       if (PPO.ablation) verdict += ' Most of its saving comes from marshals at the dock gates, whose effect is our assumption.';
     }
-    el.innerHTML = `${acts || '<p>On most sampled days the learned policy does nothing on this day.</p>'}
-      <p>On ${R.k} sampled days of this date, following the plan changes congested road-hours from <span class="mono">${fmt1(E.corridor_hours.nothing)}</span> to <span class="mono">${fmt1(E.corridor_hours.ppo)}</span>, delay from <span class="mono">${int(E.vehicle_hours.nothing)}</span> to <span class="mono">${int(E.vehicle_hours.ppo)}</span> vehicle-hours, holds passengers for <span class="mono">${int(E.held_pax_hours.ppo)}</span> passenger-hours and uses marshals for <span class="mono">${fmt1(E.marshal_hours.ppo)}</span> gate-hours.</p>
-      <p class="foot-note">The policy was trained by reinforcement learning (PPO) on simulated days and is shown as a suggestion. The port and cruise lines own disembarkation and check-in; the council owns the signs. ${verdict} See "Learned policy tested against simpler ones" below.</p>`;
-    el.querySelectorAll('[data-ppo]').forEach(b => b.addEventListener('click', () => {
-      const key = b.closest('.ppo-act').dataset.key, want = b.dataset.ppo;
+    const more = R.actions.length > 4 && !renderPPO.all ? `<button type="button" class="v-more" id="ppo-more">Show all ${R.actions.length} steps</button>` : '';
+    el.innerHTML = `${acts ? `<ul class="acts${more ? ' clamped' : ''}">${acts}</ul>${more}` : '<p>On most sampled days the learned policy does nothing on this day.</p>'}
+      <div class="fx-strip"><div class="fx"><span class="k">Congested road-hours</span><span class="v">${fmt1(E.corridor_hours.nothing)}<i>→</i>${fmt1(E.corridor_hours.ppo)}</span></div>
+        <div class="fx"><span class="k">Delay, vehicle-hours</span><span class="v">${int(E.vehicle_hours.nothing)}<i>→</i>${int(E.vehicle_hours.ppo)}</span></div>
+        <div class="fx"><span class="k">Marshals, gate-hours</span><span class="v">${fmt1(E.marshal_hours.ppo)}</span></div>
+        ${E.held_pax_hours.ppo >= 1 ? `<div class="fx"><span class="k">Passengers held, hours</span><span class="v">${int(E.held_pax_hours.ppo)}</span></div>` : ''}
+        <p class="foot-note">Without the plan, then with it, averaged over ${R.k} sampled days of this date.</p></div>`;
+    $('#ppo-why').innerHTML = `Trained by reinforcement learning (PPO) on simulated days; each step needs its owner's approval. ${verdict} The port and cruise lines own disembarkation and check-in, and the council owns the signs.`;
+    if ($('#ppo-more')) $('#ppo-more').addEventListener('click', () => { renderPPO.all = true; renderPPO(); });
+    el.querySelectorAll('[data-dec]').forEach(b => b.addEventListener('click', () => {
+      const key = b.closest('.act').dataset.key, want = b.dataset.dec;
       decisions[key] = decisions[key] === want ? 'open' : want; renderPPO();
     }));
   }
@@ -2322,7 +2410,7 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
   }
 
   function setTheme(t) {
-    if (t === 'light' || t === 'dark' || t === 'harbour' || t === 'signal' || t === 'chart') document.documentElement.dataset.theme = t;
+    if (t === 'light' || t === 'dark' || t === 'harbour' || t === 'signal' || t === 'chart' || t === 'steam') document.documentElement.dataset.theme = t;
     else delete document.documentElement.dataset.theme;
     document.querySelectorAll('[data-theme-pick]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.themePick === t)));
     try { localStorage.setItem('forecast-theme', t || ''); } catch (err) { /* private mode: theme just isn't remembered */ }
@@ -2381,8 +2469,33 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
   const TUCK = ['.provenance', '.sec-head > p', 'p.foot-note', 'div.foot-note', '.head-more', '#veh-body > p', '#ppo-body > p',
     '.ppo-act .foot-note', '#info', '.map-legend > .muted', '.scale > span:last-child', '#bus-body > p', '#bus-live-body > p',
     '.fold-body > p', '.notice > span:not(.tag)', '.timing > p', '#actions > p.muted', 'p.todo-detail', '.agents-check'].join(', ');
+  const qlayer = document.createElement('div'); qlayer.id = 'qlayer'; document.body.append(qlayer);
+  let qOpen = null;
+  // an explanation opens as its first sentence or two; the rest is behind "More"
+  function condense(el) {
+    const lead = el.querySelector(':scope > .q-lead');
+    if (lead) { lead.hidden = false; el.querySelector(':scope > .q-more').hidden = false; el.querySelector(':scope > .q-full').hidden = true; return; }
+    if (el.querySelector('svg, table, ul, ol, select, input')) return;
+    const words = n => n.nodeType === 3 ? n.textContent : n.nodeType === 1 ? [...n.childNodes].map(words).join('') + ' ' : '';
+    const full = words(el).replace(/\s+/g, ' ').replace(/\s+([.,;:)])/g, '$1').trim(), sents = full.split(/(?<=[.!?])\s+(?=[A-Z0-9£(])/);
+    let short = sents[0];
+    if (sents.length > 1 && short.length + sents[1].length < 170) short += ' ' + sents[1];
+    if (short.length >= full.length - 12) return;
+    const l = document.createElement('span'), m = document.createElement('button'), rest = document.createElement('span');
+    l.className = 'q-lead'; l.textContent = short; m.type = 'button'; m.className = 'q-more'; m.textContent = 'More';
+    rest.className = 'q-full'; rest.hidden = true; rest.append(...el.childNodes);
+    m.addEventListener('click', e => { e.stopPropagation(); l.hidden = true; m.hidden = true; rest.hidden = false; placeTuck(); });
+    el.append(l, ' ', m, rest);
+  }
+  function placeTuck() {
+    if (!qOpen) return;
+    const { b, pop } = qOpen, r = b.getBoundingClientRect(), M = 8;
+    pop.style.left = `${Math.max(M, Math.min(r.left - 4, innerWidth - pop.offsetWidth - M))}px`;
+    const below = r.bottom + 8, above = r.top - pop.offsetHeight - 8;
+    pop.style.top = `${below + pop.offsetHeight > innerHeight - M && above > M ? above : below}px`;
+  }
   function tuck(el) {
-    if (!el.parentElement || el.classList.contains('qwrap') || el.classList.contains('qpop') || el.parentElement.closest('.qwrap') || el.textContent.trim().length < 20) return;
+    if (!el.parentElement || el.classList.contains('qwrap') || el.classList.contains('qpop') || el.parentElement.closest('.qwrap, #qlayer') || el.textContent.trim().length < 20) return;
     const w = document.createElement('span'), b = document.createElement('button');
     w.className = 'qwrap'; b.type = 'button'; b.className = 'qmark'; b.textContent = '?';
     b.setAttribute('aria-label', 'More about this'); b.setAttribute('aria-expanded', 'false');
@@ -2390,17 +2503,25 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
     if (el.classList.contains('provenance')) $('.masthead .meta').append(w);
     b.addEventListener('click', e => {
       e.stopPropagation();
-      const open = !w.classList.contains('open');
+      const same = qOpen && qOpen.w === w;
       closeTucks();
-      if (open) { w.classList.add('open'); b.setAttribute('aria-expanded', 'true'); w.classList.toggle('right', w.getBoundingClientRect().left > innerWidth * 0.55); }
+      if (same) return;
+      condense(el);
+      qOpen = { w, b, pop: el }; w.classList.add('open'); b.setAttribute('aria-expanded', 'true');
+      qlayer.append(el); placeTuck();
     });
   }
-  function closeTucks() { document.querySelectorAll('.qwrap.open').forEach(x => { x.classList.remove('open'); x.firstChild.setAttribute('aria-expanded', 'false'); }); }
+  function closeTucks() {
+    if (!qOpen) return;
+    const { w, b, pop } = qOpen; qOpen = null;
+    w.classList.remove('open'); b.setAttribute('aria-expanded', 'false'); w.append(pop);
+  }
   let tuckQueued = false;
-  const tuckAll = () => { tuckQueued = false; document.querySelectorAll(TUCK).forEach(tuck); };
+  const tuckAll = () => { tuckQueued = false; if (qOpen && !qOpen.w.isConnected) closeTucks(); document.querySelectorAll(TUCK).forEach(tuck); };
   new MutationObserver(() => { if (!tuckQueued) { tuckQueued = true; queueMicrotask(tuckAll); } }).observe(document.body, { childList: true, subtree: true });
-  document.addEventListener('click', e => { if (!e.target.closest('.qwrap')) closeTucks(); });
+  document.addEventListener('click', e => { if (!e.target.closest('.qwrap, #qlayer')) closeTucks(); });
   addEventListener('keyup', e => { if (e.key === 'Escape') closeTucks(); });
+  addEventListener('scroll', placeTuck, true); addEventListener('resize', placeTuck);
 
   readPalette();
   $('#cal').classList.add('cal-intro'); setTimeout(() => $('#cal').classList.remove('cal-intro'), 1600);
