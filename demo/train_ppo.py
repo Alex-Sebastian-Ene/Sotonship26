@@ -105,11 +105,22 @@ def train(args) -> None:
     split = pe.split_dates(tasks)
     log(f"training dates {len(split['train'])}, held out {split['test']}")
     pe.get_ctx(log)  # loaded once here; forked simulator processes share it
-    fns = [_make_env(split["train"], cruise, args.seed + i) for i in range(args.n_envs)]
-    if args.n_envs > 1:  # the vec env forks before CUDA starts in this process
-        venv = SubprocVecEnv(fns, start_method="fork" if os.name != "nt" else "spawn")
+    if args.gpu_envs:  # the simulator itself on the GPU, many days per sparse product
+        from ppo_gpu import BatchedCruiseDayEnv
+        from stable_baselines3.common.vec_env import VecMonitor
+
+        venv = VecMonitor(BatchedCruiseDayEnv(args.gpu_envs, split["train"], cruise,
+                                              device="cpu" if args.cpu else "cuda",
+                                              workers=args.n_envs, seed=args.seed))
+        log(f"simulator on {'the CPU' if args.cpu else 'the GPU'}: {args.gpu_envs} days per "
+            f"batch, {args.n_envs} processes drawing days")
+        args.n_envs = args.gpu_envs
     else:
-        venv = DummyVecEnv(fns)
+        fns = [_make_env(split["train"], cruise, args.seed + i) for i in range(args.n_envs)]
+        if args.n_envs > 1:  # the vec env forks before CUDA starts in this process
+            venv = SubprocVecEnv(fns, start_method="fork" if os.name != "nt" else "spawn")
+        else:
+            venv = DummyVecEnv(fns)
     device = "cuda" if torch.cuda.is_available() and not args.cpu else "cpu"
     if device == "cuda":
         log(f"policy on {torch.cuda.get_device_name(0)}")
@@ -147,7 +158,7 @@ def train(args) -> None:
         w.writerows(rows)
     meta = {"timesteps": args.timesteps, "n_envs": args.n_envs, "n_steps": args.n_steps,
             "batch_size": batch, "lr": args.lr, "ent_coef": args.ent_coef,
-            "seed": args.seed, "device": device,
+            "seed": args.seed, "device": device, "gpu_envs": args.gpu_envs,
             "gpu": torch.cuda.get_device_name(0) if device == "cuda" else None,
             "days": len(rows), "seconds": round(clock.perf_counter() - started),
             "train_dates": split["train"], "test_dates": split["test"], "cruise": cruise,
@@ -370,15 +381,16 @@ def evaluate(args) -> None:
             "n_days": args.n_days, "n_advise": args.n_advise, "summary": res,
             "labels": LABELS, "metric_labels": METRIC_LABELS, "train": train_meta,
             "curve": curve, "days": rec, "cruise": cruise}
-    OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
-    OUT_JSON.write_text(json.dumps(data, default=float), encoding="utf-8")
-    with open(OUT_JSON.with_name("ppo_episodes.csv"), "w", newline="", encoding="utf-8") as f:
+    out_json, doc = Path(args.json), Path(args.doc)
+    out_json.parent.mkdir(parents=True, exist_ok=True)
+    out_json.write_text(json.dumps(data, default=float), encoding="utf-8")
+    with open(out_json.with_suffix(".episodes.csv"), "w", newline="", encoding="utf-8") as f:
         keys = ["policy", "date", "seed", "held_out", *METRICS]
         w = csv.DictWriter(f, fieldnames=keys, extrasaction="ignore")
         w.writeheader()
         w.writerows(rows)
-    DOC.write_text(results_md(data), encoding="utf-8")
-    log(f"wrote {OUT_JSON} and {DOC}")
+    doc.write_text(results_md(data), encoding="utf-8")
+    log(f"wrote {out_json} and {doc}")
 
 
 # --- the write-up -------------------------------------------------------------------------------
@@ -468,6 +480,9 @@ def main(argv=None) -> None:
     t.add_argument("--ent-coef", type=float, default=0.01)
     t.add_argument("--seed", type=int, default=26)
     t.add_argument("--cpu", action="store_true", help="keep the policy on the CPU")
+    t.add_argument("--gpu-envs", type=int, default=0,
+                   help="run this many days at once on the GPU (demo/ppo_gpu.py); --n-envs "
+                        "then sets the processes drawing days")
     t.add_argument("--out", default="runs/ppo/local")
     e = sub.add_parser("evaluate")
     e.add_argument("--model", type=Path, default=Path("runs/ppo/local/model.zip"))
@@ -477,6 +492,8 @@ def main(argv=None) -> None:
     e.add_argument("--n-test-dates", type=int, default=0, help="limit held-out dates (smoke tests)")
     e.add_argument("--n-advise", type=int, default=8, help="samples the advisor plans from")
     e.add_argument("--n-page", type=int, default=8, help="sampled days per page day")
+    e.add_argument("--json", default=str(OUT_JSON), help="results for the page")
+    e.add_argument("--doc", default=str(DOC), help="the generated write-up")
     args = ap.parse_args(argv)
     {"prepare": prepare, "train": train, "evaluate": evaluate}[args.cmd](args)
 

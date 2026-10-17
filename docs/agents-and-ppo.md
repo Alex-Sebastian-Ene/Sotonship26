@@ -155,10 +155,23 @@ Signs and check-in moves have no cost of their own here. Subtracting doing nothi
 which policy is best (no action affects it) but takes most of the day-to-day noise out of the
 returns.
 
-**Training** (`demo/train_ppo.py train`). Stable-Baselines3 PPO, MLP policy (256, 256), the
-simulator in one process per CPU core and the policy updates on an A100 GPU on Iridis. Dates with
-ships are split: every fourth date (from the third) is held out of training. Each training episode
-draws a date and a fresh random sample of that date.
+**Training** (`demo/train_ppo.py train`). Stable-Baselines3 PPO, MLP policy (256, 256), on an
+A100 GPU on Iridis. Dates with ships are split: every fourth date (from the third) is held out of
+training. Each training episode draws a date and a fresh random sample of that date.
+
+The simulator, not the network, is what takes the time: one 15-minute bin routes 4,796
+origin-destination flows over 14,388 candidate routes (three rounds of route choice and queues),
+about 45 ms on one CPU core, and every bin is run twice (with the policy and doing nothing). Two
+ways to run it:
+
+- one sampled day per CPU core (`ppo_env.CruiseDayEnv` in `SubprocVecEnv`): about 250 steps a
+  second on 23 cores;
+- `demo/ppo_gpu.py`: 128 sampled days and their do-nothing twins share each sparse matrix product
+  on the GPU (PyTorch, float32), while CPU processes draw the next batch of days. On the A100 the
+  simulator alone does about 9,500 day-steps a second (38 times the CPU version), and day costs
+  match the CPU environment to the penny on the real network (checked on two days, and by a test
+  on a small network). In training, the processes drawing days are the limit (about 3,300 steps
+  a second with 7 of them).
 
 **Testing** (`demo/train_ppo.py evaluate`). Four policies on the same sampled days, which were
 never used in training (a different random stream), on the held-out dates and on six training

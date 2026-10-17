@@ -285,3 +285,44 @@ def test_bus_queues_once_per_congested_stretch(ctx):
         assert end >= sched[-1] and late[0] == 0.0
         holds_seen.append(len(holds))
     assert 0 < sum(holds_seen) < 40
+
+
+def test_batched_gpu_env_matches_cpu_env(ctx):
+    """demo/ppo_gpu.py (here on the CPU) gives the same day costs as CruiseDayEnv."""
+    pytest.importorskip("torch")
+    pytest.importorskip("stable_baselines3")
+    import ppo_env as pe
+    import ppo_gpu
+
+    cpu = pe.CruiseDayEnv(ctx=ctx, shares={}, baseline=False)
+    dates = cpu.dates[:3]
+    shares = {daysim.shares_key(cpu.tasks[d]): daysim.base_shares(ctx, cpu.tasks[d]) for d in dates}
+    gpu = ppo_gpu.BatchedCruiseDayEnv(2, dates, device="cpu", workers=0, ctx=ctx, shares=shares)
+    jobs = [(dates[0], 1, 0), (dates[-1], 2, 0)]
+    obs = gpu.start_jobs(jobs)
+    act = np.stack([cpu.nothing(), cpu.nothing()])
+    act[1, : cpu.nT] = 1  # meter to 70% on the second day
+    act[1, 2 * cpu.nT + cpu.nS:] = 1  # and marshals
+    want = []
+    for d, s, _ in jobs:
+        env = pe.CruiseDayEnv(ctx=ctx, shares=shares, baseline=False)
+        o, _ = env.reset(options={"date": d, "day_seed": s, "split": "train"})
+        want.append((env, o))
+    np.testing.assert_allclose(obs, np.stack([o for _, o in want]), atol=1e-5)
+    rewards = []
+    for _ in range(tm.N_BINS):
+        gpu.step_async(act)
+        obs, rew, done, infos = gpu.step_wait()
+        rewards.append(rew)
+        for (env, _), a in zip(want, act, strict=True):
+            env.step(a)
+    assert done.all()
+    np.testing.assert_allclose(np.asarray(rewards)[:, 0], 0.0, atol=1e-5)  # doing nothing
+    # float32 on the batch: a link right at 85% may tip either way, so corridor-hours (and the
+    # cost, 5,000 pounds each) get room for a flip or two
+    tol = {"corridor_hours": (0, 0.75), "cost": (1e-2, 0), "vehicle_hours": (5e-3, 1e-3),
+           "held_pax_hours": (5e-3, 1e-3), "marshal_hours": (0, 1e-6)}
+    for (env, _), info in zip(want, infos, strict=True):
+        got = info["day_costs"]
+        for k, (rel, ab) in tol.items():
+            assert got[k] == pytest.approx(env.totals[k], rel=rel, abs=ab), k
