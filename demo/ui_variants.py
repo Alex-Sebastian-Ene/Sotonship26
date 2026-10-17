@@ -28,9 +28,13 @@ COMMON_JS = r"""
   }
   function tag(sel, views) { const el = typeof sel === 'string' ? $(sel) : sel; if (el) el.dataset.views = views; return el; }
   const calSec = $('#cal-h').closest('section'), methodSec = $('#method-h').closest('section');
+  let liveDay = null;
   function mapLive(play) {
     requestAnimationFrame(() => { layout(); zoomTo('docks', false); drawAgents(); });
-    if (play && state.layer !== 'agents' && agentDay() && !REDUCED) $('#layer-agents').click();
+    if (!play || REDUCED || !agentDay()) return;
+    if (liveDay !== state.date) { liveDay = state.date; setBin(7); }        // 06:45, before the morning build-up
+    if (state.layer !== 'agents') $('#layer-agents').click();
+    else if (!vehAnim) $('#veh-play').click();
   }
 """
 
@@ -83,6 +87,7 @@ VARIANTS["story"] = ("""
   border: 2px solid var(--ink); background: var(--surface); transition: transform .2s, background .2s; }
 .voy-port:hover { transform: scale(1.2); }
 .voy-port.done { background: var(--accent); }
+.voy-port[aria-selected="true"] { opacity: 0; }
 .voy-ship { position: absolute; bottom: 9px; left: calc(var(--k) * (100% - 18px) - 18px); width: 52px; transition: left .7s cubic-bezier(.45, 0, .2, 1); pointer-events: none; }
 .voy-ship .ship-svg { width: 100%; }
 /* the steamship is drawn as vector art (same palette and outline as the generated icons) so it stays sharp at any size */
@@ -107,6 +112,23 @@ body[data-variant="story"] .wrap { max-width: 1400px; padding-top: 18px; }
 body[data-variant="story"] #day { grid-template-columns: minmax(0, 1fr) !important; }
 body[data-variant="story"] #day > * { grid-column: 1 !important; grid-row: auto !important; }
 body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !important; }
+/* What to do: the cards on the left, the docks map with what is arranged on the right */
+@media (min-width: 1000px) {
+  body[data-variant="story"][data-view="step3"] #day { grid-template-columns: minmax(0, 1fr) minmax(380px, .9fr) !important; align-items: start; }
+  body[data-variant="story"][data-view="step3"] #day > #row-actions, body[data-variant="story"][data-view="step3"] #day > #ppo-card { grid-column: 1 !important; }
+  body[data-variant="story"][data-view="step3"] #day > #day-body { grid-column: 2 !important; grid-row: 1 / span 2 !important; position: sticky; top: 150px; }
+  body[data-variant="story"][data-view="step3"] .map-box { height: calc(100vh - 290px) !important; min-height: 380px; }
+}
+body[data-variant="story"][data-view="step3"] .map-bar .seg-ctl, body[data-variant="story"][data-view="step3"] .map-bar select,
+body[data-variant="story"][data-view="step3"] .map-bar label, body[data-variant="story"][data-view="step3"] .map-legend,
+body[data-variant="story"][data-view="step3"] .time-row { display: none !important; }
+.home-btn { width: 46px; height: 40px; padding: 2px 4px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--surface); cursor: pointer; transition: transform .15s; }
+.home-btn:hover { transform: translateY(-2px) rotate(-3deg); }
+.home-btn .ship-svg { width: 100%; }
+.appbar .brand-mark { display: none; }
+:root[data-theme="steam"] .home-btn { border: 2px solid #FFF8EA; background: #FFF8EA; }
+.landing.enter { animation: land-in .7s cubic-bezier(.2, .7, .2, 1) both; }
+@keyframes land-in { from { transform: translateY(-104%); } to { transform: none; } }
 .stk { display: inline-block; background-position: center; background-size: contain; background-repeat: no-repeat; }
 :root[data-theme="steam"] .storybar { background: #FFF6E2; border-bottom: 2px dashed #1D2B45; }
 :root[data-theme="steam"] .v-btn { border: 2px solid #1D2B45; box-shadow: 3px 3px 0 #1D2B45; }
@@ -221,7 +243,7 @@ body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !i
     { q: 'When are the hard days?', ico: 'lighthouse', show: [calSec] },
     { q: 'How bad is it?', ico: 'ring', show: ['#day-head', '#notices'] },
     { q: 'Watch the day', ico: 'gull', show: ['#day-head', '#day-body'], map: true },
-    { q: 'What to do', ico: 'wheel', show: ['#row-actions', '#ppo-card'] },
+    { q: 'What to do', ico: 'wheel', show: ['#row-actions', '#ppo-card', '#day-body'], map: true },
     { q: 'Does the AI help?', ico: 'hat', show: [methodSec, '#ppo-viz', '#bus-live'] },
   ];
   // everything starts hidden; each step lists what it shows
@@ -236,6 +258,8 @@ body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !i
       <span class="voy-ship" aria-hidden="true">${SHIP_SVG('bar')}</span></div>
     <button class="v-btn" id="story-back">Back</button><button class="v-btn primary" id="story-next">Next</button>`;
   $('.appbar').after(bar);
+  const home = document.createElement('button'); home.type = 'button'; home.className = 'home-btn'; home.title = 'Back to the start'; home.setAttribute('aria-label', 'Back to the start');
+  home.innerHTML = SHIP_SVG('home'); $('.brand').prepend(home);
   const gull = document.createElement('span'); gull.className = 'deco-gull'; gull.innerHTML = '<span class="spr spr-gull"></span>'; gull.setAttribute('aria-hidden', 'true'); document.body.append(gull);
   let step = 0;
   function showStep(i) {
@@ -368,16 +392,25 @@ body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !i
   land.addEventListener('keydown', firstTouch, { once: true });
   // browsers that already allow sound here (the visitor has interacted with the site before) play it straight away
   setTimeout(() => { try { const t = new (window.AudioContext || window.webkitAudioContext)(), ok = t.state === 'running'; t.close(); if (ok && wantSound && document.body.contains(land)) setSound(true); } catch (e) { /* no audio */ } }, 400);
+  function showLanding() {
+    stopVehicles();
+    land.classList.remove('sail', 'gone'); land.classList.add('enter');
+    document.body.append(land);
+    setTimeout(() => land.classList.remove('enter'), 800);
+    if (wantSound) setSound(true);
+    $('#l-go').focus({ preventScroll: true });
+  }
+  home.addEventListener('click', showLanding);
   const sail = () => {
     if (land.classList.contains('sail')) return;
     Sea.horn(); setTimeout(() => Sea.stop(1.2), 900);
     land.classList.add('sail');
     setTimeout(() => land.classList.add('gone'), REDUCED ? 0 : 650);
-    setTimeout(() => { land.remove(); $('#story-next').focus({ preventScroll: true }); }, REDUCED ? 0 : 1500);
+    setTimeout(() => { land.remove(); $('#story-next').focus({ preventScroll: true }); if (STEPS[step].map) mapLive(true); }, REDUCED ? 0 : 1500);
   };
+  land.querySelector('#l-go').addEventListener('click', sail);
   if (location.hash !== '#app') {
     document.body.append(land);
-    $('#l-go').addEventListener('click', sail);
     land.addEventListener('keydown', e => { if (e.key === 'Escape') sail(); });
     setTimeout(() => $('#l-go').focus({ preventScroll: true }), 50);
   }
