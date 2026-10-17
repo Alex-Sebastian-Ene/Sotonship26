@@ -20,6 +20,7 @@
   --cruise: #6A3FC4; --queue: #D8432F;
   --ra: #1F57A4; --rb: #B4458F; --rc: #C77A12;
   --pol-ppo: #2A78D6; --pol-rule: #EB6834; --pol-advisor: #1BAF7A;
+  --area-docks: #2A78D6; --area-centre: #EB6834; --area-portswood: #1BAF7A;
   --g-through: #8C9BA5; --g-county: #2F7EA6; --g-outbound: #7FB8D8; --g-internal: #8DB86A;
   --g-visitors: #E3B04B; --g-match: #C2553A; --g-cruise: #6A3FC4; --g-freight: #8A6A4F; --g-school: #C77A12; --g-bus: #11202A;
   --font-display: Arial, "Helvetica Neue", Helvetica, sans-serif;
@@ -44,6 +45,7 @@
     --cruise: #B894FF; --queue: #FF5A45;
     --ra: #86B2EA; --rb: #E681C9; --rc: #F0B04B;
     --pol-ppo: #3987E5; --pol-rule: #D95926; --pol-advisor: #199E70;
+    --area-docks: #3987E5; --area-centre: #D95926; --area-portswood: #199E70;
     --g-through: #6E7F8B; --g-county: #4FA3CF; --g-outbound: #9CCDE8; --g-internal: #9CCB78;
     --g-visitors: #F0C25E; --g-match: #E07058; --g-cruise: #B894FF; --g-freight: #B89878; --g-school: #F0B04B; --g-bus: #E2E9EE;
     color-scheme: dark;
@@ -64,6 +66,7 @@
   --cruise: #B894FF; --queue: #FF5A45;
   --ra: #86B2EA; --rb: #E681C9; --rc: #F0B04B;
   --pol-ppo: #3987E5; --pol-rule: #D95926; --pol-advisor: #199E70;
+  --area-docks: #3987E5; --area-centre: #D95926; --area-portswood: #199E70;
   --g-through: #6E7F8B; --g-county: #4FA3CF; --g-outbound: #9CCDE8; --g-internal: #9CCB78;
   --g-visitors: #F0C25E; --g-match: #E07058; --g-cruise: #B894FF; --g-freight: #B89878; --g-school: #F0B04B; --g-bus: #E2E9EE;
   color-scheme: dark;
@@ -362,6 +365,18 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
 .f-rule { fill: var(--pol-rule); background: var(--pol-rule); } .s-rule { stroke: var(--pol-rule); }
 .f-advisor { fill: var(--pol-advisor); background: var(--pol-advisor); } .s-advisor { stroke: var(--pol-advisor); }
 .s-ink { stroke: var(--ink); }
+/* Buses observed on the day (bustimes.org); area colours validated for colour-blind separation */
+#bus-live .fold-body { grid-template-columns: minmax(0, 1fr); }
+.bus-live-chart { position: relative; }
+.bus-live-chart svg { display: block; max-width: 100%; height: auto; overflow: visible; }
+.bl-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: var(--step--1); }
+.bl-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+.bl-f-docks { fill: var(--area-docks); background: var(--area-docks); } .bl-s-docks { stroke: var(--area-docks); }
+.bl-f-centre { fill: var(--area-centre); background: var(--area-centre); } .bl-s-centre { stroke: var(--area-centre); }
+.bl-f-portswood { fill: var(--area-portswood); background: var(--area-portswood); } .bl-s-portswood { stroke: var(--area-portswood); }
+.bl-ring { stroke: var(--surface); stroke-width: 2; }
+.bl-hit { fill: transparent; }
+.bl-zero { stroke: var(--line-strong); stroke-width: 1.5; stroke-dasharray: 4 3; }
 
 @media (max-width: 900px) { .grid2, .sure { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 640px) {
@@ -519,6 +534,10 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       <details class="fold" id="bus-card" hidden>
         <summary>Buses on the same roads <span class="sum-note" id="bus-src"></span></summary>
         <div class="fold-body"><div id="bus-body"></div></div>
+      </details>
+      <details class="fold" id="bus-live" hidden>
+        <summary>Buses observed on the day <span class="sum-note" id="bus-live-src"></span></summary>
+        <div class="fold-body"><div id="bus-live-body"></div></div>
       </details>
       <details class="fold" id="gates-card">
         <summary>Dock gates <span class="sum-note">Cruise vehicles per hour; a coach counts as 2</span></summary>
@@ -1615,17 +1634,69 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     const S = B.source || {}, when = (S.collected || '').slice(0, 10);
     $('#bus-src').textContent = S.kind === 'bods_gtfs' ? `Bus Open Data Service timetables (GTFS), downloaded ${when}, OGL v3.0` : `OpenStreetMap bus routes, read ${when} (ODbL); no timetable, so buses run at assumed headways`;
     const rows = A.D.buses.table, ps = [];
+    const OBS = busLiveDay(A.D.date), obsBy = OBS ? Object.fromEntries(OBS.day_lines.map(p => [p.key.toLowerCase(), p])) : {};
+    const ocell = name => { const o = obsBy[String(name).toLowerCase()]; return o ? `${lateTxt(o.mean_min)} <span class="muted">(${Math.round(o.share_over_5_min * 100)}%, n ${o.n})</span>` : ''; };
     const cell = (o, k) => o && o[k] != null ? `${o[k] >= 0 ? '+' : '−'}${fmt1(Math.abs(o[k]))}` : '';
     const pcell = o => o ? `+${fmt1(o.extra)} <span class="muted">(${fmt1(o.late)} late, ${Math.round(o.late5 * 100)}% ≥5)</span>` : '';
     for (const r of rows) for (const v of Object.values(r.portswood)) ps.push(v.late);
-    const html = rows.slice(0, 18).map(r => `<tr><td><strong>${esc(r.operator)} ${esc(r.name)}</strong><br><span class="muted">${esc(r.long)}</span></td><td class="num">${r.trips}</td>
+    const html = rows.slice(0, 18).map(r => `<tr><td><strong>${esc(r.operator)} ${esc(r.name)}</strong><br><span class="muted">${esc(r.long)}</span></td><td class="num">${r.trips}</td>${OBS ? `<td class="num">${ocell(r.name)}</td>` : ''}
       <td class="num">${cell(r.extra, 'am')} / ${cell(r.extra, 'inter')} / ${cell(r.extra, 'pm')}</td><td class="num">${cell(r.late, 'am')} / ${cell(r.late, 'pm')}</td>
       <td class="num">${pcell(r.portswood.southbound_am)}</td><td class="num">${pcell(r.portswood.southbound_pm)}</td><td class="num">${pcell(r.portswood.northbound_am)}</td><td class="num">${pcell(r.portswood.northbound_pm)}</td></tr>`).join('');
     const lo = ps.length ? Math.min(...ps) : null, hi = ps.length ? Math.max(...ps) : null;
     $('#bus-body').innerHTML = `<p>${int(A.buses.length)} bus trips run on this sampled day's link speeds and queues (no bus lanes in the model; a bus covers a link at ${Math.round(B.assumptions.bus_speed * 100)}% of a car's free-flow speed, stops ${B.assumptions.dwell_s} s at each stop and waits if early).${lo != null ? ` On Portswood Road the modelled buses reach the end of the road between <span class="mono">${fmt1(lo)}</span> and <span class="mono">${fmt1(hi)}</span> minutes behind timetable in the peaks, on average per route and direction.` : ''}</p>
       <p class="foot-note">${esc(B.council)} That count was in July, out of university term${dateOf(A.D.date).getDay() % 6 ? '' : ', and on weekdays; this day is a weekend'}.${day().permits.some(id => PERMIT[id] && PERMIT[id].corridor === 'portswood') ? ' This day also has roadworks with signals on Portswood Road, which the model treats as one lane closed all day.' : ''}</p>
-      <div class="table-scroll"><table><thead><tr><th>Route</th><th>Trips</th><th>Extra min from traffic<br>AM / midday / PM</th><th>Behind at last stop<br>AM / PM</th><th>Portswood SB<br>AM</th><th>Portswood SB<br>PM</th><th>Portswood NB<br>AM</th><th>Portswood NB<br>PM</th></tr></thead><tbody>${html}</tbody></table></div>
+      <div class="table-scroll"><table><thead><tr><th>Route</th><th>Trips</th>${OBS ? '<th>Observed today<br>mean / 5+ min</th>' : ''}<th>Extra min from traffic<br>AM / midday / PM</th><th>Behind at last stop<br>AM / PM</th><th>Portswood SB<br>AM</th><th>Portswood SB<br>PM</th><th>Portswood NB<br>AM</th><th>Portswood NB<br>PM</th></tr></thead><tbody>${html}</tbody></table></div>
       <p class="foot-note">Peaks 07:00–10:00 and 16:00–19:00 by when the bus enters the section. Portswood cells: extra minutes on the road from traffic (minutes behind timetable at the next stop, share of trips 5 or more minutes late).</p>`;
+  }
+  /* ---------- buses observed on the day (bustimes.org live positions, collected by scripts/bustimes.py) ---------- */
+  const BL = EXTRA && EXTRA.bus_live;
+  const AREA_NAME = { docks: 'Docks (Town Quay, Platform Rd, Dock Gate 4)', city_centre: 'City centre', portswood: 'Portswood' };
+  const AREA_CLS = { docks: 'docks', city_centre: 'centre', portswood: 'portswood' };
+  const busLiveDay = d => (BL && BL.days && BL.days[d]) || null;
+  const lateTxt = m => `${m < 0 ? '−' : '+'}${fmt1(Math.abs(m))}`;
+  function busLiveChart(D, W) {
+    const keys = Object.keys(AREA_NAME).filter(k => D.areas.some(p => p.key === k));
+    const hours = [...new Set(D.areas.map(p => p.hour))].sort((a, b) => a - b);
+    if (!keys.length || hours.length < 2) return '';
+    const L = 40, R = 12, T = 12, B = 24, H = 190, h0 = hours[0], h1 = hours[hours.length - 1];
+    const ys = D.areas.map(p => p.mean_min), y0 = Math.min(0, ...ys), y1 = Math.max(5, ...ys) * 1.08;
+    const X = h => L + (h - h0) / (h1 - h0) * (W - L - R), Y = v => T + (y1 - v) / (y1 - y0) * (H - T - B);
+    const step = y1 - y0 > 12 ? 5 : 2, yt = [];
+    for (let v = Math.ceil(y0 / step) * step; v <= y1; v += step) yt.push(v);
+    const grid = yt.map(v => `<line class="grid-l" x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}"/><text class="ax" x="${L - 6}" y="${Y(v) + 3}" text-anchor="end">${v}</text>`).join('');
+    const xt = hours.filter((h, i) => hours.length < 10 || i % 2 === 0).map(h => `<text class="ax" x="${X(h)}" y="${H - 6}" text-anchor="middle">${String(h).padStart(2, '0')}:00</text>`).join('');
+    const lines = keys.map(k => {
+      const ps = D.areas.filter(p => p.key === k).sort((a, b) => a.hour - b.hour);
+      return `<polyline class="bl-s-${AREA_CLS[k]}" fill="none" stroke-width="2" points="${ps.map(p => `${X(p.hour).toFixed(1)},${Y(p.mean_min).toFixed(1)}`).join(' ')}"/>${ps.map(p => `<circle class="bl-f-${AREA_CLS[k]} bl-ring" cx="${X(p.hour)}" cy="${Y(p.mean_min)}" r="4"/><circle class="bl-hit" cx="${X(p.hour)}" cy="${Y(p.mean_min)}" r="10" data-tip="${esc(`<strong>${esc(AREA_NAME[k])}</strong>, ${String(p.hour).padStart(2, '0')}:00–${String(p.hour + 1).padStart(2, '0')}:00<br>Mean <span class="mono">${lateTxt(p.mean_min)}</span> min against the timetable (90% of buses ${lateTxt(p.p90_min)} or better)<br>${Math.round(p.share_over_5_min * 100)}% of ${p.n} bus journeys 5+ min late`)}"/>`).join('')}`;
+    }).join('');
+    return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Mean bus lateness by hour and area">${grid}${xt}<line class="bl-zero" x1="${L}" x2="${W - R}" y1="${Y(0)}" y2="${Y(0)}"/>${lines}</svg>`;
+  }
+  function renderBusLive() {
+    const card = $('#bus-live');
+    const dates = BL && BL.days ? Object.keys(BL.days).sort() : [];
+    card.hidden = !dates.length;
+    if (!dates.length) return;
+    const D = busLiveDay(state.date), el = $('#bus-live-body');
+    $('#bus-live-src').textContent = `Collected ${dates.map(shortDate).join(', ')}; not live`;
+    if (!D) { el.innerHTML = `<p class="muted">Observed bus lateness was collected on ${chips(dates)}</p>`; wireChips(el); return; }
+    const from = D.collected_from.slice(11, 16), to = D.collected_to.slice(11, 16), W = Math.max(280, Math.floor(el.clientWidth || card.clientWidth || 600));
+    const lines = D.day_lines.slice().sort((a, b) => b.n - a.n).slice(0, 16);
+    const legend = Object.keys(AREA_NAME).filter(k => D.areas.some(p => p.key === k)).map(k => `<span><i class="bl-f-${AREA_CLS[k]}"></i>${esc(AREA_NAME[k])}</span>`).join('');
+    el.innerHTML = `<p><strong>Observed, not modelled.</strong> Every bus in the city box was read from bustimes.org once a minute from ${from} to ${to} on ${esc(shortDate(state.date))}: ${int(D.journeys)} bus journeys in ${int(D.polls)} readings. Lateness is the delay against the timetable that bustimes.org works out from each bus's position. Each journey counts once per hour.</p>
+      <div class="bl-legend">${legend}</div>
+      <div class="bus-live-chart">${busLiveChart(D, W)}<div class="map-tip bl-tip" hidden></div></div>
+      <p class="foot-note">Mean minutes late per hour in each area (boxes drawn by hand round each place). Hover a point for the spread.</p>
+      <div class="table-scroll"><table><thead><tr><th>Line</th><th>Journeys</th><th>Mean min late</th><th>90% no later than</th><th>5+ min late</th></tr></thead><tbody>${lines.map(p => `<tr><td><strong>${esc(p.key)}</strong></td><td class="num">${p.n}</td><td class="num">${lateTxt(p.mean_min)}</td><td class="num">${lateTxt(p.p90_min)}</td><td class="num">${Math.round(p.share_over_5_min * 100)}%</td></tr>`).join('')}</tbody></table></div>
+      <p class="foot-note">Source: ${esc(BL.source)}. Collected ${esc(D.collected_from.slice(0, 10))} ${from}–${to} by <span class="mono">scripts/bustimes.py</span>; raw readings are not published. Lines with fewer than 5 journeys are left out.</p>`;
+    const host = el.querySelector('.bus-live-chart'), tip = host.querySelector('.bl-tip');
+    host.addEventListener('mousemove', e => {
+      const t = e.target.closest('[data-tip]');
+      if (!t) { tip.hidden = true; return; }
+      tip.innerHTML = t.dataset.tip; tip.hidden = false;
+      const r = host.getBoundingClientRect();
+      tip.style.left = `${Math.max(4, Math.min(e.clientX - r.left + 14, r.width - tip.offsetWidth - 4))}px`; tip.style.top = `${e.clientY - r.top + 14}px`;
+    });
+    host.addEventListener('mouseleave', () => { tip.hidden = true; });
   }
   const PPO_KIND = { meter: 'Meter disembarkation', checkin: 'Check-in time', signs: 'Sign message', marshals: 'Marshals' };
   function ppoText(a) {
@@ -1790,7 +1861,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     $('#scenario').innerHTML = opts.map(k => `<option value="${k}"${k === state.scenario ? ' selected' : ''}>${esc(scenLabel(d, k))}</option>`).join('');
     $('#slider').value = state.bin;
     segCenters = {};
-    renderTiming(); renderActions(); renderRoutesCard(); renderSure(); renderVehicles(); renderBuses(); renderPPO(); renderVisuals();
+    renderTiming(); renderActions(); renderRoutesCard(); renderSure(); renderVehicles(); renderBuses(); renderBusLive(); renderPPO(); renderVisuals();
   }
   function renderVisuals() {
     const d = day();

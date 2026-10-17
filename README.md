@@ -133,6 +133,7 @@ the terminals. Most of the model's gain over the baselines comes from the calend
 data improves it by about 4% a day (not significant) and 2% per 15 minutes.
 | DfT road traffic statistics, AADF by direction and hourly raw manual counts (API, Southampton LA 137) | Background traffic and hourly profile on counted roads, fetched by `data/dft.py`, cached in `data/raw/dft/`, not committed | At run time (first pull 16 Oct 2026) | Open Government Licence v3.0 |
 | [Bus Open Data Service](https://data.bus-data.dft.gov.uk/timetable/download/) timetables, GTFS for the South West region (Southampton's operators are there) | Demo: Bluestar routes and timetables (and First's X4/X5; Unilink is not in BODS) run on the modelled link speeds (`demo/buses.py`); modelled bus delays per route compared with the council's Portswood bus run times (Table 3-5). Reduced to `data/cache/bods/southampton_buses.json`, not committed; the download time is in `gtfs_south_west.source.json`. Fallback if BODS is unreachable: OpenStreetMap route=bus relations (ODbL), stops only, and the page says so | 17 Oct 2026 | Open Government Licence v3.0 |
+| [bustimes.org](https://bustimes.org) live vehicle positions (`/vehicles.json` only; its robots.txt disallows `/api/` and `/trips/`, which we don't use), which republish the BODS live feed | Observed bus lateness on the day: delay against the timetable per line, and per hour near the docks, in the city centre and on Portswood Road (`src/sotonship26/data/bus_lateness.py`, `scripts/bustimes.py`). Raw readings stay in `data/raw/buses/`, not committed; the page shows aggregates with the collection window | From 17 Oct 2026, polled once a minute | BODS data, Open Government Licence v3.0, via bustimes.org |
 
 ## Provenance
 
@@ -187,5 +188,9 @@ data improves it by about 4% a day (not significant) and 2% per 15 minutes.
 - **AI-generated (PPO charts):** `demo/ppo_stats.py`, `tests/test_ppo_stats.py` and the "PPO in
   numbers" fold of `demo/page.html` (the charts, their styles and the stats wiring in
   `demo/page_extras.py`) were written by Claude Code (Edward's session) on Sat 17 Oct 2026.
+- **AI-generated (observed buses):** `src/sotonship26/data/bus_lateness.py`, `scripts/bustimes.py`,
+  `tests/test_bus_lateness.py` and the "Buses observed on the day" fold of `demo/page.html` were
+  written by Claude Code (Edward's session) on Sat 17 Oct 2026, porting the bustimes.org pipeline
+  from the parked Gangway branch (`claude/wizardly-thompson-ybdvds`, b8a77c4) onto main.
 - **Existed before the event:** TODO, confirm with the organisers.
 - **Who helped:** TODO.

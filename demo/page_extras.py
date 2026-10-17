@@ -78,6 +78,8 @@ def main(argv=None) -> None:
                     help="train_days.csv of the run (default: beside the model ppo.json names)")
     ap.add_argument("--run", action="append", default=[], metavar="LABEL=PPO_JSON",
                     help="another run's evaluate output, compared with this one in the charts")
+    ap.add_argument("--bus-live", type=Path, default=HERE / "out" / "bus_lateness.json",
+                    help="observed bus lateness from scripts/bustimes.py export")
     ap.add_argument("--out", type=Path, help="default: overwrite --page")
     ap.add_argument("--max-mb", type=float, default=15.5)
     ap.add_argument("--template", type=Path,
@@ -96,7 +98,7 @@ def main(argv=None) -> None:
                  "from this branch (its template has the block)")
     j = page.find("</script>", i)
     head, tail = page[:i + len(TAG)], page[j:]
-    extra = {"agents": None, "ppo": None}
+    extra = {"agents": None, "ppo": None, "bus_live": None}
     if args.agents.exists():
         extra["agents"] = json.loads(args.agents.read_text(encoding="utf-8"))
     if args.ppo.exists():
@@ -112,6 +114,8 @@ def main(argv=None) -> None:
             runs[label] = json.loads(Path(path).read_text(encoding="utf-8"))
         ppo["stats"] = bundle(ppo, read_csv(args.episodes or args.ppo.with_suffix(".episodes.csv")),
                               read_csv(train_days), runs)
+    if args.bus_live.exists():
+        extra["bus_live"] = json.loads(args.bus_live.read_text(encoding="utf-8"))
     keep = 1.0
     while True:
         payload = json.dumps(extra, separators=(",", ":")).replace("</", "<\\/")
@@ -125,7 +129,8 @@ def main(argv=None) -> None:
     out = args.out or args.page
     out.write_text(head + payload + tail, encoding="utf-8")
     print(f"wrote {out} ({size:.1f} MB; agents {'yes' if extra['agents'] else 'no'}, "
-          f"PPO {'yes' if extra['ppo'] else 'no'})")
+          f"PPO {'yes' if extra['ppo'] else 'no'}; observed buses "
+          f"{'yes' if extra['bus_live'] else 'no'})")
 
 
 if __name__ == "__main__":
