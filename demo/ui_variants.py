@@ -641,9 +641,9 @@ if EMBEDS:
     for key, (ai, bus) in AI_PAIRS.items():
         pages = [(EMBEDS / "viz-ai" / f"emb-{ai}.html", "Does the AI help?"), (EMBEDS / "viz-bus" / f"emb-{bus}.html", "Buses observed on the day")]
         if all(f.exists() for f, _ in pages):
-            emb = json.dumps([{"title": t, "html": f.read_text(encoding="utf-8")} for f, t in pages]).replace("</", r"<\/")
+            emb = json.dumps([{"title": t, "html": f.read_text(encoding="utf-8")} for f, t in pages]).replace("<", r"\u003c")   # no "<" inside the app's script, so nothing in the designs can end it early
             VARIANTS["story-" + key] = (VARIANTS["story"][0] + AI_CSS, VARIANTS["story"][1] + AI_JS.replace("__EMBEDS__", emb))
-            TITLES["story-" + key] = "Cruise-day traffic"
+            TITLES["story-" + key] = "Cruise-day traffic · " + key.capitalize()
 for name, (css, js) in VARIANTS.items():
     base = "story" if name.startswith("story") else name
     page = tpl.replace("</style>", COMMON_CSS + (ICON_CSS if base == "story" else "") + css + "</style>", 1)
