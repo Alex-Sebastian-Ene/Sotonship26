@@ -7,10 +7,12 @@ Structure comes from geography (OpenStreetMap, via osm_base.py):
   residential, commercial/retail/industrial/port and retail land use nearest to it;
 * county gateways: where motorways, trunk and A roads cross the edge of the study area.
 
-Demand has real structure and invented totals. Commuters come in from the rest of the county to the
-area's jobs and go home again, residents commute out, people travel between zones (gravity model),
-through traffic crosses between gateways, county visitors come to the shops, and on match days
-fans travel to St Mary's. Cruise traffic is added per ship call.
+Commuters come in from the rest of the county and go home again, and residents commute out: Census
+2021 car drivers per MSOA pair, each given the gateway that is quickest for its home and workplace
+(census_od). People travel between zones (gravity model), through traffic crosses between gateways,
+county visitors come to the shops, and on match days fans travel to St Mary's: real structure,
+invented totals. Trips within the area are scaled to council counts; everything crossing the edge
+of the area is scaled to DfT counts. Cruise traffic is added per ship call.
 
 Allocation is dynamic. Every 15 minutes all of that traffic shares the network. Each origin-
 destination flow is split over up to three routes and shifted towards the routes drivers think are
@@ -33,6 +35,7 @@ import pickle
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import external_data as ext
 import numpy as np
 import scipy.sparse as sp
 from scipy.sparse.csgraph import dijkstra
@@ -47,14 +50,58 @@ LOGIT_BETA = 6.0  # route choice: a route 10% slower than the best gets exp(-0.6
 NOISE = {"day": 0.04, "purpose": 0.04, "bin": 0.05, "rho": 0.8, "zone": 0.08, "zone_km": 2.0}
 LOCAL = {"primary", "primary_link", "secondary", "secondary_link", "tertiary", "tertiary_link",
          "unclassified"}
+# Class weights still split through traffic, cruise passengers and match fans between gateways;
+# commuters and county visitors use the census (census_od).
 GATEWAY_WEIGHT = {"motorway": 6.0, "trunk": 3.0, "primary": 2.0, "secondary": 1.0}
-GATEWAY_HINT = {  # which part of the county each gateway road brings traffic from
-    "M27 west": "New Forest, Bournemouth",
-    "M27 east": "Fareham, Portsmouth",
-    "M3 north": "Winchester, London",
-    "M27 north": "Winchester, London",
-    "M271 north": "Romsey, Test Valley",
-}
+# A gateway is a major-road node this close to the edge of the study area. A motorway that ends gets
+# a wider band, because OSM's M27 stops at junction 8, 1.6 km short of the east edge.
+GATEWAY_EDGE_M = {"motorway": 2000.0}
+GATEWAY_EDGE_DEFAULT_M = 1500.0
+# Motorway links absent from the OSM network osm_base.py builds: (what, from (lat, lon), motorway
+# there, to (lat, lon), motorway there, lanes). Each end snaps to the nearest node of that motorway.
+MISSING_LINKS = [
+    ("M3 southbound to M27 eastbound", (50.96128, -1.38826), "M3", (50.94885, -1.39472), "M27", 2),
+]
+# Census commuters pick a gateway by time: straight line outside the area (times GATEWAY_CIRCUITY,
+# at the speed of the gateway's road class) plus the quickest free-flow route inside it, shared
+# over gateways by a logit with GATEWAY_LOGIT_S spread. Assumed values.
+GATEWAY_KMH = {"motorway": 90.0, "trunk": 70.0, "primary": 55.0, "secondary": 45.0}
+GATEWAY_CIRCUITY = 1.3
+GATEWAY_LOGIT_S = 300.0
+
+# Car or van drivers commuting into the study area and out of it, Census 2021, MSOA flows within
+# 60 km (demo/external_data.py; build() recomputes them and warns if the data differ). Census day
+# fell in lockdown, so calibrate_external() rescales all county traffic to DfT counts.
+CENSUS_DRIVERS = {"county": 20904, "outbound": 27201}
+COMMUTE_DAY = 0.85  # assumed share of commuters travelling on an average weekday (leave, part-time)
+WEEKEND = {"county": (0.26, 0.14), "outbound": (0.36, 0.27)}  # assumed Saturday, Sunday vs weekday
+
+
+DAY_WEIGHTS = (5 / 7, 1 / 7, 1 / 7)  # weekday, Saturday, Sunday in an average day of the year
+
+# The cordon (cordon_od): at each gateway, the DfT count on its road (nearest count point within
+# GATEWAY_COUNT_M) minus census commuters and county visitors crossing there is split into through
+# traffic (THROUGH_SHARE; gateway pairs balanced to it) and other trips between the gateway and
+# the area's zones (business, freight, the port, shopping and leisure; bigger, nearer zones first).
+# THROUGH_SHARE and OTHER_T_S were chosen by fitting the DfT count points on 17 Oct 2026: shares
+# of 0.2 and 0.3 fitted equally (0.5 and 0.7 worse), and 0.3 is the more plausible for the M27.
+GATEWAY_COUNT_M = 3500.0
+GATEWAY_COUNT_DEPTH_M = 1000.0
+THROUGH_SHARE = 0.3
+OTHER_T_S = 900.0  # other county trips: zone weight falls by e for every 15 free-flow minutes
+# Trips these give on an average day (both directions); build() recomputes them and warns.
+CORDON_DAILY = {"through": 57720, "other": 269361}
+CORDON_DAYS = (1.0, 0.8, 0.7)  # assumed weekday, Saturday, Sunday ratio
+
+
+def commute_totals(group: str) -> tuple[int, int, int]:
+    n = CENSUS_DRIVERS[group] * COMMUTE_DAY
+    return tuple(int(round(n * f, -2)) for f in (1.0, *WEEKEND[group]))
+
+
+def cordon_totals(kind: str, share: float = 1.0) -> tuple[int, int, int]:
+    avg = sum(w * f for w, f in zip(DAY_WEIGHTS, CORDON_DAYS, strict=True))
+    return tuple(int(round(CORDON_DAILY[kind] * share / avg * f, -2)) for f in CORDON_DAYS)
 
 # Hourly shapes (24 values, any scale) for each kind of trip
 PROFILES = {
@@ -72,16 +119,21 @@ PROFILES = {
 }
 
 # key, chart group, origins, destinations, daily car trips (weekday, Saturday, Sunday),
-# profile (weekday, weekend). Totals are invented and scaled by calibrate().
+# profile (weekday, weekend). County and outbound totals and origin-destination pairs come from
+# the census (census_od), through traffic and other county trips from DfT counts at the gateways
+# (cordon_od); the others are invented. Trips within the area are scaled to council counts
+# (calibrate_to_counts), everything crossing the edge to DfT counts (calibrate_external).
 PURPOSES = [
-    ("county_in", "county", "gateway", "jobs", (42000, 11000, 6000), ("am_in", "visit_in")),
-    ("county_home", "county", "jobs", "gateway", (42000, 11000, 6000), ("pm_out", "visit_out")),
-    ("out", "outbound", "homes", "gateway", (22000, 8000, 6000), ("am_in", "visit_in")),
-    ("out_home", "outbound", "gateway", "homes", (22000, 8000, 6000), ("pm_out", "visit_out")),
+    ("county_in", "county", "gateway", "jobs", commute_totals("county"), ("am_in", "visit_in")),
+    ("county_home", "county", "jobs", "gateway", commute_totals("county"), ("pm_out", "visit_out")),
+    ("out", "outbound", "homes", "gateway", commute_totals("outbound"), ("am_in", "visit_in")),
+    ("out_home", "outbound", "gateway", "homes", commute_totals("outbound"), ("pm_out", "visit_out")),
     ("internal", "internal", "zones", "zones", (150000, 140000, 110000), ("internal_wk", "internal_we")),
-    ("through", "through", "gateway", "gateway", (60000, 48000, 42000), ("through", "through")),
-    ("visit_in", "visitors", "gateway", "retail", (6000, 26000, 18000), ("visit_in", "visit_in")),
-    ("visit_home", "visitors", "retail", "gateway", (6000, 26000, 18000), ("visit_out", "visit_out")),
+    ("through", "through", "gateway", "gateway", cordon_totals("through"), ("through", "through")),
+    ("other_in", "visitors", "gateway", "zones", cordon_totals("other", 0.5), ("through", "through")),
+    ("other_home", "visitors", "zones", "gateway", cordon_totals("other", 0.5), ("through", "through")),
+    ("visit_in", "visitors", "county", "retail", (6000, 26000, 18000), ("visit_in", "visit_in")),
+    ("visit_home", "visitors", "retail", "county", (6000, 26000, 18000), ("visit_out", "visit_out")),
     # school run: term-time weekdays only, parents driving children and driving back
     ("school_drop", "school", "homes", "schools", (9000, 0, 0), ("school_am", "school_am")),
     ("school_drop_home", "school", "schools", "homes", (6000, 0, 0), ("school_am_back", "school_am_back")),
@@ -89,6 +141,7 @@ PURPOSES = [
     ("school_pick_home", "school", "schools", "homes", (9000, 0, 0), ("school_pm_back", "school_pm_back")),
 ]
 SCHOOL_KEYS = {"school_drop", "school_drop_home", "school_pick", "school_pick_home"}
+CENSUS_KEYS = {"county_in", "county_home", "out", "out_home"}
 EXTERNAL = {"county", "outbound", "through", "visitors"}
 GROUPS = {
     "county": "Commuters from the county",
@@ -96,7 +149,7 @@ GROUPS = {
     "internal": "Trips within the area",
     "school": "School run",
     "through": "Through traffic",
-    "visitors": "Visitors from the county",
+    "visitors": "Visitors and other trips from the county",
     "match": "Match day",
     "cruise": "Cruise traffic",
 }
@@ -164,6 +217,7 @@ class Model:
     pre: dict = field(default_factory=dict)  # day type -> (bins, edges) local traffic on counted roads
     size: tuple[int, int] = (0, 0)
     sets: dict = field(default_factory=dict)  # named origin sets for cruise and match demand
+    census: dict = field(default_factory=dict)  # census commuters per gateway and district
 
     @property
     def n_od(self) -> int:
@@ -178,11 +232,172 @@ class Model:
 
 # --- building the model from the OSM network ---------------------------------------------------
 
+def _seg_dist(p, coords) -> float:
+    c = np.asarray(coords, float)
+    a, b = c[:-1], c[1:]
+    ab = b - a
+    t = np.clip(((p - a) * ab).sum(1) / np.maximum((ab * ab).sum(1), 1e-9), 0, 1)
+    return float(np.hypot(*(a + t[:, None] * ab - p).T).min())
+
+
+def repair_motorways(g, size, log=print) -> set:
+    """Mend the motorways where cutting OSM to the study area broke them at the edge.
+
+    1. M27 east of junction 8 and M3 north of junction 13 end in slip roads, so all gateway
+       traffic squeezed through one-lane slips and a local roundabout. The end of the outbound
+       slip is joined to the start of the inbound one within 500 m, and both get the motorway's
+       lanes.
+    2. West of M27 junction 3 only the westbound carriageway survives, so traffic from the M27 west
+       gateway could not head east on the motorway and detoured through Totton and over Redbridge.
+       A carriageway that still ends near the edge with no motorway onwards and no opposite
+       carriageway of the same road within 150 m is reversed back to the first junction (all with
+       the lanes of its widest part), and if nothing leads on from there, joined to the nearest
+       motorway node within 800 m.
+    3. Links in MISSING_LINKS (M3 southbound to M27 eastbound at junction 14 / 4, without which
+       that traffic cut through Eastleigh's side streets) are added.
+
+    Returns the motorway ends found at the edge: gateway candidates, though they now have links
+    both ways.
+    """
+    W, H = size
+
+    def mw(d):
+        return d["cls"] in ("motorway", "motorway_link")
+
+    def opposite_near(u, v, d) -> bool:
+        c = np.asarray(d["coords"], float)
+        head = c[-1] - c[0]
+        mid = c[len(c) // 2]
+        refs = set(d["ref"].split(";")) - {""}
+        for a, b, e in g.edges(data=True):
+            if (a, b) == (u, v) or not mw(e) or not refs & set(e["ref"].split(";")):
+                continue
+            ce = np.asarray(e["coords"], float)
+            if float((ce[-1] - ce[0]) @ head) < 0 and _seg_dist(mid, ce) < 150:
+                return True
+        return False
+
+    added, cut = [], set()
+
+    # 1. Carriageways ending in slip roads at the edge: join the ends.
+    def stub(n, inbound):
+        """Slip-road chain from a carriageway end back to a motorway that stops there."""
+        chain = []
+        while len(chain) < 10:
+            nxt = ([(p, n) for p in g.predecessors(n) if mw(g.edges[p, n])] if inbound
+                   else [(n, q) for q in g.successors(n) if mw(g.edges[n, q])])
+            if len(nxt) != 1:
+                return None
+            e = nxt[0]
+            if g.edges[e]["cls"] == "motorway":  # reached the main carriageway: does it go on?
+                m_ = e[1] if inbound else e[0]
+                goes_on = (g.successors(m_) if inbound else g.predecessors(m_))
+                main = [q for q in goes_on
+                        if g.edges[(m_, q) if inbound else (q, m_)]["cls"] == "motorway"]
+                return (chain, g.edges[e]["lanes"]) if not main else None
+            chain.append(e)
+            n = e[0] if inbound else e[1]
+        return None
+
+    ends = {"sink": [], "source": []}
+    for s in g.nodes:
+        x, y = g.nodes[s]["xy"]
+        if min(x, y, W - x, H - y) > GATEWAY_EDGE_M["motorway"]:
+            continue
+        ins = [p for p in g.predecessors(s) if mw(g.edges[p, s])]
+        outs = [q for q in g.successors(s) if mw(g.edges[s, q])]
+        kind = "sink" if ins and not outs else "source" if outs and not ins else None
+        found = stub(s, kind == "sink") if kind else None
+        if found:
+            ends[kind].append((s, *found))
+    for s, chain_in, lanes_in in ends["sink"]:
+        ref = g.edges[chain_in[0]]["ref"] if chain_in else ""
+        best = None
+        for t, chain_out, lanes_out in ends["source"]:
+            ref_t = g.edges[chain_out[0]]["ref"] if chain_out else ""
+            d = math.dist(g.nodes[s]["xy"], g.nodes[t]["xy"])
+            if ref == ref_t and d < 500 and (best is None or d < best[0]):
+                best = (d, t, chain_out, lanes_out)
+        if best is None:
+            continue
+        d, t, chain_out, lanes_out = best
+        lanes = max(lanes_in, lanes_out)
+        for e in chain_in + chain_out:
+            g.edges[e]["lanes"] = max(g.edges[e]["lanes"], lanes)
+        g.add_edge(s, t, length=d, cls="motorway_link", name="", ref=ref, lanes=lanes,
+                   cap=CAP_LANE["motorway_link"] * lanes, t0=d / (60 / 3.6),
+                   coords=[tuple(g.nodes[s]["xy"]), tuple(g.nodes[t]["xy"])])
+        added.append(f"{ref} end joined")
+        cut |= {s, t}
+
+    # 2. A carriageway still ending alone at the edge gets its missing direction.
+    for s in list(g.nodes):
+        x, y = g.nodes[s]["xy"]
+        if min(x, y, W - x, H - y) > GATEWAY_EDGE_M["motorway"]:
+            continue
+        ins = [(p, s) for p in g.predecessors(s) if mw(g.edges[p, s])]
+        if len(ins) != 1 or any(mw(g.edges[s, q]) for q in g.successors(s)):
+            continue
+        if opposite_near(*ins[0], g.edges[ins[0]]):
+            continue
+        chain, (p, v) = [], ins[0]
+        while len(chain) < 20:
+            chain.append((p, v))
+            ins = [(q, p) for q in g.predecessors(p) if mw(g.edges[q, p]) and q != v]
+            if len(ins) != 1 or any(mw(g.edges[p, q]) for q in g.successors(p) if q != v):
+                break
+            p, v = ins[0]
+        lanes = max(g.edges[e]["lanes"] for e in chain)  # a cut-off slip stands for the motorway
+        cut.add(s)
+        for a, b in chain:
+            g.edges[a, b]["lanes"] = lanes
+            d = dict(g.edges[a, b])
+            d["coords"] = list(d["coords"])[::-1]
+            g.add_edge(b, a, **d)
+            added.append(d["ref"] or d["name"])
+        j, inner = chain[-1][0], {n for e in chain for n in e}
+        if not any(mw(g.edges[j, q]) for q in g.successors(j) if q not in inner):
+            pj = np.asarray(g.nodes[j]["xy"], float)
+            near = [(math.dist(pj, g.nodes[q]["xy"]), q) for q in g.nodes
+                    if q not in inner and any(mw(g.edges[q, r]) for r in g.successors(q))]
+            dist, q = min(near)
+            if dist < 800:
+                ref = g.edges[chain[0]]["ref"]
+                g.add_edge(j, q, length=dist, cls="motorway_link", name="", ref=ref, lanes=2,
+                           cap=CAP_LANE["motorway_link"] * 2, t0=dist / (60 / 3.6),
+                           coords=[tuple(g.nodes[j]["xy"]), tuple(g.nodes[q]["xy"])])
+                added.append(f"{ref} connector")
+    # 3. Motorway links missing from the network altogether.
+    x0, y1, *_, to_bng = ext.frame_origin()
+    for what, a, ref_a, b, ref_b, lanes in MISSING_LINKS:
+        pts = []
+        for (lat, lon), ref, out in ((a, ref_a, True), (b, ref_b, False)):
+            e, n = to_bng.transform(lon, lat)
+            p = (e - x0, y1 - n)
+            on = [u for u in g.nodes
+                  if any(mw(g.edges[(u, q) if out else (q, u)])
+                         and ref in g.edges[(u, q) if out else (q, u)]["ref"].split(";")
+                         for q in (g.successors(u) if out else g.predecessors(u)))]
+            pts.append(min(on, key=lambda u: math.dist(p, g.nodes[u]["xy"])))
+        u, v = pts
+        if not g.has_edge(u, v):
+            d = 1.3 * math.dist(g.nodes[u]["xy"], g.nodes[v]["xy"])  # slip roads curve
+            g.add_edge(u, v, length=d, cls="motorway_link", name="", ref=ref_a, lanes=lanes,
+                       cap=CAP_LANE["motorway_link"] * lanes, t0=d / (70 / 3.6),
+                       coords=[tuple(g.nodes[u]["xy"]), tuple(g.nodes[v]["xy"])])
+            added.append(what)
+    if added:
+        log(f"network repair: added {len(added)} links where cutting OSM to the area broke a "
+            f"motorway or OSM lacks one ({'; '.join(sorted(set(added)))})")
+    return cut
+
+
 def build(net_path: Path, gates: dict[str, tuple[int, int]], log=print) -> Model:
     with open(net_path, "rb") as f:
         net = pickle.load(f)
     g = net["graph"]
     W, H = net["size"]
+    cut_ends = repair_motorways(g, (W, H), log)
     nodes = list(g.nodes)
     nid = {n: i for i, n in enumerate(nodes)}
     xy = np.array([g.nodes[n]["xy"] for n in nodes], float)
@@ -253,19 +468,27 @@ def build(net_path: Path, gates: dict[str, tuple[int, int]], log=print) -> Model
                 if v not in node_class or rank[base] < rank[node_class[v][0]]:
                     node_class[v] = (base, ref[k] or name[k])
     edge_dist = np.minimum.reduce([xy[:, 0], xy[:, 1], W - xy[:, 0], H - xy[:, 1]])
-    cands = sorted((i for i in node_class if edge_dist[i] < 1500),
+    cut = {nid[n] for n in cut_ends}
+
+    def near_edge(i: int) -> bool:
+        base = node_class[i][0]
+        return edge_dist[i] < (GATEWAY_EDGE_M.get(base, GATEWAY_EDGE_DEFAULT_M) if i in cut
+                               else GATEWAY_EDGE_DEFAULT_M)
+
+    cands = sorted((i for i in node_class if near_edge(i)),
                    key=lambda i: (rank[node_class[i][0]], edge_dist[i]))
     gateways: list[Centroid] = []
+    gw_class: list[str] = []
     for i in cands:
         if any(math.dist(xy[i], gw.xy) < 2200 for gw in gateways):
             continue
         base, road = node_class[i]
+        road = road.split(";")[0]
         side = ["west", "north", "east", "south"][int(np.argmin(
             [xy[i, 0], xy[i, 1], W - xy[i, 0], H - xy[i, 1]]))]
-        label = f"{road.split(';')[0]} {side}".strip()
-        gateways.append(Centroid(label, "gateway", int(i), tuple(int(v) for v in xy[i]),
-                                 weight=GATEWAY_WEIGHT[base],
-                                 hint=GATEWAY_HINT.get(label, "rest of Hampshire")))
+        gateways.append(Centroid(f"{road} {side}".strip(), "gateway", int(i),
+                                 tuple(int(v) for v in xy[i]), weight=GATEWAY_WEIGHT[base]))
+        gw_class.append(base)
     log("gateways: " + ", ".join(f"{gw.name} ({gw.weight:g})" for gw in gateways))
 
     specials = []
@@ -293,8 +516,13 @@ def build(net_path: Path, gates: dict[str, tuple[int, int]], log=print) -> Model
         log("schools: no OSM school locations, using homes as a stand-in")
         schools = homes
     gw = norm([centroids[i].weight for i in G_])
+    csr = sp.csr_matrix((t0, (eu, ev)), shape=(n, n))
+    census = census_od(centroids, Z, G_, gw_class, csr, (W, H), log)
+    cordon = cordon_od(centroids, Z, G_, gw_class, census, ext.count_points(log)["cordon"],
+                       norm(jobs + 0.8 * retail + 0.5 * homes), csr, (W, H), log)
+    census["summary"]["cordon"] = cordon["summary"]
     sets = {"homes": (Z, homes), "jobs": (Z, jobs), "retail": (Z, retail), "gateway": (G_, gw),
-            "schools": (Z, schools)}
+            "schools": (Z, schools), "county": (G_, census["gw_share"])}
     zxy = np.array([centroids[i].xy for i in Z], float)
     zdist = np.hypot(*(zxy[:, None, :] - zxy[None, :, :]).transpose(2, 0, 1))
 
@@ -302,7 +530,9 @@ def build(net_path: Path, gates: dict[str, tuple[int, int]], log=print) -> Model
     od_weight: dict[str, dict[tuple[int, int], float]] = {}
     for key, _, o_set, d_set, _, _ in PURPOSES:
         w: dict[tuple[int, int], float] = {}
-        if key == "internal" or key in SCHOOL_KEYS:
+        if key in CENSUS_KEYS:
+            w = dict(census["od"][key])
+        elif key == "internal" or key in SCHOOL_KEYS:
             dist = zdist
             if key == "internal":
                 T = homes[:, None] * (jobs + 0.5 * homes + 0.8 * retail)[None, :] * np.exp(-dist / 3000.0)
@@ -315,12 +545,8 @@ def build(net_path: Path, gates: dict[str, tuple[int, int]], log=print) -> Model
             cut = flat[np.searchsorted(np.cumsum(flat), 0.92 * flat.sum())]
             for a, b in zip(*np.nonzero(T >= cut), strict=True):
                 w[(Z[a], Z[b])] = T[a, b]
-        elif key == "through":
-            for a in range(len(G_)):
-                for b in range(len(G_)):
-                    if a != b and math.dist(centroids[G_[a]].xy, centroids[G_[b]].xy) > 6000:
-                        strategic = min(centroids[G_[a]].weight, centroids[G_[b]].weight) >= 3
-                        w[(G_[a], G_[b])] = gw[a] * gw[b] * (1.0 if strategic else 0.15)
+        elif key in cordon["od"]:
+            w = dict(cordon["od"][key])
         else:
             oi, ow = sets[o_set]
             di, dw = sets[d_set]
@@ -366,8 +592,7 @@ def build(net_path: Path, gates: dict[str, tuple[int, int]], log=print) -> Model
     log(f"origin-destination pairs: {len(pairs)}")
 
     # candidate routes: quickest, then two alternatives that avoid the earlier ones
-    csr = sp.csr_matrix((t0, (eu, ev)), shape=(n, n))
-    edge_of = {(int(a), int(b)): k for k, (a, b) in enumerate(zip(eu, ev, strict=True))}
+    edge_of ={(int(a), int(b)): k for k, (a, b) in enumerate(zip(eu, ev, strict=True))}
     important = np.zeros(len(pairs), bool)
     total_w = sum(purpose_od.values())
     important[total_w >= np.quantile(total_w, 0.5)] = True
@@ -427,7 +652,212 @@ def build(net_path: Path, gates: dict[str, tuple[int, int]], log=print) -> Model
                  coords=coords, centroids=centroids, ods=pairs, od_index=od_index,
                  purpose_od=purpose_od, paths=paths, A=A, AT=A.T.tocsr(), col_idx=rows,
                  col_ptr=col_ptr, size=(W, H), sets=sets, uniq=uniq, od_zone=od_zone,
-                 zone_kernel=kern)
+                 zone_kernel=kern, census=census["summary"])
+
+
+def _crosses(p: np.ndarray, q: np.ndarray, a, b) -> np.ndarray:
+    """(len(p), len(q)) mask: does the segment from p[i] to q[j] cross the segment a-b?"""
+    def side(u, v, w):
+        return np.sign((v[..., 0] - u[..., 0]) * (w[..., 1] - u[..., 1])
+                       - (v[..., 1] - u[..., 1]) * (w[..., 0] - u[..., 0]))
+
+    a, b = np.asarray(a, float), np.asarray(b, float)
+    P, Q = p[:, None, :], q[None, :, :]
+    return (side(a, b, P) * side(a, b, Q) < 0) & (side(P, Q, a) * side(P, Q, b) < 0)
+
+
+def census_od(centroids, Z, G_, gw_class, csr, size, log=print) -> dict:
+    """Census 2021 commuters crossing the edge of the area, as gateway-zone trips.
+
+    Each MSOA flow (car or van drivers) is put on the zone nearest its inside end and shared over
+    gateways by time: straight line from its outside end to the gateway at the gateway road's speed,
+    plus the quickest free-flow route between gateway and zone. No approach crosses Southampton
+    Water or cuts across the area. Returns OD weights for the four commuter purposes, the inbound
+    share per gateway (also used for county visitors) and a summary per gateway and district for
+    the log and the page.
+    """
+    data = ext.commute_flows(log)
+    rows = data["rows"]
+    inbound = np.array([r["inbound"] for r in rows])
+    drivers = np.array([r["n"] * r["car"] for r in rows])
+    home = np.array([(r["hx"], r["hy"]) for r in rows], float)
+    work = np.array([(r["wx"], r["wy"]) for r in rows], float)
+    outside = np.where(inbound[:, None], home, work)
+    inside = np.where(inbound[:, None], work, home)
+    district = np.array([r["home_la"] if r["inbound"] else r["work_la"] for r in rows])
+
+    zone = cKDTree([centroids[i].xy for i in Z]).query(inside)[1]
+    gxy = np.array([centroids[i].xy for i in G_], float)
+    gnode = [centroids[i].node for i in G_]
+    znode = np.array([centroids[i].node for i in Z])
+    t_from = dijkstra(csr, indices=gnode)[:, znode]  # gateway -> zone, seconds
+    t_to = dijkstra(csr.T.tocsr(), indices=gnode)[:, znode]  # zone -> gateway
+    kmh = np.array([GATEWAY_KMH[c] for c in gw_class])
+    approach = (np.hypot(*(outside[:, None, :] - gxy[None, :, :]).transpose(2, 0, 1)) / 1000
+                * GATEWAY_CIRCUITY / kmh * 3600)
+    cost = approach + np.where(inbound[:, None], t_from[:, zone].T, t_to[:, zone].T)
+    barrier = np.asarray(ext.water_barrier(), float)
+    for a, b in zip(barrier[:-1], barrier[1:], strict=True):
+        cost[_crosses(outside, gxy, a, b)] = np.inf
+    # nor through the area itself: traffic whose straight line cuts across it enters elsewhere
+    W, H = size
+    m_ = GATEWAY_EDGE_M["motorway"] + 500
+    for s in np.linspace(0.05, 0.95, 19):
+        pt = (1 - s) * outside[:, None, :] + s * gxy[None, :, :]
+        x, y = pt[..., 0], pt[..., 1]
+        cost[(x > m_) & (x < W - m_) & (y > m_) & (y < H - m_)] = np.inf
+    ok = np.isfinite(cost).any(axis=1)
+    if not ok.all():
+        log(f"census: {drivers[~ok].sum():.0f} drivers have no reachable gateway; left out")
+    cost, drivers, inbound = cost[ok], drivers[ok], inbound[ok]
+    zone, district = zone[ok], district[ok]
+    p = np.exp(-(cost - cost.min(axis=1, keepdims=True)) / GATEWAY_LOGIT_S)
+    flow = drivers[:, None] * p / p.sum(axis=1, keepdims=True)  # drivers per row and gateway
+
+    tot = {"county": float(drivers[inbound].sum()), "outbound": float(drivers[~inbound].sum())}
+    log(f"census: {tot['county']:.0f} car or van drivers commute into the area, "
+        f"{tot['outbound']:.0f} out of it (Census 2021, MSOA flows within {data['max_km']:g} km)")
+    for g, v in tot.items():
+        if abs(v / CENSUS_DRIVERS[g] - 1) > 0.01:
+            log(f"census: WARNING {g} drivers {v:.0f} differ from CENSUS_DRIVERS "
+                f"{CENSUS_DRIVERS[g]}; update the constant")
+
+    w_in = np.zeros((len(Z), len(G_)))
+    w_out = np.zeros((len(Z), len(G_)))
+    np.add.at(w_in, zone[inbound], flow[inbound])
+    np.add.at(w_out, zone[~inbound], flow[~inbound])
+    od: dict[str, dict] = {k: {} for k in CENSUS_KEYS}
+    for zi in range(len(Z)):
+        for gi in range(len(G_)):
+            if w_in[zi, gi] > 2e-5 * tot["county"]:
+                od["county_in"][(G_[gi], Z[zi])] = od["county_home"][(Z[zi], G_[gi])] = w_in[zi, gi]
+            if w_out[zi, gi] > 2e-5 * tot["outbound"]:
+                od["out"][(Z[zi], G_[gi])] = od["out_home"][(G_[gi], Z[zi])] = w_out[zi, gi]
+
+    by_district = {}
+    for d in np.unique(district):
+        mask = district == d
+        by_district[str(d)] = (flow[mask & inbound].sum(axis=0), flow[mask & ~inbound].sum(axis=0))
+    gw_in, gw_out = w_in.sum(axis=0), w_out.sum(axis=0)
+    summary = {"source": data["source"], "collected": data["collected"], "drivers": tot,
+               "commute_day": COMMUTE_DAY, "gateways": [], "districts": []}
+    log("census commuters per gateway (car or van drivers, both directions on a weekday "
+        f"= x{COMMUTE_DAY:g} before calibration):")
+    for gi, g in enumerate(G_):
+        both = {d: v[0][gi] + v[1][gi] for d, v in by_district.items()}
+        top = [d for d, v in sorted(both.items(), key=lambda kv: -kv[1])
+               if v >= 0.1 * (gw_in[gi] + gw_out[gi])][:3]
+        centroids[g].hint = ", ".join(top) or "rest of Hampshire"
+        summary["gateways"].append({"name": centroids[g].name, "in": round(gw_in[gi]),
+                                    "out": round(gw_out[gi]), "from": top})
+        log(f"  {centroids[g].name:14s} in {gw_in[gi]:6.0f}  out {gw_out[gi]:6.0f}  "
+            f"({centroids[g].hint})")
+    log("census commuters per district (car or van drivers) and their main gateways:")
+    names = [centroids[g].name for g in G_]
+    for d, (a, b) in sorted(by_district.items(), key=lambda kv: -(kv[1][0].sum() + kv[1][1].sum())):
+        total = a + b
+        main = [f"{names[i]} {100 * total[i] / total.sum():.0f}%" for i in np.argsort(-total)[:3]
+                if total[i] >= 0.1 * total.sum()]
+        summary["districts"].append({"name": d, "in": round(a.sum()), "out": round(b.sum()),
+                                     "via": main})
+        if a.sum() + b.sum() >= 150:
+            log(f"  {d:34s} in {a.sum():6.0f}  out {b.sum():6.0f}  via {', '.join(main)}")
+    return {"od": od, "gw_share": gw_in / gw_in.sum(), "summary": summary}
+
+
+def cordon_od(centroids, Z, G_, gw_class, census: dict, cordon: list[dict], attract, csr, size,
+              log=print) -> dict:
+    """Through traffic and other county trips from DfT counts on the gateway roads.
+
+    Each gateway takes the nearest count point on its road within GATEWAY_COUNT_M that lies outside
+    the area or less than GATEWAY_COUNT_DEPTH_M inside it (deeper ones count local traffic too);
+    one gateway per count point, and gateways without one get neither. What the count leaves after
+    census commuters and county visitors crossing there (average day, before calibration) is split:
+
+    * THROUGH_SHARE is through traffic: gateway pairs more than 6 km apart are seeded 1, or 0.15
+      unless both ends are motorway or trunk, then balanced to each gateway's through crossings
+      by iterative proportional fitting;
+    * the rest is other trips, half in and half out, to zones by ``attract`` times
+      exp(-free-flow time / OTHER_T_S).
+    """
+    W, H = size
+    cand = []
+    for gi, g in enumerate(G_):
+        road = centroids[g].name.rsplit(" ", 1)[0]
+        for c in cordon:
+            d = math.dist(centroids[g].xy, (c["x"], c["y"]))
+            depth = min(c["x"], c["y"], W - c["x"], H - c["y"])  # how far inside the area
+            if c["road"] == road and d < GATEWAY_COUNT_M and depth < GATEWAY_COUNT_DEPTH_M:
+                cand.append((d, gi, c))
+    count: dict[int, dict] = {}
+    for _, gi, c in sorted(cand, key=lambda t: t[0]):
+        if gi not in count and all(c is not v for v in count.values()):
+            count[gi] = c
+
+    totals = {k: t for k, _, _, _, t, _ in PURPOSES}
+
+    def average(key):
+        return sum(w * t for w, t in zip(DAY_WEIGHTS, totals[key], strict=True))
+
+    crossing = np.zeros(len(G_))  # census commuters and visitors over each gateway, both ways
+    pos = {g: gi for gi, g in enumerate(G_)}
+    for key, w in census["od"].items():
+        s = sum(w.values())
+        for (o, d), v in w.items():
+            crossing[pos[o] if o in pos else pos[d]] += average(key) * v / s
+    crossing += (average("visit_in") + average("visit_home")) * census["gw_share"]
+    rest = np.zeros(len(G_))
+    for gi, c in count.items():
+        rest[gi] = max(c["aadf"] - crossing[gi], 0.0)
+    target, other = THROUGH_SHARE * rest, (1 - THROUGH_SHARE) * rest
+
+    gxy = np.array([centroids[g].xy for g in G_], float)
+    far = np.hypot(*(gxy[:, None, :] - gxy[None, :, :]).transpose(2, 0, 1)) > 6000
+    strategic = np.array([c in ("motorway", "trunk") for c in gw_class])
+    S = far * np.where(strategic[:, None] & strategic[None, :], 1.0, 0.15)
+    S *= (target[:, None] > 0) & (target[None, :] > 0)
+    a = np.where(target > 0, 1.0, 0.0)
+    for _ in range(200):
+        made = 2 * a * (S @ a)
+        a = np.where(made > 0, a * np.sqrt(target / np.maximum(made, 1e-9)), 0.0)
+    T = a[:, None] * a[None, :] * S  # through trips per average day, from row to column gateway
+    made = T.sum(axis=0) + T.sum(axis=1)
+    daily = {"through": float(T.sum()), "other": float(other.sum())}
+    od: dict[str, dict] = {"other_in": {}, "other_home": {}}
+    od["through"] = {(G_[i], G_[j]): T[i, j]
+                     for i, j in zip(*np.nonzero(T > 1e-4 * daily["through"]), strict=True)}
+    gnode = [centroids[g].node for g in G_]
+    znode = np.array([centroids[z].node for z in Z])
+    for key, t in (("other_in", dijkstra(csr, indices=gnode)[:, znode]),
+                   ("other_home", dijkstra(csr.T.tocsr(), indices=gnode)[:, znode])):
+        for gi in np.flatnonzero(other > 0):
+            w = attract * np.exp(-t[gi] / OTHER_T_S)
+            w = 0.5 * other[gi] * w / w.sum()
+            for zi in np.flatnonzero(w > 1e-4 * w.sum()):
+                od[key][(G_[gi], Z[zi]) if key == "other_in" else (Z[zi], G_[gi])] = w[zi]
+
+    log(f"cordon from DfT counts at the gateways (average day, before calibration): through "
+        f"{daily['through']:.0f} trips ({THROUGH_SHARE:g} of what census commuters and visitors "
+        f"leave), other county trips {daily['other']:.0f}")
+    summary = []
+    for gi, g in enumerate(G_):
+        c = count.get(gi)
+        row = {"gateway": centroids[g].name, "commuters_visitors": round(crossing[gi]),
+               "through": round(made[gi]), "other": round(other[gi])}
+        if c:
+            row.update(count_point=c["count_point"], year=c["year"], method=c["method"],
+                       aadf=c["aadf"])
+        summary.append(row)
+        log(f"  {centroids[g].name:14s} DfT "
+            + (f"{c['aadf']:7d} ({c['count_point']}, {c['year']} {c['method'].lower()})" if c
+               else "   none" + " " * 21)
+            + f"  commuters+visitors {crossing[gi]:6.0f}  through {made[gi]:7.0f}"
+            f"  other {other[gi]:6.0f}")
+    for k, v in daily.items():
+        if abs(v / max(CORDON_DAILY[k], 1) - 1) > 0.03:
+            log(f"cordon: WARNING {k} {v:.0f} trips differ from CORDON_DAILY {CORDON_DAILY[k]}; "
+                "update the constant")
+    return {"od": od, "daily": daily, "summary": summary}
 
 
 # --- demand ------------------------------------------------------------------------------------
@@ -669,28 +1099,93 @@ def calibrate_to_counts(m: Model, sites: list[dict], log=print,
     return best[2]
 
 
-def calibrate_external(m: Model, target: float = 0.85, log=print,
-                       grid=(0.15, 0.25, 0.35, 0.5, 0.65, 0.8, 1.0, 1.2)) -> float:
-    """Scale county and through trips so weekday peak-hour loads on motorway and trunk roads put
-    their length-weighted 85th percentile near ``target``. A stand-in until WebTRIS counts are used.
+ESTIMATED_WEIGHT = 0.5  # DfT "Estimated" AADF (factored from an older count) counts half in the fit
+
+
+def count_point_edges(m: Model, site: dict, radius: float = 250.0) -> list[int]:
+    """Model links at a DfT count point: the nearest link of the counted road in each direction.
+
+    A site with names (a bridge) takes the nearest links with those names at any distance: DfT
+    counts hold for the whole link between junctions, and the count point can sit away from the
+    bridge on the same link.
     """
-    strategic = np.array([c in ("motorway", "trunk") for c in m.cls])
-    peak = list(range(12, 16)) + list(range(48, 52))  # 08:00-09:00 and 17:00-18:00
+    p = np.array([site["x"], site["y"]], float)
+    names = site.get("names")
+    found = []
+    for k in range(len(m.t0)):
+        if names:
+            if m.name[k] not in names:
+                continue
+        elif site["road"] not in m.ref[k].split(";") or m.cls[k].endswith("_link"):
+            continue
+        c = np.asarray(m.coords[k], float)
+        a, b = c[:-1], c[1:]
+        ab = b - a
+        t = np.clip(((p - a) * ab).sum(1) / np.maximum((ab * ab).sum(1), 1e-9), 0, 1)
+        d = float(np.hypot(*(a + t[:, None] * ab - p).T).min())
+        if d < radius or names:
+            head = c[-1] - c[0]
+            found.append((d, k, head / max(np.hypot(*head), 1e-9)))
+    if not found:
+        return []
+    found.sort(key=lambda f: f[0])
+    _, k1, h1 = found[0]
+    back = [k for _, k, h in found if float(h @ h1) < -0.3]
+    return [k1] + back[:1]
+
+
+def modelled_aadf(m: Model, sites: list[dict], edges: list[list[int]]) -> np.ndarray:
+    """Average daily two-way vehicles past each count point (weekday, Saturday and Sunday flows
+    over 05:00-20:00, at most capacity, weighted by DAY_WEIGHTS and grossed up to 24 hours by
+    DAY_WINDOW_SHARE)."""
+    out = np.zeros(len(sites))
+    for dt, wd in enumerate(DAY_WEIGHTS):
+        v = flows(m, background(m, dt)[0], m.cap, pre=m.pre.get(dt))
+        v = np.minimum(v, m.cap)  # a counter sees what gets through, not queued traffic re-trying
+        out += wd * np.array([v[:, ks].sum() / 4.0 for ks in edges]) / DAY_WINDOW_SHARE
+    return out
+
+
+def calibrate_external(m: Model, sites: list[dict], log=print,
+                       grid=(0.6, 0.8, 1.0, 1.25, 1.5, 1.8, 2.1, 2.5, 3.0)) -> list[dict]:
+    """Scale everything that crosses the edge of the area (census commuters, county visitors and
+    through traffic) so modelled average daily two-way flows match DfT AADF at the count points.
+
+    Grid search on the weighted root-mean-square log error, like calibrate_to_counts: route choice
+    makes flows at one point non-linear in the scale. Returns one row per count point.
+    """
+    edges = [count_point_edges(m, s) for s in sites]
+    use = [i for i, e in enumerate(edges) if e]
+    for i, s in enumerate(sites):
+        if not edges[i]:
+            log(f"calibrate DfT: no model link found for {s['label']} "
+                f"(count point {s['count_point']})")
+    sites_u, edges_u = [sites[i] for i in use], [edges[i] for i in use]
+    obs = np.array([s["aadf"] for s in sites_u], float)
+    wts = np.array([(1.0 if s["method"] == "Counted" else ESTIMATED_WEIGHT) * s.get("fit", True)
+                    for s in sites_u])
     best = None
     for g in grid:
         m.scale_ext = g
-        v = flows(m, background(m, 0)[0], m.cap)
-        x = (v[peak] / m.cap).max(axis=0)[strategic]
-        w = m.length[strategic]
-        order = np.argsort(x)
-        cum = np.cumsum(w[order]) / w.sum()
-        p85 = float(x[order][np.searchsorted(cum, 0.85)])
-        log(f"calibrate county traffic: scale {g:.2f} -> motorway/trunk peak load p85 {p85:.2f}")
-        if best is None or abs(p85 - target) < best[0]:
-            best = (abs(p85 - target), g, p85)
-    m.scale_ext = best[1]
-    log(f"calibrate county traffic: chose {m.scale_ext:.2f} (p85 {best[2]:.2f})")
-    return best[2]
+        mod = modelled_aadf(m, sites_u, edges_u)
+        err = math.sqrt(float((wts * np.log((obs + 1) / (mod + 1)) ** 2).sum() / wts.sum()))
+        log(f"calibrate DfT: scale {g:.2f} -> modelled/observed AADF {mod.sum() / obs.sum():.2f} "
+            f"overall (log error {err:.3f})")
+        if best is None or err < best[0]:
+            best = (err, g, mod)
+    err, m.scale_ext, mod = best
+    log(f"calibrate DfT: chose scale {m.scale_ext:.2f} for traffic crossing the edge "
+        f"(log error {err:.3f})")
+    rows = []
+    for s, ks, md in zip(sites_u, edges_u, mod, strict=True):
+        rows.append({"road": s["label"], "count_point": s["count_point"], "year": s["year"],
+                     "method": s["method"], "link": s["link"], "observed": s["aadf"],
+                     "modelled": round(float(md)), "links": len(ks),
+                     "fitted": bool(s.get("fit", True))})
+        log(f"  DfT {s['count_point']:6d} {s['label']:42s} {s['year']} {s['method']:9s} "
+            f"observed {s['aadf']:7d}  modelled {md:7.0f}  ({100 * (md / s['aadf'] - 1):+.0f}%)"
+            + ("" if s.get("fit", True) else "  (check, not fitted)"))
+    return rows
 
 
 

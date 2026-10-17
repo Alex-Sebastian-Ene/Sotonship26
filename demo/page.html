@@ -425,7 +425,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       <div class="card">
         <ol class="steps">
           <li><strong>The network is Southampton's.</strong> <span id="m-edges"></span> one-way road links from OpenStreetMap, with lanes and speed limits, from motorways down to unclassified roads.</li>
-          <li><strong>Zones and gateways come from geography.</strong> <span id="m-zones"></span> zones built from OSM places. Each zone's homes, jobs and shops come from nearby residential, commercial, industrial, port and retail land. <span id="m-gw"></span> county gateways sit where the M27, M3, A35, A33 and other roads cross into the area.</li>
+          <li><strong>Zones and gateways come from geography.</strong> <span id="m-zones"></span> zones built from OSM places. Each zone's homes, jobs and shops come from nearby residential, commercial, industrial, port and retail land. <span id="m-gw"></span> county gateways sit where the M27, M3, A35, A33 and other roads cross into the area. Where cutting the map to the area broke the M27 and M3 (a missing carriageway, slip roads standing in for the motorway), and where OpenStreetMap lacks the M3 to M27 eastbound link, the model joins them up.</li>
           <li><strong>General traffic is generated, not assumed.</strong> Commuters from the county to the area's jobs and back, residents working outside, trips between zones (more between big, close zones), through traffic between gateways and county visitors to the shops. Each has its own pattern over the day, different at weekends. The school run adds drop-off and pick-up peaks on term-time weekdays only (city council half-term 26–30 Oct). Match days add fans to St Mary's.</li>
           <li><strong>Counted roads use the counts.</strong> On Portswood Road, Highfield Lane and Bevois Hill, measured peak speeds of 16–20 mph on 30 mph roads show they are at their limit, so the counted peak-hour flow sets their capacity. Local traffic the zones miss is added so flows match the counts, plus <span id="m-uni"></span> for university term, because the counts were taken in July.</li>
           <li><strong>Cruise traffic is added per ship.</strong> Car drop-offs, park and cruise, taxis and coaches, timed by disembarkation and boarding and sent to the terminal's nearest dock gate.</li>
@@ -436,19 +436,24 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       </div>
       <div class="card status">
         <p class="eyebrow" style="color: inherit">Backtest: not run yet</p>
-        <p>The demo has no observed traffic, so it cannot show accuracy. The product replaces the invented totals with Census 2021 travel-to-work flows and DfT counts, learns the cruise travel assumptions from 15-minute counts on past cruise days (lead candidate: National Highways WebTRIS on the M271), and tests on later days it has not seen.</p>
+        <p>The demo is fitted to annual and July counts but has no observed cruise days, so it cannot show accuracy. County commuters already come from Census 2021 travel-to-work flows and county traffic is fitted to DfT annual counts. The product also learns the cruise travel assumptions from 15-minute counts on past cruise days (lead candidate: National Highways WebTRIS on the M271), and tests on later days it has not seen.</p>
         <p>It reports average error, Brier score and how often observations fall inside the 80% range, against three baselines: the last comparable cruise day, a model using passenger numbers only, and no cruise effect.</p>
       </div>
       <div class="card">
         <h3>Trip totals in this demo</h3>
         <div class="table-scroll"><table id="purposes"></table></div>
-        <p class="foot-note">Invented, then scaled <span id="m-scale"></span>. Trips within the area are fitted to council counts. County and through trips are set so weekday peaks on motorway and trunk roads sit near 85% of capacity, a stand-in until WebTRIS counts are used. Cruise travel split: <span id="m-modes"></span>.</p>
+        <p class="foot-note">Scaled <span id="m-scale"></span>. Commuters from the county and residents working outside are Census 2021 car drivers crossing the edge of the area (<span id="m-census"></span>), with where they come from and which road they use. Through traffic and other county trips come from DfT counts on the roads into the area. Visitors, trips within the area and the school run are invented totals. Trips within the area are fitted to council counts. Everything crossing the edge of the area is fitted to DfT counts (below), because census day fell in lockdown. Cruise travel split: <span id="m-modes"></span>.</p>
       </div>
       <div class="card" style="grid-column: 1 / -1">
         <h3>Checked against council traffic counts</h3>
         <p class="foot-note">Trips within the area are scaled so that, summed over four counting sites around Portswood, modelled weekday flows match what was counted. Saturday is a check, not fitted. Single roads are less accurate because each zone loads the network at one point; finer zones are the next step. Source: <span id="calib-src"></span>.</p>
         <div class="table-scroll"><table id="calib"></table></div>
         <p class="foot-note">The same report gives bus run times on Portswood Road (Table 3-5): in July 2024 services ran 0:24 to 4:22 minutes behind timetable in the peaks, and a quarter of Bluestar 2 southbound buses were 5 or more minutes late. The modelled delays on Portswood Road should sit in that range out of term and above it in term. Longer waits that residents report, such as 30 minutes, build up across several junctions on a whole journey; checking them needs term-time journey times, for example bus positions from the Bus Open Data Service.</p>
+      </div>
+      <div class="card" style="grid-column: 1 / -1">
+        <h3>Checked against DfT traffic counts</h3>
+        <p class="foot-note">County commuters, visitors and through traffic are scaled together so that modelled average daily two-way flows match the DfT annual average daily flow (all motor vehicles) at these count points. Modelled flows are 05:00–20:00 on a weekday, Saturday and Sunday, weighted 5:1:1 and grossed up to 24 hours (<span id="dft-window"></span> of traffic assumed between 05:00 and 20:00). "Estimated" points are DfT figures factored from an older count and count half in the fit. Itchen Bridge is tolled and the model has no tolls, so some of its traffic sits on Northam Bridge instead; both are checks, not fitted. At each gateway, what the DfT count on that road leaves after census commuters and visitors is split: 30% through traffic, 70% other trips to and from the area (business, freight, the port, shopping), going to bigger and nearer zones first. Source: <span id="dft-src"></span>, downloaded <span id="dft-date"></span>.</p>
+        <div class="table-scroll"><table id="calib-dft"></table></div>
       </div>
       <div class="card">
         <h3>Not modelled yet</h3>
@@ -459,7 +464,9 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
           <li>Incidents, breakdowns and weather</li>
           <li>Buses, rail and people switching mode when roads are busy</li>
           <li>Traffic inside the port</li>
-          <li>County traffic from real origin–destination data (some bottlenecks, such as Itchen Bridge and Redbridge, run over capacity even without ships)</li>
+          <li>Where county trips other than commuting go inside the area (bigger, nearer zones first; port freight is not separate)</li>
+          <li>Itchen Bridge toll (the model sends some Northam Bridge traffic over Itchen Bridge)</li>
+          <li>Commuters' routes outside the area (each picks a gateway by a straight-line estimate)</li>
         </ul>
         <p class="foot-note">Only roads with sensors can be checked against reality. Every other road on this page is a model output.</p>
       </div>
@@ -629,6 +636,17 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     }).join('');
     $('#calib').innerHTML = `<thead><tr><th>Count site</th><th>When</th><th>Counted</th><th>Modelled</th><th>Diff</th></tr></thead><tbody>${sums}${rowsHtml}</tbody>`;
     $('#calib-src').textContent = cal.source;
+    const dft = cal.dft;
+    if (dft) {
+      const pctDiff = r => Math.round((r.modelled / r.observed - 1) * 100);
+      $('#calib-dft').innerHTML = `<thead><tr><th>Count point</th><th>DfT link</th><th>Year</th><th>Counted (AADF)</th><th>Modelled</th><th>Diff</th></tr></thead><tbody>${dft.rows.map(r =>
+        `<tr><td>${esc(r.road)} <span class="muted mono">#${r.count_point}</span>${r.fitted ? '' : ' <span class="muted">(check, not fitted)</span>'}</td><td>${esc(r.link)}</td><td>${r.year} ${r.method === 'Counted' ? 'counted' : '<span class="muted">estimated</span>'}</td><td class="num">${int(r.observed)}</td><td class="num">${int(r.modelled)}</td><td class="num">${pctDiff(r) > 0 ? '+' : ''}${pctDiff(r)}%</td></tr>`).join('')}</tbody>`;
+      $('#dft-src').textContent = dft.source;
+      $('#dft-date').textContent = dft.collected;
+      $('#dft-window').textContent = `${Math.round(cal.day_window_share * 100)}%`;
+    }
+    const cz = M.census;
+    if (cz && cz.drivers) $('#m-census').textContent = `${int(cz.drivers.county)} in and ${int(cz.drivers.outbound)} out per weekday in 2021, ${Math.round(cz.commute_day * 100)}% assumed to travel on a given weekday`;
     $('#m-uni').textContent = `+${Math.round((M.uni_term - 1) * 100)}%`;
     $('#legend').innerHTML = LEVELS.map(l => { const nx = LEVELS[l.n + 1]; return `<span><span class="sw lv-${l.key}"></span>${l.label} <span class="mono">${nx ? `${l.min}–${nx.min}` : `${l.min}+`}</span></span>`; }).join('') +
       '<span>extra corridor-hours at risk from cruise traffic</span><span><span class="tag">Works</span> roadworks permit</span><span><span class="tag">Match</span> home match</span><span><span class="tag">?</span> passenger figure missing</span>';
