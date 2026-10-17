@@ -234,5 +234,12 @@ data improves it by about 4% a day (not significant) and 2% per 15 minutes.
   the public sources cited on each line.
 - **AI-generated (queues at bottlenecks):** the counted-road capacity and local-traffic change in `demo/traffic_model.py` (`COUNT_HEADROOM`, per-link top-up in `anchor_counts`), `demo/bus_check.py`, `demo/queue_report.py`, `cluster/iridis/bus_check.slurm`, `tests/test_demo_queues.py` and `docs/queues.md` were written with Claude Code on Sat 17 Oct 2026. The headroom is fitted to the council's July 2024 bus run times on Portswood Road (Portswood Project Baseline Data Report, Table 3-5) and its peak speeds (Table 3-10).
 - **AI-generated (SUMO check):** `demo/sumo_net.py`, `demo/sumo_demand.py`, `demo/sumo_compare.py`, `cluster/iridis/sumo.slurm`, `tests/test_sumo_check.py` and `docs/sumo-check.md` were written with Claude Code on Sat 17 Oct 2026. The microsimulation itself is Eclipse SUMO 1.28.0 (EPL-2.0, the official container image) run on Iridis.
+- **AI-generated (west-side counts, SOT-27):** counting each vehicle once at the count points
+  (`run_day`'s `count` output, used by `flows`, `modelled_aadf` and `modelled_lorries`), the
+  M271 cruise probe capped at capacity, the network repairs for the M27 eastbound through
+  junction 3, the A326 northbound into M27 junction 2 and the M3 southbound lanes
+  (`MISSING_LINKS`, `LANE_FIXES`), the count-point link choice at the A33 Redbridge Road, the
+  refitted through share and other-trip decay, the alternating DfT and council fits in
+  `build_ctx`, and `docs/west-side-counts.md` were written with Claude Code on Sat 17 Oct 2026.
 - **Existed before the event:** TODO, confirm with the organisers.
 - **Who helped:** TODO.

@@ -62,10 +62,33 @@ GATEWAY_WEIGHT = {"motorway": 6.0, "trunk": 3.0, "primary": 2.0, "secondary": 1.
 # a wider band, because OSM's M27 stops at junction 8, 1.6 km short of the east edge.
 GATEWAY_EDGE_M = {"motorway": 2000.0}
 GATEWAY_EDGE_DEFAULT_M = 1500.0
-# Motorway links absent from the OSM network osm_base.py builds: (what, from (lat, lon), motorway
-# there, to (lat, lon), motorway there, lanes). Each end snaps to the nearest node of that motorway.
+# Links absent from the OSM network osm_base.py builds: (what, from, to, lanes, class), each end
+# (lat, lon), road, "in" or "out". An end snaps to the nearest node where an edge of that road
+# ends ("in") or starts ("out"), or to the nearest node of any road where none is given.
+# The Totton Western Bypass (A326) northbound from the A36 to M27 junction 2 at Ower lies on the
+# west edge of the area and is cut off, with the A36's slip onto it, while southbound survives:
+# without it everything from Totton, the Waterside and the A3090 to the M27 and M3 detoured over
+# the Redbridge Causeway and the M271 (DfT counts 27,898 a day on the bypass, count point 99867).
+# The M27 eastbound carriageway is missing from the west edge through junction 3 (OSM ways
+# 151025941 to 25789767, 3 lanes): step 2 rebuilds it to the west side of junction 3, and without
+# the rest all eastbound M27 traffic left by the slip, went round the Rownhams roundabout and
+# rejoined by a two-lane slip, which jammed all day.
 MISSING_LINKS = [
-    ("M3 southbound to M27 eastbound", (50.96128, -1.38826), "M3", (50.94885, -1.39472), "M27", 2),
+    ("M27 eastbound through junction 3", ((50.9449, -1.4836), "M27", "in"),
+     ((50.9497, -1.4667), "M27", "out"), 3, "motorway"),
+    ("M3 southbound to M27 eastbound", ((50.96128, -1.38826), "M3", "out"),
+     ((50.94885, -1.39472), "M27", "in"), 2, "motorway_link"),
+    ("A326 northbound to M27 junction 2", ((50.9391, -1.5277), "A326", "in"),
+     ((50.9452, -1.5288), "M27", "in"), 2, "primary"),
+    ("A36 to the A326 northbound", ((50.9405, -1.5297), None, "out"),
+     ((50.9452, -1.5288), "M27", "in"), 1, "primary_link"),
+]
+# Motorway carriageways the network has too few lanes on: (what, (lat, lon) on it, motorway,
+# heading, lanes). South of junction 13 the M3 southbound is two 2-lane carriageways in OSM (ways
+# 146454517 and 146454543) and the network kept one, so all M3 southbound traffic squeezed into
+# two lanes.
+LANE_FIXES = [
+    ("M3 southbound, junctions 13 to 14", (50.9657, -1.3830), "M3", "south", 4),
 ]
 # Census commuters pick a gateway by time: straight line outside the area (times GATEWAY_CIRCUITY,
 # at the speed of the gateway's road class) plus the quickest free-flow route inside it, shared
@@ -88,14 +111,19 @@ DAY_WEIGHTS = (5 / 7, 1 / 7, 1 / 7)  # weekday, Saturday, Sunday in an average d
 # GATEWAY_COUNT_M) minus census commuters and county visitors crossing there is split into through
 # traffic (THROUGH_SHARE; gateway pairs balanced to it) and other trips between the gateway and
 # the area's zones (business, freight, the port, shopping and leisure; bigger, nearer zones first).
-# THROUGH_SHARE and OTHER_T_S were chosen by fitting the DfT count points on 17 Oct 2026: shares
-# of 0.2 and 0.3 fitted equally (0.5 and 0.7 worse), and 0.3 is the more plausible for the M27.
+# THROUGH_SHARE and OTHER_T_S were chosen by fitting the DfT count points on 17 Oct 2026 (SOT-27,
+# docs/west-side-counts.md), after the fit stopped counting queued traffic again every 15
+# minutes: through shares of 0.3 and 0.45 (OTHER_T_S 900 s) gave log errors 0.233 and 0.205, 0.6
+# and 0.75 (1800 s) 0.197 and 0.201; 900 against 1800 s changed little in earlier scans. 0.6 is
+# the more plausible share for gateways that are not motorways. The DfT counts round the
+# M27 say much of its traffic passes the city: 80,096 a day west of junction 2, 102,592 between
+# junctions 2 and 3, 136,437 between 3 and 4, with 72,424 on the link to the M3.
 GATEWAY_COUNT_M = 3500.0
 GATEWAY_COUNT_DEPTH_M = 1000.0
-THROUGH_SHARE = 0.3
-OTHER_T_S = 900.0  # other county trips: zone weight falls by e for every 15 free-flow minutes
+THROUGH_SHARE = 0.6
+OTHER_T_S = 1800.0  # other county trips: zone weight falls by e for every 30 free-flow minutes
 # Trips these give on an average day (both directions); build() recomputes them and warns.
-CORDON_DAILY = {"through": 57063, "other": 266294}
+CORDON_DAILY = {"through": 114224, "other": 152298}
 CORDON_DAYS = (1.0, 0.8, 0.7)  # assumed weekday, Saturday, Sunday ratio
 
 # Port freight (SOT-24): lorries between the county gateways and the port gates, in car-equivalents
@@ -198,6 +226,7 @@ GROUPS = {
 }
 MATCH_FANS_CARS = 9000
 SHORT_TRIP_M = 1200  # internal trips shorter than this mostly use residential streets or walk
+INTERNAL_D_M = 3000.0  # trips within the area: zone pair weight falls by e every this many metres
 # Mid-link capacity per lane (vehicles/hour) by road class, replacing the junction-limited values
 # osm_base.py stores; the model's links are road sections between junctions.
 CAP_LANE = {"motorway": 2000, "motorway_link": 1600, "trunk": 1800, "trunk_link": 1400,
@@ -298,8 +327,10 @@ def repair_motorways(g, size, log=print) -> set:
        carriageway of the same road within 150 m is reversed back to the first junction (all with
        the lanes of its widest part), and if nothing leads on from there, joined to the nearest
        motorway node within 800 m.
-    3. Links in MISSING_LINKS (M3 southbound to M27 eastbound at junction 14 / 4, without which
-       that traffic cut through Eastleigh's side streets) are added.
+    3. Links in MISSING_LINKS are added: M3 southbound to M27 eastbound at junction 14 / 4,
+       without which that traffic cut through Eastleigh's side streets, and the A326 northbound
+       into M27 junction 2.
+    4. Carriageways in LANE_FIXES get the lanes OSM gives them.
 
     Returns the motorway ends found at the edge: gateway candidates, though they now have links
     both ways.
@@ -412,28 +443,45 @@ def repair_motorways(g, size, log=print) -> set:
                            cap=CAP_LANE["motorway_link"] * 2, t0=dist / (60 / 3.6),
                            coords=[tuple(g.nodes[j]["xy"]), tuple(g.nodes[q]["xy"])])
                 added.append(f"{ref} connector")
-    # 3. Motorway links missing from the network altogether.
+    # 3. Links missing from the network altogether.
     x0, y1, *_, to_bng = ext.frame_origin()
-    for what, a, ref_a, b, ref_b, lanes in MISSING_LINKS:
+    def road(e, ref):
+        d = g.edges[e]
+        return ref in d["ref"].split(";") and (mw(d) or not ref.startswith("M"))
+
+    for what, *ends, lanes, link_cls in MISSING_LINKS:
         pts = []
-        for (lat, lon), ref, out in ((a, ref_a, True), (b, ref_b, False)):
+        for (lat, lon), ref, side in ends:
             e, n = to_bng.transform(lon, lat)
             p = (e - x0, y1 - n)
             on = [u for u in g.nodes
-                  if any(mw(g.edges[(u, q) if out else (q, u)])
-                         and ref in g.edges[(u, q) if out else (q, u)]["ref"].split(";")
-                         for q in (g.successors(u) if out else g.predecessors(u)))]
+                  if any(ref is None or road(x, ref)
+                         for x in ([(u, q) for q in g.successors(u)] if side == "out"
+                                   else [(q, u) for q in g.predecessors(u)]))]
             pts.append(min(on, key=lambda u: math.dist(p, g.nodes[u]["xy"])))
         u, v = pts
         if not g.has_edge(u, v):
-            d = 1.3 * math.dist(g.nodes[u]["xy"], g.nodes[v]["xy"])  # slip roads curve
-            g.add_edge(u, v, length=d, cls="motorway_link", name="", ref=ref_a, lanes=lanes,
-                       cap=CAP_LANE["motorway_link"] * lanes, t0=d / (70 / 3.6),
+            main = link_cls == "motorway"
+            d = (1.05 if main else 1.3) * math.dist(g.nodes[u]["xy"], g.nodes[v]["xy"])  # slips curve
+            kmh = 100 if main else 70 if link_cls == "motorway_link" else 60
+            g.add_edge(u, v, length=d, cls=link_cls, name="", ref=ends[0][1] or "", lanes=lanes,
+                       cap=CAP_LANE[link_cls] * lanes, t0=d / (kmh / 3.6),
                        coords=[tuple(g.nodes[u]["xy"]), tuple(g.nodes[v]["xy"])])
             added.append(what)
+    # 4. Lanes the network lost.
+    for what, (lat, lon), ref, heading, lanes in LANE_FIXES:
+        e, n = to_bng.transform(lon, lat)
+        p = np.array([e - x0, y1 - n])
+        on = [(_seg_dist(p, d["coords"]), u, v) for u, v, d in g.edges(data=True)
+              if d["cls"] == "motorway" and ref in d["ref"].split(";")
+              and (d["coords"][-1][1] > d["coords"][0][1]) == (heading == "south")]
+        dist, u, v = min(on)
+        if dist < 300 and g.edges[u, v]["lanes"] < lanes:
+            g.edges[u, v]["lanes"] = lanes
+            added.append(what)
     if added:
-        log(f"network repair: added {len(added)} links where cutting OSM to the area broke a "
-            f"motorway or OSM lacks one ({'; '.join(sorted(set(added)))})")
+        log(f"network repair: {len(added)} fixes where cutting OSM to the area broke a motorway "
+            f"or the network lacks a link or lanes ({'; '.join(sorted(set(added)))})")
     return cut
 
 
@@ -595,7 +643,8 @@ def build(net_path: Path, gates: dict[str, tuple[int, int]], log=print,
         elif key == "internal" or key in SCHOOL_KEYS:
             dist = zdist
             if key == "internal":
-                T = homes[:, None] * (jobs + 0.5 * homes + 0.8 * retail)[None, :] * np.exp(-dist / 3000.0)
+                T = (homes[:, None] * (jobs + 0.5 * homes + 0.8 * retail)[None, :]
+                     * np.exp(-dist / INTERNAL_D_M))
             elif o_set == "homes":
                 T = homes[:, None] * schools[None, :] * np.exp(-dist / 1800.0)
             else:
@@ -1044,11 +1093,20 @@ def run_day(m: Model, D: np.ndarray, cap: np.ndarray, shares0: np.ndarray, iters
 
     D: vehicles per bin per OD (all traffic), cruise: the cruise part of D (or None).
     Returns a dict of per-bin arrays and the route shares to warm-start from next time.
+
+    "x" is demand over capacity: traffic waiting in a queue is on every link of its route again
+    in each 15 minutes it waits. "count" (and "cruise_count") is what a roadside counter sees,
+    each vehicle once: on the links before its route's bottleneck when it sets off, on the
+    bottleneck and after it when it gets through.
     """
     queue = np.zeros(m.n_od)
     cruise_queue = np.zeros(m.n_od)
     out = {k: [] for k in want}
     shares = np.empty_like(shares0)
+    counting = "count" in out or "cruise_count" in out
+    if counting:
+        starts = m.col_ptr
+        path_of = np.repeat(np.arange(len(starts)), np.diff(np.append(starts, len(m.col_idx))))
     for b in range(N_BINS):
         veh = D[b] + queue
         rate = veh * 4.0
@@ -1066,6 +1124,14 @@ def run_day(m: Model, D: np.ndarray, cap: np.ndarray, shares0: np.ndarray, iters
             out["delay"].append(delay_minutes(m, x))
         served = f / np.maximum(bottleneck, 1.0)
         unserved = CARRY * (f - served).reshape(m.n_od, ROUTES).sum(axis=1) / 4.0
+        if counting:
+            reached = x[m.col_idx] >= bottleneck[path_of]
+            cs = np.cumsum(reached)
+            after = cs - (cs[starts] - reached[starts])[path_of] > 0
+            new = np.repeat(np.divide(D[b], veh, out=np.zeros_like(veh), where=veh > 0), ROUTES)
+            if "count" in out:
+                w = np.where(after, served[path_of], (f * new)[path_of])
+                out["count"].append(np.bincount(m.col_idx, weights=w, minlength=len(m.t0)) + pb)
         cap_now = capb
         with np.errstate(invalid="ignore", divide="ignore"):
             sh = np.where(rate[:, None] > 0, f.reshape(m.n_od, ROUTES) / rate[:, None], shares0[b])
@@ -1080,6 +1146,12 @@ def run_day(m: Model, D: np.ndarray, cap: np.ndarray, shares0: np.ndarray, iters
             fc = f * np.repeat(frac, ROUTES)
             if "cruise_edge" in out:
                 out["cruise_edge"].append(m.A @ fc)
+            if "cruise_count" in out:
+                new_c = np.repeat(np.divide(cruise[b], veh, out=np.zeros_like(veh), where=veh > 0),
+                                  ROUTES)
+                w = np.where(after, (served * np.repeat(frac, ROUTES))[path_of],
+                             (f * new_c)[path_of])
+                out["cruise_count"].append(np.bincount(m.col_idx, weights=w, minlength=len(m.t0)))
             if "cruise_path" in out:
                 out["cruise_path"].append(fc)
             cruise_queue = unserved * frac
@@ -1126,9 +1198,10 @@ PERIODS = {"am": (8, 20), "pm": (44, 56), "day": (0, N_BINS)}  # 07-10, 16-19, 0
 
 
 def flows(m: Model, D: np.ndarray, cap: np.ndarray, iters: int = 8, pre=None) -> np.ndarray:
-    """Vehicles per hour on every edge in every bin for a deterministic day."""
-    res, _ = run_day(m, D, cap, initial_shares(m), iters, want=("x",), pre=pre)
-    return res["x"] * cap
+    """Vehicles per hour past every edge in every bin for a deterministic day, as a counter sees
+    them (each vehicle once, see run_day)."""
+    res, _ = run_day(m, D, cap, initial_shares(m), iters, want=("count",), pre=pre)
+    return np.minimum(res["count"], cap)
 
 
 def road_edges(m: Model, names, min_length: float = 40.0) -> list[int]:
@@ -1231,22 +1304,28 @@ def count_point_edges(m: Model, site: dict, radius: float = 250.0) -> list[int]:
 
     found.sort(key=lambda f: (not tie(f), -m.length[f[1]] if tie(f) else f[0]))
     _, k1, h1 = found[0]
-    back = [k for _, k, h in found if float(h @ h1) < -0.3]
-    return [k1] + back[:1]
+    back = sorted((f for f in found if float(f[2] @ h1) < -0.3), key=lambda f: f[0])
+    # the other direction on the same road, where there is one close by: at 90217 the A33
+    # Redbridge Road inbound splits at the count point into the Millbrook Flyover and the slip to
+    # Millbrook roundabout, and the nearest link (the flyover) carries only part of it
+    same = [f for f in back if m.name[k1] and m.name[f[1]] == m.name[k1] and f[0] < 60.0]
+    if same:
+        back = sorted((f for f in same if f[0] <= same[0][0] + 25.0), key=lambda f: -m.length[f[1]])
+    return [k1] + [f[1] for f in back[:1]]
 
 
 def modelled_aadf(m: Model, sites: list[dict], edges: list[list[int]]) -> np.ndarray:
     """Average daily two-way vehicles past each count point (weekday, Saturday and Sunday flows
-    over 05:00-20:00, at most capacity, weighted by DAY_WEIGHTS and grossed up to 24 hours by
-    DAY_WINDOW_SHARE)."""
+    over 05:00-20:00, each vehicle counted once and at most capacity, weighted by DAY_WEIGHTS and
+    grossed up to 24 hours by DAY_WINDOW_SHARE)."""
     out = np.zeros(len(sites))
     for dt, wd in enumerate(DAY_WEIGHTS):
         D, _ = background(m, dt)
         Df = freight_demand(m, dt)
-        res, _ = run_day(m, D, m.cap, initial_shares(m), 8, cruise=Df, want=("x", "cruise_edge"),
-                         pre=m.pre.get(dt))
-        v = np.minimum(res["x"] * m.cap, m.cap)  # a counter sees what gets through
-        lorry_pcu = res["cruise_edge"]
+        res, _ = run_day(m, D, m.cap, initial_shares(m), 8, cruise=Df,
+                         want=("count", "cruise_count"), pre=m.pre.get(dt))
+        v = np.minimum(res["count"], m.cap)  # a counter sees what gets through, once
+        lorry_pcu = res["cruise_count"]
         v = v - lorry_pcu * (1 - 1 / HGV_PCU)  # count a lorry once, not as 2.5 cars
         daily = np.array([v[:, ks].sum() / 4.0 for ks in edges])
         lorries = np.array([lorry_pcu[:, ks].sum() / 4.0 / HGV_PCU for ks in edges])
@@ -1270,8 +1349,8 @@ def modelled_lorries(m: Model, edges: list[list[int]]) -> np.ndarray:
     for dt, wd in enumerate(DAY_WEIGHTS):
         D, _ = background(m, dt)
         res, _ = run_day(m, D, m.cap, initial_shares(m), 8, cruise=freight_demand(m, dt),
-                         want=("cruise_edge",), pre=m.pre.get(dt))
-        lorries = np.array([res["cruise_edge"][:, ks].sum() / 4.0 / HGV_PCU for ks in edges])
+                         want=("cruise_count",), pre=m.pre.get(dt))
+        lorries = np.array([res["cruise_count"][:, ks].sum() / 4.0 / HGV_PCU for ks in edges])
         out += wd * lorries / FREIGHT_WINDOW_SHARE[dt]
     return out
 

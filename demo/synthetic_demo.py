@@ -279,8 +279,10 @@ def build_ctx(log=print) -> tuple[Ctx, dict]:
             gates["Eastern Docks gate"] = tuple(np.mean(east, axis=0).round().astype(int))
     m = tm.build(CACHE / "network.pkl", gates, log=log, port_gates=dict(base.get("gates") or {}))
     dft = ext.count_points(log=log)
-    tm.calibrate_external(m, dft["sites"], log=log, grid=(0.6, 0.8, 1.0, 1.25, 1.6))
-    calibration = tm.calibrate_to_counts(m, COUNT_SITES, log=log)
+    # county and city traffic both load the count points, so fit the two scales in turn
+    for _ in range(2):
+        tm.calibrate_external(m, dft["sites"], log=log, grid=(0.6, 0.8, 1.0, 1.25, 1.6))
+        calibration = tm.calibrate_to_counts(m, COUNT_SITES, log=log)
     freight_rows = tm.calibrate_freight(m, dft["sites"], log=log)
     near = tuple(round(m.scale_ext * f, 3) for f in (0.85, 0.92, 1.0, 1.08, 1.17))
     dft_rows = tm.calibrate_external(m, dft["sites"], log=log, grid=near)
@@ -628,9 +630,13 @@ def forecast(task: dict) -> dict:
                                    events=events)
                 cxb, _ = corridor_stats(rb["x"])
                 if task.get("probe") is not None:  # paired cruise flow on chosen edges, veh/h
+                    # Link load at most capacity, not run_day's "count": queued traffic still
+                    # re-occupies the links before its bottleneck every 15 minutes, so counted
+                    # once the extra cruise cars mostly displace others at Redbridge (SOT-27,
+                    # docs/west-side-counts.md).
                     pe = np.asarray(task["probe"])
-                    diff = (x[:, pe] - rb["x"][:, pe]) * m.cap[pe]
-                    acc["probe"] = acc["probe"] + diff.mean(axis=1)
+                    diff = np.minimum(x[:, pe], 1.0) - np.minimum(rb["x"][:, pe], 1.0)
+                    acc["probe"] = acc["probe"] + (diff * cap[pe]).mean(axis=1)
             else:
                 cxb = cx
             acc["bg85"] = acc["bg85"] + (cxb > tm.AT_RISK)
