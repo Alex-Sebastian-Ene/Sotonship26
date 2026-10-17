@@ -77,7 +77,7 @@ Iridis. "Queues only" is steps 1 and 3 (Iridis job 1890524); "this branch" is al
 | M271 cruise fit, counted, RMSE per 15 min | 19.6 | 19.3 | **13.6** |
 | M271 cruise fit on link load (what the page used), RMSE | 13.8 | | |
 | Cruise assumptions the fit picks (car and taxi share, from the county, shift) | x1.0, 80%, 0 | x1.0, 95%, 0 | x1.15, 95%, 0 |
-| Corridor-hours at risk per day, 44 days, mean (max) | 110.0 (158.5) | 67.6 (99.4) | IRIDIS_V3 |
+| Corridor-hours at risk per day, 44 days, mean (max) | 110.0 (158.5) | 67.6 (99.4) | 57.9 (83.0) |
 
 The cruise fit compares the paired with-and-without-ships difference on the two M271 northbound
 links at WebTRIS 19974 with the learned uplift for a Saturday with 5,000 berths at each dock
@@ -94,9 +94,13 @@ demand (see `docs/west-side-counts.md`), not queues. The M271 rises from +11% to
 it is past those jams: traffic held at the A35 slip and at the A33 slip to Redbridge roundabout
 now gets onto it instead of being loaded again upstream (step 1) or disappearing (step 2).
 
-**Corridor-hours at risk fall** because demand over capacity no longer counts waiting traffic on
-the links before its bottleneck. Those links were shown at risk only because the same cars were
-loaded on them again every 15 minutes.
+**Corridor-hours at risk fall by about half** (full rebuild, Iridis job 1890911 against 1890271,
+same 44 days and schedule). Demand over capacity no longer counts waiting traffic on the links
+before its bottleneck; those links were shown at risk only because the same cars were loaded on
+them again every 15 minutes. Steps 1 and 3 alone take the mean to 67.6 (job 1890524); the lower
+county and city scales after step 2 take it to 57.9. Each day falls to 0.41-0.63 of its old
+value, and the order of days barely changes (Spearman rank correlation 0.85): Fri 27 Nov is
+still the worst day (158.5 to 83.0). The page's risk numbers change with it.
 
 ## Where the cruise cars were lost (before step 2)
 
