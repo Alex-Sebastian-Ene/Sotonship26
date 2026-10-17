@@ -20,6 +20,7 @@ import numpy as np
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from agents import dec, enc  # noqa: E402
+from ppo_stats import bundle, read_csv  # noqa: E402
 
 TAG = '<script id="extra-data" type="application/json">'
 
@@ -70,6 +71,15 @@ def main(argv=None) -> None:
     ap.add_argument("--ppo", type=Path, default=HERE / "out" / "ppo.json")
     ap.add_argument("--ablation", type=Path, default=HERE / "out" / "ppo_ablation.json",
                     help="train_ppo.py ablation output for the same policy, shown with it")
+    ap.add_argument("--episodes", type=Path,
+                    help="train_ppo.py evaluate's per-day rows (default: ppo.episodes.csv next to "
+                         "--ppo), for the PPO charts")
+    ap.add_argument("--train-days", type=Path,
+                    help="train_days.csv of the run (default: beside the model ppo.json names)")
+    ap.add_argument("--run", action="append", default=[], metavar="LABEL=PPO_JSON",
+                    help="another run's evaluate output, compared with this one in the charts")
+    ap.add_argument("--bus-live", type=Path, default=HERE / "out" / "bus_lateness.json",
+                    help="observed bus lateness from scripts/bustimes.py export")
     ap.add_argument("--out", type=Path, help="default: overwrite --page")
     ap.add_argument("--max-mb", type=float, default=15.5)
     ap.add_argument("--template", type=Path,
@@ -88,13 +98,24 @@ def main(argv=None) -> None:
                  "from this branch (its template has the block)")
     j = page.find("</script>", i)
     head, tail = page[:i + len(TAG)], page[j:]
-    extra = {"agents": None, "ppo": None}
+    extra = {"agents": None, "ppo": None, "bus_live": None}
     if args.agents.exists():
         extra["agents"] = json.loads(args.agents.read_text(encoding="utf-8"))
     if args.ppo.exists():
         extra["ppo"] = json.loads(args.ppo.read_text(encoding="utf-8"))
         if args.ablation.exists():
             extra["ppo"]["ablation"] = json.loads(args.ablation.read_text(encoding="utf-8"))
+        ppo = extra["ppo"]
+        train_days = args.train_days or (Path(ppo["model"]).with_name("train_days.csv")
+                                         if ppo.get("model") else None)
+        runs = {"This run": ppo}
+        for r in args.run:
+            label, path = r.split("=", 1)
+            runs[label] = json.loads(Path(path).read_text(encoding="utf-8"))
+        ppo["stats"] = bundle(ppo, read_csv(args.episodes or args.ppo.with_suffix(".episodes.csv")),
+                              read_csv(train_days), runs)
+    if args.bus_live.exists():
+        extra["bus_live"] = json.loads(args.bus_live.read_text(encoding="utf-8"))
     keep = 1.0
     while True:
         payload = json.dumps(extra, separators=(",", ":")).replace("</", "<\\/")
@@ -108,7 +129,8 @@ def main(argv=None) -> None:
     out = args.out or args.page
     out.write_text(head + payload + tail, encoding="utf-8")
     print(f"wrote {out} ({size:.1f} MB; agents {'yes' if extra['agents'] else 'no'}, "
-          f"PPO {'yes' if extra['ppo'] else 'no'})")
+          f"PPO {'yes' if extra['ppo'] else 'no'}; observed buses "
+          f"{'yes' if extra['bus_live'] else 'no'})")
 
 
 if __name__ == "__main__":

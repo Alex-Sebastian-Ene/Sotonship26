@@ -19,6 +19,8 @@
   --l0: #D8BD78; --l1: #EBA04E; --l2: #E47F3A; --l3: #C8462D; --l4: #861B1B; --l5: #4A0D0D;
   --cruise: #6A3FC4; --queue: #D8432F;
   --ra: #1F57A4; --rb: #B4458F; --rc: #C77A12;
+  --pol-ppo: #2A78D6; --pol-rule: #EB6834; --pol-advisor: #1BAF7A;
+  --area-docks: #2A78D6; --area-centre: #EB6834; --area-portswood: #1BAF7A;
   --g-through: #8C9BA5; --g-county: #2F7EA6; --g-outbound: #7FB8D8; --g-internal: #8DB86A;
   --g-visitors: #E3B04B; --g-match: #C2553A; --g-cruise: #6A3FC4; --g-freight: #8A6A4F; --g-school: #C77A12; --g-bus: #11202A;
   --font-display: Arial, "Helvetica Neue", Helvetica, sans-serif;
@@ -42,6 +44,8 @@
     --l0: #4A4221; --l1: #7D5A20; --l2: #B3632B; --l3: #D8483B; --l4: #FF7062; --l5: #FFB3A8;
     --cruise: #B894FF; --queue: #FF5A45;
     --ra: #86B2EA; --rb: #E681C9; --rc: #F0B04B;
+    --pol-ppo: #3987E5; --pol-rule: #D95926; --pol-advisor: #199E70;
+    --area-docks: #3987E5; --area-centre: #D95926; --area-portswood: #199E70;
     --g-through: #6E7F8B; --g-county: #4FA3CF; --g-outbound: #9CCDE8; --g-internal: #9CCB78;
     --g-visitors: #F0C25E; --g-match: #E07058; --g-cruise: #B894FF; --g-freight: #B89878; --g-school: #F0B04B; --g-bus: #E2E9EE;
     color-scheme: dark;
@@ -61,6 +65,8 @@
   --l0: #4A4221; --l1: #7D5A20; --l2: #B3632B; --l3: #D8483B; --l4: #FF7062; --l5: #FFB3A8;
   --cruise: #B894FF; --queue: #FF5A45;
   --ra: #86B2EA; --rb: #E681C9; --rc: #F0B04B;
+  --pol-ppo: #3987E5; --pol-rule: #D95926; --pol-advisor: #199E70;
+  --area-docks: #3987E5; --area-centre: #D95926; --area-portswood: #199E70;
   --g-through: #6E7F8B; --g-county: #4FA3CF; --g-outbound: #9CCDE8; --g-internal: #9CCB78;
   --g-visitors: #F0C25E; --g-match: #E07058; --g-cruise: #B894FF; --g-freight: #B89878; --g-school: #F0B04B; --g-bus: #E2E9EE;
   color-scheme: dark;
@@ -334,6 +340,43 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
 .ppo-act[data-state="declined"] { opacity: 0.55; }
 .owner { font-size: var(--step--1); color: var(--warn-ink); }
 .curve svg { display: block; width: 100%; height: auto; }
+/* PPO in numbers (charts fold) */
+#ppo-viz .fold-body { grid-template-columns: minmax(0, 1fr); }
+#ppo-viz-body { position: relative; display: grid; gap: 26px; }
+#ppo-viz-body svg { display: block; max-width: 100%; height: auto; overflow: visible; }
+#ppo-viz-body h3 { font-size: var(--step-0); margin: 0 0 4px; }
+.viz-sec { display: grid; gap: 6px; }
+.viz-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+.viz-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: var(--step--1); }
+.viz-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+.viz-legend i.zero-sw { width: 14px; height: 0; border-radius: 0; border-top: 2px dashed var(--line-strong); vertical-align: 3px; }
+.viz-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.viz-tile { display: grid; gap: 2px; align-content: start; border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
+.viz-tile .big { font-size: var(--step-2); font-weight: 650; }
+.viz-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px 28px; }
+.viz-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#ppo-viz-body .lbl { font-family: var(--font-body); font-size: 12px; fill: var(--ink); }
+#ppo-viz-body .lbl-m { font-family: var(--font-body); font-size: 11px; fill: var(--muted); }
+#ppo-viz-body .zero { stroke: var(--line-strong); stroke-width: 1.5; stroke-dasharray: 4 3; }
+#ppo-viz-body .hit { fill: transparent; }
+#ppo-viz-body .xh { stroke: var(--muted); stroke-width: 1; }
+#ppo-viz-body .ring { stroke: var(--surface); stroke-width: 2; }
+.f-ppo { fill: var(--pol-ppo); background: var(--pol-ppo); } .s-ppo { stroke: var(--pol-ppo); }
+.f-rule { fill: var(--pol-rule); background: var(--pol-rule); } .s-rule { stroke: var(--pol-rule); }
+.f-advisor { fill: var(--pol-advisor); background: var(--pol-advisor); } .s-advisor { stroke: var(--pol-advisor); }
+.s-ink { stroke: var(--ink); }
+/* Buses observed on the day (bustimes.org); area colours validated for colour-blind separation */
+#bus-live .fold-body { grid-template-columns: minmax(0, 1fr); }
+.bus-live-chart { position: relative; }
+.bus-live-chart svg { display: block; max-width: 100%; height: auto; overflow: visible; }
+.bl-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: var(--step--1); }
+.bl-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+.bl-f-docks { fill: var(--area-docks); background: var(--area-docks); } .bl-s-docks { stroke: var(--area-docks); }
+.bl-f-centre { fill: var(--area-centre); background: var(--area-centre); } .bl-s-centre { stroke: var(--area-centre); }
+.bl-f-portswood { fill: var(--area-portswood); background: var(--area-portswood); } .bl-s-portswood { stroke: var(--area-portswood); }
+.bl-ring { stroke: var(--surface); stroke-width: 2; }
+.bl-hit { fill: transparent; }
+.bl-zero { stroke: var(--line-strong); stroke-width: 1.5; stroke-dasharray: 4 3; }
 
 @media (max-width: 900px) { .grid2, .sure { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 640px) {
@@ -492,6 +535,10 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
         <summary>Buses on the same roads <span class="sum-note" id="bus-src"></span></summary>
         <div class="fold-body"><div id="bus-body"></div></div>
       </details>
+      <details class="fold" id="bus-live" hidden>
+        <summary>Buses observed on the day <span class="sum-note" id="bus-live-src"></span></summary>
+        <div class="fold-body"><div id="bus-live-body"></div></div>
+      </details>
       <details class="fold" id="gates-card">
         <summary>Dock gates <span class="sum-note">Cruise vehicles per hour; a coach counts as 2</span></summary>
         <div class="fold-body"><div class="gates" id="gates"></div></div>
@@ -563,6 +610,10 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       <details class="fold" id="ppo-test" hidden>
         <summary>Learned policy tested against simpler ones <span class="sum-note">PPO, the advisor and a rule on held-out days</span></summary>
         <div class="fold-body"><div id="ppo-test-body"></div></div>
+      </details>
+      <details class="fold" id="ppo-viz" hidden>
+        <summary>PPO in numbers <span class="sum-note">Charts of the training run and every test day (simulated)</span></summary>
+        <div class="fold-body"><div id="ppo-viz-body"></div></div>
       </details>
       <details class="fold">
         <summary>Not modelled yet</summary>
@@ -1583,17 +1634,69 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     const S = B.source || {}, when = (S.collected || '').slice(0, 10);
     $('#bus-src').textContent = S.kind === 'bods_gtfs' ? `Bus Open Data Service timetables (GTFS), downloaded ${when}, OGL v3.0` : `OpenStreetMap bus routes, read ${when} (ODbL); no timetable, so buses run at assumed headways`;
     const rows = A.D.buses.table, ps = [];
+    const OBS = busLiveDay(A.D.date), obsBy = OBS ? Object.fromEntries(OBS.day_lines.map(p => [p.key.toLowerCase(), p])) : {};
+    const ocell = name => { const o = obsBy[String(name).toLowerCase()]; return o ? `${lateTxt(o.mean_min)} <span class="muted">(${Math.round(o.share_over_5_min * 100)}%, n ${o.n})</span>` : ''; };
     const cell = (o, k) => o && o[k] != null ? `${o[k] >= 0 ? '+' : '−'}${fmt1(Math.abs(o[k]))}` : '';
     const pcell = o => o ? `+${fmt1(o.extra)} <span class="muted">(${fmt1(o.late)} late, ${Math.round(o.late5 * 100)}% ≥5)</span>` : '';
     for (const r of rows) for (const v of Object.values(r.portswood)) ps.push(v.late);
-    const html = rows.slice(0, 18).map(r => `<tr><td><strong>${esc(r.operator)} ${esc(r.name)}</strong><br><span class="muted">${esc(r.long)}</span></td><td class="num">${r.trips}</td>
+    const html = rows.slice(0, 18).map(r => `<tr><td><strong>${esc(r.operator)} ${esc(r.name)}</strong><br><span class="muted">${esc(r.long)}</span></td><td class="num">${r.trips}</td>${OBS ? `<td class="num">${ocell(r.name)}</td>` : ''}
       <td class="num">${cell(r.extra, 'am')} / ${cell(r.extra, 'inter')} / ${cell(r.extra, 'pm')}</td><td class="num">${cell(r.late, 'am')} / ${cell(r.late, 'pm')}</td>
       <td class="num">${pcell(r.portswood.southbound_am)}</td><td class="num">${pcell(r.portswood.southbound_pm)}</td><td class="num">${pcell(r.portswood.northbound_am)}</td><td class="num">${pcell(r.portswood.northbound_pm)}</td></tr>`).join('');
     const lo = ps.length ? Math.min(...ps) : null, hi = ps.length ? Math.max(...ps) : null;
     $('#bus-body').innerHTML = `<p>${int(A.buses.length)} bus trips run on this sampled day's link speeds and queues (no bus lanes in the model; a bus covers a link at ${Math.round(B.assumptions.bus_speed * 100)}% of a car's free-flow speed, stops ${B.assumptions.dwell_s} s at each stop and waits if early).${lo != null ? ` On Portswood Road the modelled buses reach the end of the road between <span class="mono">${fmt1(lo)}</span> and <span class="mono">${fmt1(hi)}</span> minutes behind timetable in the peaks, on average per route and direction.` : ''}</p>
       <p class="foot-note">${esc(B.council)} That count was in July, out of university term${dateOf(A.D.date).getDay() % 6 ? '' : ', and on weekdays; this day is a weekend'}.${day().permits.some(id => PERMIT[id] && PERMIT[id].corridor === 'portswood') ? ' This day also has roadworks with signals on Portswood Road, which the model treats as one lane closed all day.' : ''}</p>
-      <div class="table-scroll"><table><thead><tr><th>Route</th><th>Trips</th><th>Extra min from traffic<br>AM / midday / PM</th><th>Behind at last stop<br>AM / PM</th><th>Portswood SB<br>AM</th><th>Portswood SB<br>PM</th><th>Portswood NB<br>AM</th><th>Portswood NB<br>PM</th></tr></thead><tbody>${html}</tbody></table></div>
+      <div class="table-scroll"><table><thead><tr><th>Route</th><th>Trips</th>${OBS ? '<th>Observed today<br>mean / 5+ min</th>' : ''}<th>Extra min from traffic<br>AM / midday / PM</th><th>Behind at last stop<br>AM / PM</th><th>Portswood SB<br>AM</th><th>Portswood SB<br>PM</th><th>Portswood NB<br>AM</th><th>Portswood NB<br>PM</th></tr></thead><tbody>${html}</tbody></table></div>
       <p class="foot-note">Peaks 07:00–10:00 and 16:00–19:00 by when the bus enters the section. Portswood cells: extra minutes on the road from traffic (minutes behind timetable at the next stop, share of trips 5 or more minutes late).</p>`;
+  }
+  /* ---------- buses observed on the day (bustimes.org live positions, collected by scripts/bustimes.py) ---------- */
+  const BL = EXTRA && EXTRA.bus_live;
+  const AREA_NAME = { docks: 'Docks (Town Quay, Platform Rd, Dock Gate 4)', city_centre: 'City centre', portswood: 'Portswood' };
+  const AREA_CLS = { docks: 'docks', city_centre: 'centre', portswood: 'portswood' };
+  const busLiveDay = d => (BL && BL.days && BL.days[d]) || null;
+  const lateTxt = m => `${m < 0 ? '−' : '+'}${fmt1(Math.abs(m))}`;
+  function busLiveChart(D, W) {
+    const keys = Object.keys(AREA_NAME).filter(k => D.areas.some(p => p.key === k));
+    const hours = [...new Set(D.areas.map(p => p.hour))].sort((a, b) => a - b);
+    if (!keys.length || hours.length < 2) return '';
+    const L = 40, R = 12, T = 12, B = 24, H = 190, h0 = hours[0], h1 = hours[hours.length - 1];
+    const ys = D.areas.map(p => p.mean_min), y0 = Math.min(0, ...ys), y1 = Math.max(5, ...ys) * 1.08;
+    const X = h => L + (h - h0) / (h1 - h0) * (W - L - R), Y = v => T + (y1 - v) / (y1 - y0) * (H - T - B);
+    const step = y1 - y0 > 12 ? 5 : 2, yt = [];
+    for (let v = Math.ceil(y0 / step) * step; v <= y1; v += step) yt.push(v);
+    const grid = yt.map(v => `<line class="grid-l" x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}"/><text class="ax" x="${L - 6}" y="${Y(v) + 3}" text-anchor="end">${v}</text>`).join('');
+    const xt = hours.filter((h, i) => hours.length < 10 || i % 2 === 0).map(h => `<text class="ax" x="${X(h)}" y="${H - 6}" text-anchor="middle">${String(h).padStart(2, '0')}:00</text>`).join('');
+    const lines = keys.map(k => {
+      const ps = D.areas.filter(p => p.key === k).sort((a, b) => a.hour - b.hour);
+      return `<polyline class="bl-s-${AREA_CLS[k]}" fill="none" stroke-width="2" points="${ps.map(p => `${X(p.hour).toFixed(1)},${Y(p.mean_min).toFixed(1)}`).join(' ')}"/>${ps.map(p => `<circle class="bl-f-${AREA_CLS[k]} bl-ring" cx="${X(p.hour)}" cy="${Y(p.mean_min)}" r="4"/><circle class="bl-hit" cx="${X(p.hour)}" cy="${Y(p.mean_min)}" r="10" data-tip="${esc(`<strong>${esc(AREA_NAME[k])}</strong>, ${String(p.hour).padStart(2, '0')}:00–${String(p.hour + 1).padStart(2, '0')}:00<br>Mean <span class="mono">${lateTxt(p.mean_min)}</span> min against the timetable (90% of buses ${lateTxt(p.p90_min)} or better)<br>${Math.round(p.share_over_5_min * 100)}% of ${p.n} bus journeys 5+ min late`)}"/>`).join('')}`;
+    }).join('');
+    return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Mean bus lateness by hour and area">${grid}${xt}<line class="bl-zero" x1="${L}" x2="${W - R}" y1="${Y(0)}" y2="${Y(0)}"/>${lines}</svg>`;
+  }
+  function renderBusLive() {
+    const card = $('#bus-live');
+    const dates = BL && BL.days ? Object.keys(BL.days).sort() : [];
+    card.hidden = !dates.length;
+    if (!dates.length) return;
+    const D = busLiveDay(state.date), el = $('#bus-live-body');
+    $('#bus-live-src').textContent = `Collected ${dates.map(shortDate).join(', ')}; not live`;
+    if (!D) { el.innerHTML = `<p class="muted">Observed bus lateness was collected on ${chips(dates)}</p>`; wireChips(el); return; }
+    const from = D.collected_from.slice(11, 16), to = D.collected_to.slice(11, 16), W = Math.max(280, Math.floor(el.clientWidth || card.clientWidth || 600));
+    const lines = D.day_lines.slice().sort((a, b) => b.n - a.n).slice(0, 16);
+    const legend = Object.keys(AREA_NAME).filter(k => D.areas.some(p => p.key === k)).map(k => `<span><i class="bl-f-${AREA_CLS[k]}"></i>${esc(AREA_NAME[k])}</span>`).join('');
+    el.innerHTML = `<p><strong>Observed, not modelled.</strong> Every bus in the city box was read from bustimes.org once a minute from ${from} to ${to} on ${esc(shortDate(state.date))}: ${int(D.journeys)} bus journeys in ${int(D.polls)} readings. Lateness is the delay against the timetable that bustimes.org works out from each bus's position. Each journey counts once per hour.</p>
+      <div class="bl-legend">${legend}</div>
+      <div class="bus-live-chart">${busLiveChart(D, W)}<div class="map-tip bl-tip" hidden></div></div>
+      <p class="foot-note">Mean minutes late per hour in each area (boxes drawn by hand round each place). Hover a point for the spread.</p>
+      <div class="table-scroll"><table><thead><tr><th>Line</th><th>Journeys</th><th>Mean min late</th><th>90% no later than</th><th>5+ min late</th></tr></thead><tbody>${lines.map(p => `<tr><td><strong>${esc(p.key)}</strong></td><td class="num">${p.n}</td><td class="num">${lateTxt(p.mean_min)}</td><td class="num">${lateTxt(p.p90_min)}</td><td class="num">${Math.round(p.share_over_5_min * 100)}%</td></tr>`).join('')}</tbody></table></div>
+      <p class="foot-note">Source: ${esc(BL.source)}. Collected ${esc(D.collected_from.slice(0, 10))} ${from}–${to} by <span class="mono">scripts/bustimes.py</span>; raw readings are not published. Lines with fewer than 5 journeys are left out.</p>`;
+    const host = el.querySelector('.bus-live-chart'), tip = host.querySelector('.bl-tip');
+    host.addEventListener('mousemove', e => {
+      const t = e.target.closest('[data-tip]');
+      if (!t) { tip.hidden = true; return; }
+      tip.innerHTML = t.dataset.tip; tip.hidden = false;
+      const r = host.getBoundingClientRect();
+      tip.style.left = `${Math.max(4, Math.min(e.clientX - r.left + 14, r.width - tip.offsetWidth - 4))}px`; tip.style.top = `${e.clientY - r.top + 14}px`;
+    });
+    host.addEventListener('mouseleave', () => { tip.hidden = true; });
   }
   const PPO_KIND = { meter: 'Meter disembarkation', checkin: 'Check-in time', signs: 'Sign message', marshals: 'Marshals' };
   function ppoText(a) {
@@ -1758,7 +1861,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     $('#scenario').innerHTML = opts.map(k => `<option value="${k}"${k === state.scenario ? ' selected' : ''}>${esc(scenLabel(d, k))}</option>`).join('');
     $('#slider').value = state.bin;
     segCenters = {};
-    renderTiming(); renderActions(); renderRoutesCard(); renderSure(); renderVehicles(); renderBuses(); renderPPO(); renderVisuals();
+    renderTiming(); renderActions(); renderRoutesCard(); renderSure(); renderVehicles(); renderBuses(); renderBusLive(); renderPPO(); renderVisuals();
   }
   function renderVisuals() {
     const d = day();
@@ -1799,12 +1902,175 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
   });
   function stopPlay() { if (state.playing) clearInterval(state.playing); state.playing = null; $('#play').textContent = 'Play the day'; }
 
+  /* ---------- PPO in numbers: charts of the training run and the paired test days ---------- */
+  // Closed by default; drawn the first time the fold opens, at the fold's own width (1 unit = 1px).
+  const VIZ = { split: 'all', drawn: false, w: 0, t: 0 };
+  const POL_ORDER = ['ppo', 'rule', 'advisor'];
+  const sgn = v => (v < 0 ? '−' : v > 0 ? '+' : '');
+  const kfmt = v => { const a = Math.abs(v); return a >= 1e6 ? `${+(a / 1e6).toFixed(1)}M` : a >= 10000 ? `${Math.round(a / 1000)}k` : a >= 1000 ? `${+(a / 1000).toFixed(1)}k` : a >= 10 ? `${Math.round(a)}` : `${+a.toFixed(1)}`; };
+  const VFMT = {
+    cost: v => `${sgn(v)}£${int(Math.abs(v))}`, corridor_hours: v => `${sgn(v)}${fmt1(Math.abs(v))}`,
+    vehicle_hours: v => `${sgn(v)}${int(Math.abs(v))}`, marshal_hours: v => `${sgn(v)}${fmt1(Math.abs(v))}`,
+    sign_hours: v => `${sgn(v)}${fmt1(Math.abs(v))}`,
+  };
+  const VNAME = { cost: 'Cost per day', corridor_hours: 'Congested road-hours', vehicle_hours: 'Delay (vehicle-hours)', marshal_hours: 'Marshal gate-hours', sign_hours: 'Sign location-hours' };
+  const shortPol = p => PPO.labels[p].replace(/ \(.*\)/, '');
+  function niceTicks(lo, hi, n = 4) {
+    const span = hi - lo || 1, raw = span / n, mag = 10 ** Math.floor(Math.log10(raw)), e = raw / mag;
+    const step = (e >= 5 ? 10 : e >= 2 ? 5 : e >= 1.5 ? 2 : 1) * mag, out = [];
+    for (let v = Math.ceil(lo / step) * step; v <= hi + step * 1e-6; v += step) out.push(Math.abs(v) < step * 1e-6 ? 0 : v);
+    return out;
+  }
+  const domain = (vals, pad = 0.08) => { const lo = Math.min(0, ...vals), hi = Math.max(0, ...vals), p = (hi - lo || 1) * pad; return [lo - p, hi + p]; };
+  const tipAttr = html => ` data-tip="${esc(html)}"`;
+  const inSplit = held => VIZ.split === 'all' || (VIZ.split === 'held_out') === held;
+  const zeroAt = (x, y0, y1) => `<line class="zero" x1="${x}" x2="${x}" y1="${y0}" y2="${y1}"/><text class="ax" x="${x}" y="10" text-anchor="middle">do nothing</text>`;
+  const xAxis = (x0, x1, X, y, w) => niceTicks(x0, x1, Math.max(2, Math.floor(w / 110))).map(v => `<text class="ax" x="${X(v)}" y="${y}" text-anchor="middle">${sgn(v)}£${kfmt(v)}</text>`).join('');
+
+  // A line over training with an optional 10-90% band; hover columns move a crosshair.
+  function lineChart(pts, key, { W, H = 190, band = false, unit = '', title }) {
+    const L = 46, R = 10, T = 10, B = 26, x1 = Math.max(...pts.map(p => p.days));
+    const [y0, y1] = domain(pts.flatMap(p => (band ? [p.p10, p.p90, p[key]] : [p[key]])), 0.05);
+    const X = v => L + v / x1 * (W - L - R), Y = v => T + (y1 - v) / (y1 - y0) * (H - T - B);
+    const grid = niceTicks(y0, y1).map(v => `<line class="grid-l" x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}"/><text class="ax" x="${L - 6}" y="${Y(v) + 3}" text-anchor="end">${v < 0 ? '−' : ''}${unit}${kfmt(v)}</text>`).join('');
+    const xa = niceTicks(0, x1, Math.max(2, Math.floor(W / 140))).map(v => `<text class="ax" x="${X(v)}" y="${H - 8}" text-anchor="middle">${kfmt(v)}</text>`).join('');
+    const pt = (p, k) => `${X(p.days).toFixed(1)},${Y(p[k]).toFixed(1)}`;
+    const bandP = band ? `<path class="f-ppo" opacity="0.18" d="M${pts.map(p => pt(p, 'p90')).join('L')}L${pts.slice().reverse().map(p => pt(p, 'p10')).join('L')}Z"/>` : '';
+    const zero = y0 < 0 && y1 > 0 ? `<line class="zero" x1="${L}" x2="${W - R}" y1="${Y(0)}" y2="${Y(0)}"/>` : '';
+    const val = v => (unit === '£' ? VFMT.cost(v).replace('+', '') : fmt1(v));
+    const hits = pts.map((p, i) => {
+      const a = i ? (X(pts[i - 1].days) + X(p.days)) / 2 : L, b = i < pts.length - 1 ? (X(p.days) + X(pts[i + 1].days)) / 2 : W - R;
+      const t = `<strong>After ${int(p.days)} training days</strong><br><span class="muted">${int(p.steps)} steps${p.minutes ? `, ${fmt1(p.minutes)} min` : ''}</span><br>${esc(title)}: <span class="mono">${val(p[key])}</span>${band ? `<br><span class="muted">10–90% of days: ${val(p.p10)} to ${val(p.p90)}</span>` : ''}`;
+      return `<rect class="hit" x="${a}" y="${T}" width="${Math.max(1, b - a)}" height="${H - T - B}" data-cx="${X(p.days)}" data-cy="${Y(p[key])}"${tipAttr(t)}/>`;
+    }).join('');
+    return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(title)} over training">${grid}${xa}${zero}${bandP}<polyline class="s-ppo" fill="none" stroke-width="2" stroke-linejoin="round" points="${pts.map(p => pt(p, key)).join(' ')}"/><line class="xh" y1="${T}" y2="${H - B}" style="display:none"/><circle class="xh-dot f-ppo ring" r="4" style="display:none"/>${hits}</svg>`;
+  }
+
+  // Dot and 95% interval per row against a dashed "do nothing" line; labels left, values right.
+  function dotRows(rows, { W, fmt, title, rowH = 26 }) {
+    const LW = Math.min(150, W * 0.36), R = 62, T = 18, H = T + rows.length * rowH + 4;
+    const [x0, x1] = domain(rows.flatMap(r => [r.v, r.lo ?? r.v, r.hi ?? r.v]));
+    const X = v => LW + (v - x0) / (x1 - x0) * (W - LW - R);
+    const body = rows.map((r, i) => {
+      const y = T + i * rowH + rowH / 2;
+      const ci = r.lo != null ? `<line class="s-${r.cls}" stroke-width="2" stroke-linecap="round" x1="${X(r.lo)}" x2="${X(r.hi)}" y1="${y}" y2="${y}"/>` : '';
+      return `<text class="lbl" x="0" y="${y + 4}">${esc(r.label)}</text>${ci}<circle class="f-${r.cls} ring" cx="${X(r.v)}" cy="${y}" r="5"/><text class="lbl num" x="${W}" y="${y + 4}" text-anchor="end">${fmt(r.v)}</text><rect class="hit" x="0" y="${y - rowH / 2}" width="${W}" height="${rowH}"${tipAttr(r.tip)}/>`;
+    }).join('');
+    return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(title)}">${zeroAt(X(0), T - 4, H - 2)}${body}</svg>`;
+  }
+
+  // One strip of dots per policy: each sampled test day's cost minus doing nothing that day.
+  function strips(S, W) {
+    const keep = S.days.map((d, i) => [d, i]).filter(([d]) => inSplit(d.held_out)), pols = POL_ORDER.filter(p => S.diff[p]);
+    const LW = Math.min(150, W * 0.36), R = 62, rowH = 48, T = 18, H = T + pols.length * rowH;
+    const [x0, x1] = domain(pols.flatMap(p => keep.map(([, i]) => S.diff[p].cost[i])), 0.03), X = v => LW + (v - x0) / (x1 - x0) * (W - LW - R);
+    const jit = i => (((i * 2654435761) >>> 0) % 1000) / 1000 - 0.5;
+    const body = pols.map((p, j) => {
+      const yc = T + j * rowH + rowH / 2, vs = keep.map(([, i]) => S.diff[p].cost[i]).sort((a, b) => a - b);
+      const med = vs.length ? vs[Math.floor(vs.length / 2)] : 0, share = vs.filter(v => v < -1e-6).length / (vs.length || 1);
+      const dots = keep.map(([d, i]) => {
+        const v = S.diff[p].cost[i];
+        return `<circle class="f-${p} ring" opacity="0.75" cx="${X(v).toFixed(1)}" cy="${(yc + jit(i) * (rowH - 18)).toFixed(1)}" r="3.5"${tipAttr(`<strong>${esc(PPO.labels[p])}</strong><br>${esc(shortDate(d.date))}, sampled day ${d.seed + 1}${d.held_out ? ' (held-out date)' : ''}<br>Cost against doing nothing: <span class="mono">${VFMT.cost(v)}</span>`)}/>`;
+      }).join('');
+      return `<text class="lbl" x="0" y="${yc - 2}">${esc(shortPol(p))}</text><text class="lbl-m" x="0" y="${yc + 12}">cheaper on ${Math.round(share * 100)}%</text>${dots}<line class="s-ink" stroke-width="2" x1="${X(med)}" x2="${X(med)}" y1="${yc - rowH / 2 + 5}" y2="${yc + rowH / 2 - 5}"/><text class="lbl num" x="${W}" y="${yc + 4}" text-anchor="end">${VFMT.cost(med)}</text>`;
+    }).join('');
+    return `<svg viewBox="0 0 ${W} ${H + 16}" width="${W}" height="${H + 16}" role="img" aria-label="Cost against doing nothing on each sampled test day">${zeroAt(X(0), T - 4, H)}${body}${xAxis(x0, x1, X, H + 13, W - LW)}</svg>`;
+  }
+
+  // Each test date: the mean cost against doing nothing for every policy, held-out dates marked.
+  function byDate(S, W) {
+    const rows = S.by_date.filter(r => inSplit(r.held_out)), pols = POL_ORDER.filter(p => S.diff[p]);
+    const LW = Math.min(150, W * 0.36), R = 12, rowH = 24, T = 18, H = T + rows.length * rowH;
+    const [x0, x1] = domain(rows.flatMap(r => pols.map(p => r[p].cost)), 0.05), X = v => LW + (v - x0) / (x1 - x0) * (W - LW - R);
+    const body = rows.map((r, i) => {
+      const y = T + i * rowH + rowH / 2, xs = pols.map(p => X(r[p].cost));
+      const tip = `<strong>${esc(shortDate(r.date))}</strong>${r.held_out ? ', held out of training' : ', a training date (new draws)'}; ${r.n} sampled days<br>${pols.map(p => `${esc(shortPol(p))}: <span class="mono">${VFMT.cost(r[p].cost)}</span>`).join('<br>')}`;
+      return `<text class="lbl" x="0" y="${y + 4}">${esc(shortDate(r.date))}${r.held_out ? '<tspan class="lbl-m"> · held out</tspan>' : ''}</text><line class="grid-l" x1="${Math.min(...xs)}" x2="${Math.max(...xs)}" y1="${y}" y2="${y}"/>${pols.map(p => `<circle class="f-${p} ring" cx="${X(r[p].cost)}" cy="${y}" r="4.5"/>`).join('')}<rect class="hit" x="0" y="${y - rowH / 2}" width="${W}" height="${rowH}"${tipAttr(tip)}/>`;
+    }).join('');
+    return `<svg viewBox="0 0 ${W} ${H + 16}" width="${W}" height="${H + 16}" role="img" aria-label="Mean cost against doing nothing per test date">${zeroAt(X(0), T - 4, H)}${body}${xAxis(x0, x1, X, H + 13, W - LW)}</svg>`;
+  }
+
+  function renderPPOViz() {
+    const host = $('#ppo-viz-body'), W = Math.max(280, Math.floor(host.clientWidth));
+    VIZ.w = W; VIZ.drawn = true;
+    const S = PPO.stats || {}, SUM = PPO.summary[VIZ.split] || PPO.summary.all, tr = PPO.train || {};
+    const half = W >= 640 ? Math.floor((W - 28) / 2) : W, pols = POL_ORDER.filter(p => SUM[p]);
+    const sec = (title, note, body) => `<section class="viz-sec"><h3>${esc(title)}</h3>${note ? `<p class="foot-note">${note}</p>` : ''}${body}</section>`;
+    const splits = [['all', 'All test days'], ['held_out', 'Held-out dates'], ['seen', 'Training dates']].filter(([k]) => PPO.summary[k]);
+    const parts = [`<div class="viz-ctl"><div class="seg-ctl" role="group" aria-label="Which test days">${splits.map(([k, t]) => `<button type="button" data-split="${k}" aria-pressed="${VIZ.split === k}">${t}</button>`).join('')}</div>
+      <div class="viz-legend">${pols.map(p => `<span><i class="f-${p}"></i>${esc(shortPol(p))}</span>`).join('')}<span><i class="zero-sw"></i>Do nothing (dashed line)</span></div></div>`];
+    const tiles = [];
+    if (tr.timesteps) tiles.push([`${kfmt(tr.timesteps)} steps`, `${int(tr.days)} simulated days of training${tr.seconds ? `, ${Math.round(tr.seconds / 60)} min` : ''}${tr.gpu || tr.device ? ` on ${esc(tr.gpu || tr.device)}` : ''}`]);
+    if (SUM.ppo) tiles.push([VFMT.cost(SUM.ppo.cost.diff), `PPO's cost per day against doing nothing (95%: ${VFMT.cost(SUM.ppo.cost.diff_lo)} to ${VFMT.cost(SUM.ppo.cost.diff_hi)}); cheaper on ${Math.round(SUM.ppo.better_days * 100)}% of ${SUM.ppo.n} days`]);
+    Object.entries(S.head_to_head || {}).forEach(([k, h]) => tiles.push([VFMT.cost(h.mean), `PPO minus the ${esc(shortPol(k).toLowerCase())} per day (95%: ${VFMT.cost(h.lo)} to ${VFMT.cost(h.hi)}); PPO cheaper on ${Math.round(h.ppo_cheaper * 100)}% of all ${h.n} test days`]));
+    if (tiles.length) parts.push(`<div class="viz-tiles">${tiles.map(([b, t]) => `<div class="viz-tile"><span class="big">${b}</span><span class="foot-note">${t}</span></div>`).join('')}</div>`);
+    const span = (m, v) => (m === 'cost' ? `£${int(v)}` : fmt1(v));
+    const metrics = ['cost', 'corridor_hours', 'vehicle_hours', 'marshal_hours'].filter(m => SUM.ppo && SUM.ppo[m]);
+    parts.push(sec('Change against doing nothing, per day', `Mean of the paired differences on ${SUM.nothing ? SUM.nothing.n : ''} sampled days; the bar is the 95% bootstrap interval. Left of the dashed line means less than doing nothing.`,
+      `<div class="viz-grid${half < W ? ' two' : ''}">${metrics.map(m => `<div><div class="eyebrow">${VNAME[m]}</div>${dotRows(pols.map(p => {
+        const v = SUM[p][m];
+        return { label: shortPol(p), cls: p, v: v.diff, lo: v.diff_lo, hi: v.diff_hi, tip: `<strong>${esc(PPO.labels[p])}</strong><br>${VNAME[m]}: <span class="mono">${VFMT[m](v.diff)}</span> a day against doing nothing<br><span class="muted">95% interval ${VFMT[m](v.diff_lo)} to ${VFMT[m](v.diff_hi)}<br>With the policy: ${span(m, v.mean)} a day (10–90%: ${span(m, v.p10)} to ${span(m, v.p90)})</span>` };
+      }), { W: half, fmt: VFMT[m], title: VNAME[m] })}</div>`).join('')}</div>`));
+    if (S.diff && S.days) parts.push(sec('Every sampled test day', 'Each dot is one sampled day: the policy\'s cost minus doing nothing on that same day. The black tick is the median.', strips(S, W)));
+    if (S.by_date) parts.push(sec('By date', 'Mean cost against doing nothing on each test date. Held-out dates were never seen in training.', byDate(S, W)));
+    if (S.curve && S.curve.length > 1) {
+      parts.push(sec('Learning curve', 'Pounds saved per simulated training day against doing nothing on the same day: the mean of each block of days, with the 10–90% range shaded. Across: simulated training days.', lineChart(S.curve, 'mean', { W, band: true, unit: '£', title: 'Saving per day' })));
+      const lev = [['marshal_hours', 'Marshal gate-hours per day'], ['sign_hours', 'Sign location-hours per day'], ['held_pax_hours', 'Passenger-hours held per day'], ['corridor_hours', 'Congested road-hours per day']].filter(([k]) => S.curve[0][k] != null);
+      if (lev.length) parts.push(sec('What it learned to use', 'The levers PPO pulled per training day, averaged over each block of days. Each chart has its own scale; across: simulated training days.', `<div class="viz-grid${half < W ? ' two' : ''}">${lev.map(([k, t]) => `<div><div class="eyebrow">${t}</div>${lineChart(S.curve, k, { W: half, H: 140, title: t })}</div>`).join('')}</div>`));
+    } else if ((PPO.curve || []).length > 1) {
+      parts.push(sec('Learning curve', 'Pounds saved per simulated training day against doing nothing on the same day.', lineChart(PPO.curve.map(c => ({ ...c, mean: c.saving })), 'mean', { W, unit: '£', title: 'Saving per day' })));
+    }
+    if (S.runs && S.runs.length > 1) {
+      parts.push(sec('Training runs compared', 'PPO\'s cost per day against doing nothing on each run\'s own test days, with 95% intervals.', dotRows(S.runs.map(r => ({
+        label: `${r.label}${r.steps ? ` · ${kfmt(r.steps)} steps` : ''}`, cls: 'ppo', v: r.cost_diff, lo: r.cost_diff_lo, hi: r.cost_diff_hi,
+        tip: `<strong>${esc(r.label)}</strong>${r.made ? ` <span class="muted">(${esc(r.made)})</span>` : ''}<br>${r.steps ? `${int(r.steps)} steps, ${int(r.days)} days${r.minutes ? `, ${r.minutes} min` : ''}${r.device ? ` on ${esc(r.device)}` : ''}<br>` : ''}Cost: <span class="mono">${VFMT.cost(r.cost_diff)}</span> (95%: ${VFMT.cost(r.cost_diff_lo)} to ${VFMT.cost(r.cost_diff_hi)})<br>Congested road-hours: <span class="mono">${VFMT.corridor_hours(r.corridor_hours_diff)}</span>${r.better_days != null ? `<br>Cheaper than nothing on ${Math.round(r.better_days * 100)}% of ${r.n} days` : ''}`,
+      })), { W, fmt: VFMT.cost, title: 'Training runs compared' })));
+    }
+    const AB = PPO.ablation && PPO.ablation.rows;
+    if (AB) {
+      const names = { ppo: 'All levers', ppo_no_meter: 'No metering', ppo_no_checkin: 'No check-in move', ppo_no_signs: 'No signs', ppo_no_marshals: 'No marshals', marshal_rule: 'Marshals-only rule' };
+      const rows = Object.keys(names).filter(k => AB[k] && AB[k].cost).map(k => {
+        const c = AB[k].cost;
+        return { label: names[k], cls: k === 'marshal_rule' ? 'rule' : 'ppo', v: c.mean, lo: c.mean - 1.96 * c.se, hi: c.mean + 1.96 * c.se, tip: `<strong>${esc(names[k])}</strong><br>Cost against doing nothing: <span class="mono">${VFMT.cost(c.mean)}</span> a day (±£${int(1.96 * c.se)}, 95%)<br>${AB[k].n} sampled days` };
+      });
+      if (rows.length) parts.push(sec('Levers switched off one at a time', 'PPO with one lever removed, on the same test days: cost per day against doing nothing, with ±1.96 standard errors.', dotRows(rows, { W, fmt: VFMT.cost, title: 'Levers switched off one at a time' })));
+    }
+    parts.push(`<p class="foot-note">Source: ${esc(S.source || 'Simulated days of the demo\'s traffic model (synthetic, not observed)')}. Results generated ${esc(PPO.made || '')} by <span class="mono">demo/train_ppo.py evaluate</span>. Costs are the weights listed under "Learned policy tested against simpler ones", which also has these numbers as a table.</p>`);
+    host.innerHTML = parts.join('') + '<div class="map-tip viz-tip" hidden></div>';
+    host.querySelectorAll('[data-split]').forEach(b => b.addEventListener('click', () => { VIZ.split = b.dataset.split; renderPPOViz(); }));
+  }
+  function wirePPOViz() {
+    if (!PPO || !PPO.summary || !PPO.summary.all) return;
+    const fold = $('#ppo-viz'), host = $('#ppo-viz-body');
+    fold.hidden = false;
+    const redraw = () => { if (fold.open && (!VIZ.drawn || Math.abs(host.clientWidth - VIZ.w) > 4)) renderPPOViz(); };
+    fold.addEventListener('toggle', redraw);
+    addEventListener('resize', () => { clearTimeout(VIZ.t); VIZ.t = setTimeout(redraw, 150); });
+    const hideX = () => host.querySelectorAll('.xh, .xh-dot').forEach(x => { x.style.display = 'none'; });
+    host.addEventListener('mousemove', e => {
+      const tip = host.querySelector('.viz-tip'), t = e.target.closest('[data-tip]');
+      hideX();
+      if (!tip) return;
+      if (!t) { tip.hidden = true; return; }
+      if (t.dataset.cx) {
+        const svg = t.ownerSVGElement, xh = svg.querySelector('.xh'), dot = svg.querySelector('.xh-dot');
+        xh.setAttribute('x1', t.dataset.cx); xh.setAttribute('x2', t.dataset.cx); xh.style.display = '';
+        dot.setAttribute('cx', t.dataset.cx); dot.setAttribute('cy', t.dataset.cy); dot.style.display = '';
+      }
+      tip.innerHTML = t.dataset.tip; tip.hidden = false;
+      const r = host.getBoundingClientRect();
+      tip.style.left = `${Math.max(4, Math.min(e.clientX - r.left + 14, r.width - tip.offsetWidth - 4))}px`;
+      tip.style.top = `${e.clientY - r.top + 14}px`;
+    });
+    host.addEventListener('mouseleave', () => { const tip = host.querySelector('.viz-tip'); if (tip) tip.hidden = true; hideX(); });
+  }
+
   function onTheme() { readPalette(); if (state.date && !day().beyond) renderVisuals(); }
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', onTheme);
   new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
   readPalette();
-  renderMeta(); renderPPOTest();
+  renderMeta(); renderPPOTest(); wirePPOViz();
   renderBacktest();
   renderFit();
   buildMap();
