@@ -84,7 +84,18 @@ VARIANTS["story"] = ("""
 .voy-port:hover { transform: scale(1.2); }
 .voy-port.done { background: var(--accent); }
 .voy-ship { position: absolute; bottom: 9px; left: calc(var(--k) * (100% - 18px) - 18px); width: 52px; transition: left .7s cubic-bezier(.45, 0, .2, 1); pointer-events: none; }
-.voy-ship .spr { display: block; width: 100%; }
+.voy-ship .ship-svg { width: 100%; }
+/* the steamship is drawn as vector art (same palette and outline as the generated icons) so it stays sharp at any size */
+.ship-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.ship-svg .rock { transform-box: view-box; transform-origin: 300px 400px; animation: rock 3s ease-in-out infinite; }
+@keyframes rock { 0%, 100% { transform: rotate(-1.5deg) translateY(0); } 50% { transform: rotate(1.5deg) translateY(-7px); } }
+.ship-svg .puff2 { transform-box: fill-box; transform-origin: center; opacity: 0; animation: steam 1.76s linear infinite; }
+.ship-svg .pu-o { fill: #1D2B45; stroke: #1D2B45; stroke-width: 12; animation-name: steam-o; }
+@keyframes steam-o { 0% { transform: translate(0, 10px) scale(.3); opacity: 0; } 8% { opacity: 1; } 50% { opacity: 1; } 78% { opacity: 0; } 100% { transform: translate(-120px, -160px) scale(1.8); opacity: 0; } }
+.ship-svg .pu-i { fill: #FFF8EC; }
+@keyframes steam { 0% { transform: translate(0, 10px) scale(.3); opacity: 0; } 8% { opacity: 1; } 65% { opacity: .95; } 100% { transform: translate(-120px, -160px) scale(1.8); opacity: 0; } }
+.ship-svg .wv { animation: lap 1.6s ease-in-out infinite; }
+@keyframes lap { 50% { transform: translateX(-12px); } }
 .voyage.back .voy-ship { transform: scaleX(-1); }
 .puff { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #fff; border: 1.5px solid #1D2B45; opacity: 0; animation: puff 2.4s ease-out infinite; }
 .voy-ship .puff { left: 20px; top: -2px; }
@@ -124,12 +135,12 @@ body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !i
 .l-gull.g2 .spr { transform: scaleX(-1); --dur: .85s; }
 @keyframes cross { from { transform: translate(-12vw, 0); } 25% { transform: translate(18vw, -24px); } 50% { transform: translate(48vw, 6px); } 75% { transform: translate(78vw, -18px); } to { transform: translate(112vw, 0); } }
 .l-light { position: absolute; right: 1vw; bottom: 31%; width: 32vmin; z-index: 1; }
-.l-light .spr, .l-anchor .spr, .l-wheel .spr, .l-ship .spr, .l-spray .spr { display: block; width: 100%; }
+.l-light .spr, .l-anchor .spr, .l-wheel .spr, .l-spray .spr { display: block; width: 100%; }
 .l-anchor { position: absolute; left: 3vw; bottom: 4%; width: 11vmin; z-index: 4; }
 .l-wheel { position: absolute; right: 5vw; bottom: 4%; width: 12vmin; z-index: 4; }
 .l-ship { position: absolute; left: 66%; bottom: 18%; width: min(40vmin, 360px); transform: translateX(-50%); z-index: 2; transition: transform 1.3s cubic-bezier(.5, 0, .7, .4); }
-.l-spray { position: absolute; width: 34%; right: -16%; bottom: 2%; }
-.l-spray.s2 { width: 26%; right: auto; left: -8%; bottom: 0; transform: scaleX(-1); }
+.l-spray { position: absolute; width: 30%; left: -14%; bottom: 4%; transform: scaleX(-1); }
+.l-spray.s2 { width: 22%; left: auto; right: -6%; bottom: 2%; transform: none; }
 .l-rock-spray { position: absolute; right: 13vmin; bottom: 28%; width: 12vmin; z-index: 1; }
 .l-rock-spray .spr { display: block; width: 100%; --dur: 1.3s; }
 .landing.sail .l-ship { transform: translateX(70vw); }
@@ -139,7 +150,7 @@ body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !i
 @keyframes wave { to { transform: translateX(-50%); } }
 .l-sun { left: 66%; }
 /* the words sit in the sky on the left; the ship sails the right half */
-.l-card { position: relative; z-index: 5; display: grid; justify-items: start; gap: 14px; text-align: left; padding: 0 16px; place-self: center start; margin: -14vh 0 0 6vw; max-width: min(660px, 56vw); }
+.l-card { position: relative; z-index: 5; display: grid; justify-items: start; gap: 14px; text-align: left; padding: 0 16px; place-self: center start; margin: -14vh 0 0 6vw; max-width: min(660px, 52vw); }
 .l-kicker { font-weight: 600; letter-spacing: .12em; text-transform: uppercase; font-size: .85rem; }
 .l-plate { position: relative; padding: 14px 38px 16px; border-radius: 18px; background: #1D2B45; color: #FFF6E2; box-shadow: 0 0 0 4px #FFF6E2, 0 0 0 7px #1D2B45, 8px 10px 0 7px rgba(29, 43, 69, .3); }
 .l-plate::before, .l-plate::after { content: ''; position: absolute; top: 50%; width: 9px; height: 9px; margin-top: -4.5px; border-radius: 50%; background: #F2B84B; }
@@ -156,7 +167,7 @@ body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !i
 .l-go:hover { transform: translate(-1px, -2px); box-shadow: 5px 7px 0 #1D2B45; }
 .l-go:active { transform: translate(3px, 4px); box-shadow: 1px 1px 0 #1D2B45; }
 .l-go .spr { width: 40px; flex: none; }
-.l-src { font-size: .78rem; font-weight: 500; max-width: 60ch; padding: 3px 10px; border-radius: 999px; background: rgba(255, 246, 226, .7); }
+.l-src { font-size: .78rem; font-weight: 500; max-width: min(60ch, 100%); padding: 3px 10px; border-radius: 999px; background: rgba(255, 246, 226, .7); }
 .l-sound { position: absolute; top: 16px; right: 16px; z-index: 6; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 2.5px solid #1D2B45;
   background: #FFF6E2; color: #1D2B45; font: 600 .95rem "Fredoka", sans-serif; cursor: pointer; box-shadow: 3px 3px 0 #1D2B45; }
 .l-sound svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -165,16 +176,47 @@ body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !i
 @keyframes hint { 50% { transform: scale(1.08); } }
 /* portrait and narrow screens: words on top, the ship below them on the horizon */
 @media (max-width: 820px), (max-aspect-ratio: 1/1) {
-  .l-card { place-self: start center; margin: 64px 0 0; justify-items: center; text-align: center; max-width: none; }
-  .l-ship { left: 50%; width: min(46vmin, 300px); bottom: 17%; }
+  .l-card { place-self: start center; margin: 72px 0 0; justify-items: center; text-align: center; max-width: none; }
+  .l-ship { left: 50%; width: min(46vmin, 300px); bottom: 21%; }
   .l-sun { left: 50%; }
   .l-light { width: 26vmin; right: -4vw; }
   .l-tickets { justify-content: center; }
+}
+/* short landscape screens (a phone on its side): a compact card, the ship pushed right */
+@media (max-height: 520px) and (min-aspect-ratio: 1/1) {
+  .l-card { margin: 0 0 0 4vw; gap: 8px; place-self: center start; justify-items: start; text-align: left; max-width: 58vw; }
+  .l-kicker, .l-sub { display: none; }
+  .l-ticket { padding: 3px 12px 5px; } .l-ticket b { font-size: 1.2rem; }
+  .l-go { font-size: 1.1rem; padding: 6px 20px 6px 8px; } .l-go .spr { width: 30px; }
+  .l-ship { left: 79%; width: 30vmax; bottom: 16%; } .l-sun { left: 79%; } .l-light { display: none; } .l-rock-spray { display: none; }
 }
 @media (max-width: 640px) { .l-light { display: none; } .l-rock-spray { display: none; }
   .storybar { gap: 8px 10px; } .story-q { flex-basis: 100%; } .voyage { flex: 1 1 150px; width: auto; } .storybar .v-btn { padding: 6px 12px; min-height: 36px; } }
 @media (prefers-reduced-motion: reduce) { .landing *, .voy-ship, .deco-gull { animation: none !important; transition: none !important; } .landing { transition: none; } }
 """, r"""
+  const NAVY = '#1D2B45', CREAM = '#FFF6E6', RED = '#E4573F';
+  const HULL = 'M24 262 L576 262 L548 378 Q545 388 534 388 L92 388 Q80 388 74 378 Z';
+  // steam: the same puffs drawn twice, a navy layer under a cream one, so they merge into one outlined cloud
+  const puffSet = cls => [259, 381].map((x, f) => Array.from({ length: 8 }, (_, i) => `<circle class="puff2 ${cls}" cx="${x}" cy="62" r="26" style="animation-delay:${-(i * 0.22 + f * 0.11).toFixed(2)}s"/>`).join('')).join('');
+  const puffs = puffSet('pu-o') + puffSet('pu-i');
+  const range = (a, b, st) => Array.from({ length: Math.floor((b - a) / st) + 1 }, (_, i) => a + i * st);
+  const SHIP_SVG = id => `<svg class="ship-svg" viewBox="0 0 600 440" aria-hidden="true"><defs><clipPath id="hc-${id}"><path d="${HULL}"/></clipPath></defs>
+    <g class="rock" stroke="${NAVY}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">
+      <g stroke="none">${puffs}</g>
+      <line x1="160" y1="170" x2="160" y2="98"/><line x1="146" y1="118" x2="174" y2="118"/><circle cx="160" cy="92" r="7" fill="${NAVY}"/>
+      <line x1="528" y1="216" x2="528" y2="150"/><path d="M528 152 L580 165 L528 180 Z" fill="${RED}"/>
+      ${[228, 350].map(x => `<path d="M${x} 72 L${x + 62} 72 L${x + 56} 172 L${x + 6} 172 Z" fill="${RED}"/><path d="M${x} 72 L${x + 62} 72 L${x + 61} 92 L${x + 1} 92 Z" fill="${NAVY}"/><line x1="${x + 4}" y1="128" x2="${x + 58}" y2="128" stroke="${CREAM}" stroke-width="6"/>`).join('')}
+      <rect x="170" y="168" width="290" height="50" rx="9" fill="${CREAM}"/>
+      ${range(192, 436, 34).map(x => `<rect x="${x}" y="184" width="18" height="16" rx="4" fill="${NAVY}" stroke="none"/>`).join('')}
+      <rect x="116" y="214" width="396" height="52" rx="9" fill="${CREAM}"/>
+      ${range(140, 488, 34).map(x => `<rect x="${x}" y="232" width="18" height="16" rx="4" fill="${NAVY}" stroke="none"/>`).join('')}
+      <g clip-path="url(#hc-${id})" stroke="none"><path d="${HULL}" fill="${CREAM}"/><rect x="0" y="328" width="600" height="22" fill="${NAVY}"/><rect x="0" y="350" width="600" height="50" fill="${RED}"/></g>
+      <path d="${HULL}" fill="none"/>
+      ${range(150, 530, 40).map(x => `<circle cx="${x}" cy="298" r="9" fill="${CREAM}" stroke-width="5"/>`).join('')}
+      <g stroke-width="5" fill="none"><circle cx="96" cy="282" r="5"/><path d="M96 287 V318 M84 297 H108 M80 306 Q96 330 112 306"/></g>
+      <g class="wv"><path d="M30 404 ${range(0, 10, 1).map(() => 'q27 -20 54 0').join(' ')} V440 H30 Z" fill="#3E9E9C"/>
+      <path d="M30 404 ${range(0, 10, 1).map(() => 'q27 -20 54 0').join(' ')}" fill="none" stroke="#FFF8EC" stroke-width="6"/></g>
+    </g></svg>`;
   const STEPS = [
     { q: 'When are the hard days?', ico: 'lighthouse', show: [calSec] },
     { q: 'How bad is it?', ico: 'ring', show: ['#day-head', '#notices'] },
@@ -191,7 +233,7 @@ body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !i
   bar.innerHTML = `<span class="story-q"><span class="story-ico" id="story-stk" aria-hidden="true"></span><span class="story-n" id="story-n"></span><span id="story-q"></span><span id="story-src"></span></span>
     <div class="voyage" id="voyage" role="tablist" aria-label="Steps"><span class="voy-sea"></span>
       ${STEPS.map((s, i) => `<button class="voy-port" role="tab" data-step="${i}" style="--x:${i / (STEPS.length - 1)}" aria-label="Step ${i + 1}: ${esc(s.q)}" title="${esc(s.q)}"></button>`).join('')}
-      <span class="voy-ship" aria-hidden="true"><span class="spr spr-ship"></span></span></div>
+      <span class="voy-ship" aria-hidden="true">${SHIP_SVG('bar')}</span></div>
     <button class="v-btn" id="story-back">Back</button><button class="v-btn primary" id="story-next">Next</button>`;
   $('.appbar').after(bar);
   const gull = document.createElement('span'); gull.className = 'deco-gull'; gull.innerHTML = '<span class="spr spr-gull"></span>'; gull.setAttribute('aria-hidden', 'true'); document.body.append(gull);
@@ -226,7 +268,7 @@ body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !i
   land.innerHTML = `<div class="l-sun"></div><div class="l-cloud c1"></div><div class="l-cloud c2"></div><div class="l-cloud c3"></div>
     <span class="l-gull g1" aria-hidden="true"><span class="spr spr-gull"></span></span><span class="l-gull g2" aria-hidden="true"><span class="spr spr-gull"></span></span>
     <span class="l-light" aria-hidden="true"><span class="spr spr-lighthouse"></span></span><span class="l-rock-spray" aria-hidden="true"><span class="spr spr-spray"></span></span>
-    <div class="l-ship" aria-hidden="true"><span class="spr spr-ship"></span><span class="l-spray"><span class="spr spr-spray"></span></span><span class="l-spray s2"><span class="spr spr-spray"></span></span></div>
+    <div class="l-ship" aria-hidden="true">${SHIP_SVG('land')}<span class="l-spray"><span class="spr spr-spray"></span></span><span class="l-spray s2"><span class="spr spr-spray"></span></span></div>
     <button type="button" class="l-sound hint" id="l-sound" aria-pressed="false" aria-label="Sound"><svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="on" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="off" d="M16 9.5l5 5M21 9.5l-5 5"/></svg><span id="l-sound-t">Sound on</span></button>
     <svg class="l-waves" viewBox="0 0 2400 300" preserveAspectRatio="none" aria-hidden="true"><path class="w1" d="${wave(70, 30)}"/><path class="w2" d="${wave(140, 24)}"/><path class="w3" d="${wave(210, 18)}"/></svg>
     <span class="l-anchor" aria-hidden="true"><span class="spr spr-anchor"></span></span><span class="l-wheel" aria-hidden="true"><span class="spr spr-wheel"></span></span>
