@@ -113,5 +113,8 @@ Fill in the date collected and the licence for every source before submission.
 - **AI-generated:** the project scaffold (`pyproject.toml` backend extras, `src/`, `tests/`,
   `scripts/`, `cluster/`, `configs/`, this README) was generated with Claude Code on
   Fri 16 Oct 2026.
+- **AI-generated (backtest):** `demo/webtris_backtest.py` (data loading, the gradient-boosted
+  uplift model, baselines and backtest) and `docs/backtest.md` were written with Claude Code on
+  Fri 16 to Sat 17 Oct 2026, following the data choices in `notes/data-spike.md`.
 - **Existed before the event:** TODO, confirm with the organisers.
 - **Who helped:** TODO.
