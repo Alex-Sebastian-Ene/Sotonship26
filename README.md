@@ -145,6 +145,9 @@ data improves it by about 4% a day (not significant) and 2% per 15 minutes.
 - **AI-generated (backtest):** `demo/webtris_backtest.py` (data loading, the gradient-boosted
   uplift model, baselines and backtest) and `docs/backtest.md` were written with Claude Code on
   Fri 16 to Sat 17 Oct 2026, following the data choices in `notes/data-spike.md`.
+- **AI-generated (page redesign):** the layout, styles and wording of `demo/page.html` (day briefing,
+  to-do list, plain-language labels, folded method sections) were rewritten with Claude Code on
+  Sat 17 Oct 2026 (SOT-26). The data and the charts it draws are unchanged.
 - **AI-generated (ML-fitted cruise assumptions):** the fit of the simulator's cruise assumptions
   to the learned M271 uplift (`cruise_sets`, `m271_probe`, `cruise_fit_tasks` and the fit step in
   `demo/synthetic_demo.py`), the ships-only profiles exported by `demo/webtris_backtest.py`, the
