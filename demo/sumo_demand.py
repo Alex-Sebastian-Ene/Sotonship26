@@ -64,7 +64,8 @@ SEED = 7  # agents.AGENT_SEED: the same sampled day as the agents on the page
 DAY_START_S = tm.DAY_START_H * 3600
 END_S = DAY_START_S + tm.N_BINS * 900  # 20:00: no trip leaves later
 SIM_END_S = END_S + 2 * 3600  # run on to 22:00 so the last trips can finish
-LOCAL_TYPES = {"primary", "secondary", "tertiary", "unclassified"}
+# roads a zone's trips start and end on; residential streets exist only in the --residential net
+LOCAL_TYPES = {"primary", "secondary", "tertiary", "unclassified", "residential", "living_street"}
 MAJOR_RANK = ["motorway", "trunk", "primary", "secondary", "tertiary", "unclassified"]
 MIN_EDGE_M = 25.0
 ZONE_MAX_M = 2500.0
@@ -463,11 +464,19 @@ def write_trips(path: Path, net: Net, trips, bus_list) -> dict:
 
 
 def write_configs(run_dir: Path, net_path: Path, threads: int, seed: int,
-                  sim_threads: int = 1) -> None:
+                  sim_threads: int = 1, reroute: bool = True) -> None:
     """micro.sumocfg and meso.sumocfg: the same trips, one-shot assignment with every vehicle
     rerouting every 5 minutes on travel times smoothed over the last 3 minutes, and route costs
     disturbed by up to 20% per routing call so drivers do not all take the one quickest road.
-    ``sim_threads`` > 1 runs the microsimulation's steps in parallel (SUMO --threads)."""
+    ``reroute`` False: each vehicle keeps the route it gets when it enters, the quickest on
+    empty roads (with the same 20% disturbance). ``sim_threads`` > 1 runs the microsimulation's
+    steps in parallel (SUMO --threads)."""
+    device = (f"""    <device.rerouting.probability value="1"/>
+    <device.rerouting.period value="300"/>
+    <device.rerouting.adaptation-interval value="10"/>
+    <device.rerouting.adaptation-steps value="18"/>
+    <device.rerouting.threads value="{threads}"/>
+""" if reroute else "")
     for mode in ("micro", "meso"):
         (run_dir / f"{mode}.edgedata.add.xml").write_text(
             "<additional>\n"
@@ -497,12 +506,7 @@ def write_configs(run_dir: Path, net_path: Path, threads: int, seed: int,
     <collision.action value="warn"/>
   </processing>
   <routing>
-    <device.rerouting.probability value="1"/>
-    <device.rerouting.period value="300"/>
-    <device.rerouting.adaptation-interval value="10"/>
-    <device.rerouting.adaptation-steps value="18"/>
-    <device.rerouting.threads value="{threads}"/>
-    <weights.random-factor value="1.2"/>
+{device}    <weights.random-factor value="1.2"/>
   </routing>
   <output>
     <summary-output value="{mode}.summary.xml"/>
@@ -528,12 +532,16 @@ def write_configs(run_dir: Path, net_path: Path, threads: int, seed: int,
 
 # --- the macro model on the same day ----------------------------------------------------------
 
-def macro_reference(ctx: sd.Ctx, task: dict, day: daysim.SampledDay, Dc: np.ndarray, log=print):
-    """run_day on the sampled day's demand, dry and with no incident, plus its buses."""
+def macro_reference(ctx: sd.Ctx, task: dict, day: daysim.SampledDay, Dc: np.ndarray,
+                    scale: float = 1.0, log=print):
+    """run_day on the sampled day's demand, dry and with no incident, plus its buses. With
+    ``scale`` < 1 every kind of traffic (and the counted roads' local traffic) is scaled as the
+    SUMO trips are, so both models carry the same reduced day."""
     m = ctx.m
     cap = sd.capacity(ctx, set(task["closed"]))
-    D = day.Dbg + day.Dm + Dc
-    res, _ = tm.run_day(m, D, cap, day.shares0, 3, want=("x", "queue", "held"), pre=day.pre,
+    D = (day.Dbg + day.Dm + Dc) * scale
+    pre = day.pre * scale if day.pre is not None else None
+    res, _ = tm.run_day(m, D, cap, day.shares0, 3, want=("x", "queue", "held"), pre=pre,
                         noise=day.noise, events=())
     x = res["x"]
     log(f"macro: {D.sum():.0f} vehicles (car-equivalents), held at 17:00 {res['held'][48]:.0f}, "
@@ -575,6 +583,8 @@ def main(argv=None) -> None:
     ap.add_argument("--out", type=Path, default=RUNS)
     ap.add_argument("--threads", type=int, default=8, help="routing threads per run")
     ap.add_argument("--sim-threads", type=int, default=1, help="micro: SUMO --threads")
+    ap.add_argument("--no-reroute", action="store_true",
+                    help="routes fixed when a vehicle enters (quickest on empty roads)")
     ap.add_argument("--seed", type=int, default=SEED)
     ap.add_argument("--no-buses", action="store_true")
     args = ap.parse_args(argv)
@@ -601,7 +611,7 @@ def main(argv=None) -> None:
     log(f"{args.date}: {len(task['calls'])} calls, cruise assumptions {cruise or 'default'}, "
         f"wet {day.wet}, incident {bool(day.events)}")
 
-    cap, res, macro_bus = macro_reference(ctx, task, day, Dc, log)
+    cap, res, macro_bus = macro_reference(ctx, task, day, Dc, args.scale, log)
 
     net = Net(args.net)
     log(f"SUMO network: {len(net.edges)} edges, {int(net.main.sum())} in its main part")
@@ -639,7 +649,8 @@ def main(argv=None) -> None:
                     f'name="{nm}"/>\n')
         f.write("</additional>\n")
     counts = write_trips(run_dir / "trips.xml.gz", net, trips, bus_list)
-    write_configs(run_dir, args.net.resolve(), args.threads, args.seed, args.sim_threads)
+    write_configs(run_dir, args.net.resolve(), args.threads, args.seed, args.sim_threads,
+                  reroute=not args.no_reroute)
     log(f"trips: {sum(v for k, v in counts.items() if k not in ('dropped_no_edge', 'same_edge'))} "
         f"written ({counts})")
 
@@ -685,7 +696,8 @@ def main(argv=None) -> None:
             "freight_f": task.get("freight_f"), "cruise": cruise,
             "sampled": {"wet": day.wet, "incident": bool(day.events),
                         "note": "macro reference and SUMO run on dry roads with no incident"},
-            "counts": counts, "vtypes": VTYPES, "made": clock.strftime("%Y-%m-%dT%H:%M")}
+            "counts": counts, "vtypes": VTYPES, "net": str(args.net),
+            "reroute": not args.no_reroute, "made": clock.strftime("%Y-%m-%dT%H:%M")}
     (run_dir / "meta.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
     log(f"wrote {run_dir}")
 

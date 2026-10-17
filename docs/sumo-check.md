@@ -96,7 +96,7 @@ cover only the hours they reached, and the macro figures next to them cover the 
 SUMO's delay is time lost against each driver's wanted speed on the roads (junction and signal
 delay included); the macro model's is BPR running time plus 15 minutes per vehicle its point
 queues carry into the next 15 minutes. At half the demand the macro model has almost no delay
-(V/C around 0.4 gives BPR next to nothing), while SUMO still loses about 2.5 minutes a trip at
+(V/C around 0.4 gives BPR next to nothing), while SUMO still loses 2-3 minutes a trip at
 junctions and signals; the two are not the same measure at low load.
 
 ### Agreement per corridor and 15 minutes
@@ -167,8 +167,9 @@ The council's July 2024 peak figures are 0:24 to 4:22 behind timetable (Table 3-
 | Bluestar 20 NB | -1.0 (9) | 1.9 (9) | -1.0 (9) / -1.0 (10) | 1.9 (9) / 1.9 (11) |
 | Bluestar 20 SB | 5.3 (11) | 2.1 (11) | 0.3 (11) / -0.5 (12) | -0.6 (11) / -0.7 (12) |
 
-At full demand the few buses that got through before the runs stopped were 4-28 minutes late in
-SUMO (gridlock) against the macro model's 5-81 (the 81 is Bluestar 2 southbound, 4 buses).
+At full demand the buses that got past the section before the runs stopped (1-8 per route and
+direction) were between on time and 28 minutes late in SUMO, against the macro model's 2 minutes
+early to 81 minutes late (the 81 is Bluestar 2 southbound, 4 buses).
 
 <!-- DETAIL -->
 
