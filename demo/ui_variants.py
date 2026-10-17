@@ -139,7 +139,7 @@ body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !i
 @keyframes wave { to { transform: translateX(-50%); } }
 .l-sun { left: 66%; }
 /* the words sit in the sky on the left; the ship sails the right half */
-.l-card { position: relative; z-index: 5; display: grid; justify-items: start; gap: 14px; text-align: left; padding: 0 16px; place-self: center start; margin: -14vh 0 0 6vw; max-width: min(660px, 56vw); }
+.l-card { position: relative; z-index: 5; display: grid; justify-items: start; gap: 14px; text-align: left; padding: 0 16px; place-self: center start; margin: -14vh 0 0 6vw; max-width: min(660px, 52vw); }
 .l-kicker { font-weight: 600; letter-spacing: .12em; text-transform: uppercase; font-size: .85rem; }
 .l-plate { position: relative; padding: 14px 38px 16px; border-radius: 18px; background: #1D2B45; color: #FFF6E2; box-shadow: 0 0 0 4px #FFF6E2, 0 0 0 7px #1D2B45, 8px 10px 0 7px rgba(29, 43, 69, .3); }
 .l-plate::before, .l-plate::after { content: ''; position: absolute; top: 50%; width: 9px; height: 9px; margin-top: -4.5px; border-radius: 50%; background: #F2B84B; }
@@ -156,7 +156,7 @@ body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !i
 .l-go:hover { transform: translate(-1px, -2px); box-shadow: 5px 7px 0 #1D2B45; }
 .l-go:active { transform: translate(3px, 4px); box-shadow: 1px 1px 0 #1D2B45; }
 .l-go .spr { width: 40px; flex: none; }
-.l-src { font-size: .78rem; font-weight: 500; max-width: 60ch; padding: 3px 10px; border-radius: 999px; background: rgba(255, 246, 226, .7); }
+.l-src { font-size: .78rem; font-weight: 500; max-width: min(60ch, 100%); padding: 3px 10px; border-radius: 999px; background: rgba(255, 246, 226, .7); }
 .l-sound { position: absolute; top: 16px; right: 16px; z-index: 6; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 2.5px solid #1D2B45;
   background: #FFF6E2; color: #1D2B45; font: 600 .95rem "Fredoka", sans-serif; cursor: pointer; box-shadow: 3px 3px 0 #1D2B45; }
 .l-sound svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -165,11 +165,19 @@ body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !i
 @keyframes hint { 50% { transform: scale(1.08); } }
 /* portrait and narrow screens: words on top, the ship below them on the horizon */
 @media (max-width: 820px), (max-aspect-ratio: 1/1) {
-  .l-card { place-self: start center; margin: 64px 0 0; justify-items: center; text-align: center; max-width: none; }
-  .l-ship { left: 50%; width: min(46vmin, 300px); bottom: 17%; }
+  .l-card { place-self: start center; margin: 72px 0 0; justify-items: center; text-align: center; max-width: none; }
+  .l-ship { left: 50%; width: min(46vmin, 300px); bottom: 21%; }
   .l-sun { left: 50%; }
   .l-light { width: 26vmin; right: -4vw; }
   .l-tickets { justify-content: center; }
+}
+/* short landscape screens (a phone on its side): a compact card, the ship pushed right */
+@media (max-height: 520px) and (min-aspect-ratio: 1/1) {
+  .l-card { margin: 0 0 0 4vw; gap: 8px; place-self: center start; justify-items: start; text-align: left; max-width: 58vw; }
+  .l-kicker, .l-sub { display: none; }
+  .l-ticket { padding: 3px 12px 5px; } .l-ticket b { font-size: 1.2rem; }
+  .l-go { font-size: 1.1rem; padding: 6px 20px 6px 8px; } .l-go .spr { width: 30px; }
+  .l-ship { left: 79%; width: 30vmax; bottom: 16%; } .l-sun { left: 79%; } .l-light { display: none; } .l-rock-spray { display: none; }
 }
 @media (max-width: 640px) { .l-light { display: none; } .l-rock-spray { display: none; }
   .storybar { gap: 8px 10px; } .story-q { flex-basis: 100%; } .voyage { flex: 1 1 150px; width: auto; } .storybar .v-btn { padding: 6px 12px; min-height: 36px; } }
