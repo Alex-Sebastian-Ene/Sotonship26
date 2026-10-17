@@ -8,6 +8,7 @@ import pandas as pd
 from sotonship26.flow_forecast import (
     backtest_site,
     calendar_features,
+    forecast,
     lagged_split,
     last_year,
     recent_median,
@@ -38,6 +39,8 @@ def test_calendar_features_flags():
     assert f["bank_holiday"].tolist() == [1.0, 0.0]
     assert f["christmas"].tolist() == [1.0, 0.0]
     assert f.loc[date(2024, 6, 5), "wd2"] == 1.0  # a Wednesday
+    # the demo forecasts into January 2027, so New Year's Day must be flagged
+    assert calendar_features([date(2027, 1, 1)])["bank_holiday"].tolist() == [1.0]
 
 
 def test_school_holiday_flags_weekdays_inside_council_dates_only():
@@ -92,3 +95,12 @@ def test_skill_ci_resamples_whole_weeks():
     assert abs(lo - 0.5) < 1e-9 and abs(hi - 0.5) < 1e-9  # same ratio every day
     lo, hi = skill_ci(days, rng.permutation(base), base)
     assert lo < 0 < hi  # no real difference, so the interval straddles zero
+
+
+def test_forecast_never_negative_and_interval_ordered():
+    # flow falls steadily, so the trend term extrapolates below zero a year on
+    days = np.array([date(2024, 1, 1) + timedelta(days=i) for i in range(600)])
+    y = np.outer(np.linspace(400, 20, 600), np.ones(96))
+    out = forecast(days, y, [date(2025, 12, 1), date(2026, 3, 1)])
+    assert (out["flow_veh"] >= 0).all()
+    assert (out["lo80"] <= out["flow_veh"]).all() and (out["flow_veh"] <= out["hi80"]).all()

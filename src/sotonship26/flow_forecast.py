@@ -132,6 +132,11 @@ def lagged_split(dates: np.ndarray, idx: np.ndarray, lag: int,
     return proper, cal
 
 
+def predict_flow(model: Ridge, feats: pd.DataFrame) -> np.ndarray:
+    """Ridge forecast clipped at zero. The model is linear, so holiday dummies can stack below 0."""
+    return np.maximum(model.predict(feats), 0.0)
+
+
 def skill_ci(days: list[date], model_err: np.ndarray, base_err: np.ndarray,
              n_boot: int = 2000, seed: int = 0) -> tuple[float, float]:
     """90% CI of skill = 1 - MAE(model)/MAE(base) from per-day errors, resampling whole weeks.
@@ -170,7 +175,7 @@ def backtest_site(site: int, dates: np.ndarray, y: np.ndarray, cutoff: date,
             continue
         n_cal = len(cal)
         model = Ridge(features=CAL_FEATURES).fit(feats.iloc[proper], y[proper])
-        half_ridge = conformal_halfwidth(y[cal] - model.predict(feats.iloc[cal]))
+        half_ridge = conformal_halfwidth(y[cal] - predict_flow(model, feats.iloc[cal]))
         final = Ridge(lam=model.lam, features=CAL_FEATURES).fit(feats.iloc[pub_idx], y[pub_idx])
         # baseline intervals from their errors on the newest published days they can forecast
         base_resid = {b: [] for b, _ in BASELINES}
@@ -180,7 +185,7 @@ def backtest_site(site: int, dates: np.ndarray, y: np.ndarray, cutoff: date,
                 if p is not None and len(base_resid[name]) < n_cal:
                     base_resid[name].append(y[i] - p)
         month_days = [d for d in test_days if (d.year, d.month) == (year, month)]
-        month_pred = final.predict(calendar_features(month_days))
+        month_pred = predict_flow(final, calendar_features(month_days))
         for d, p in zip(month_days, month_pred, strict=True):
             preds["ridge"][d], halves["ridge"][d] = p, half_ridge
             for name, fn in BASELINES:
@@ -220,9 +225,9 @@ def forecast(dates: np.ndarray, y: np.ndarray, targets: list[date],
     proper, cal = lagged_split(dates, np.arange(len(dates)), lag)
     feats = calendar_features(dates)
     model = Ridge(features=CAL_FEATURES).fit(feats.iloc[proper], y[proper])
-    half = conformal_halfwidth(y[cal] - model.predict(feats.iloc[cal]))
+    half = conformal_halfwidth(y[cal] - predict_flow(model, feats.iloc[cal]))
     final = Ridge(lam=model.lam, features=CAL_FEATURES).fit(feats, y)
-    pred = final.predict(calendar_features(targets))
+    pred = predict_flow(final, calendar_features(targets))
     rows = [pd.DataFrame({"date": d, "tod_bin": np.arange(96), "flow_veh": p,
                           "lo80": np.maximum(p - half, 0), "hi80": p + half})
             for d, p in zip(targets, pred, strict=True)]

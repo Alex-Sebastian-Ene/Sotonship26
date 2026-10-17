@@ -28,8 +28,8 @@ Test period 2025-07-01 to 2026-06-29.
 | Claim | Number | Sample |
 |---|---|---|
 | Ridge vs five-week year-ago median, M3 J14 (site 20025) | skill 0.066, 90% CI 0.005–0.12 | 355 test days |
-| Same, MAE in vehicles per 15 min | 35.0 vs 37.4 | 355 days |
-| Where the win comes from: school-holiday weekdays | MAE 39.1 vs 55.7 | 62 days |
+| Same, MAE in vehicles per 15 min | 34.9 vs 37.4 | 355 days |
+| Where the win comes from: school-holiday weekdays | MAE 38.9 vs 55.7 | 62 days |
 | Ordinary days (the planner rule is slightly better) | MAE 34.1 vs 33.6 | the other 293 days |
 | 80% interval coverage, M3 J14 | 0.84 | 355 days |
 | M271 northbound (19974) vs five-week year-ago median | skill −0.30 (CI −0.42 to −0.23), a **loss** | 17 days, 1–22 Mar 2026 (4 weeks to resample, so the CI is rough) |
@@ -42,7 +42,7 @@ Do not quote:
 
 ## The failure to demo (judging: "must demo a failure")
 
-Pick one; both are real and reproducible from the repo.
+Pick one; all three are real and reproducible from the repo.
 
 1. **The model loses where history is thin.** At M271 site 19974 the five-week year-ago median
    beats ridge (MAE 25.6 vs 33.3, 17 days). Show the row. The app does not yet
@@ -51,6 +51,11 @@ Pick one; both are real and reproducible from the repo.
    exits and points to SOT-21: no permitted open source of historic cruise calls exists (see
    `notes/cruise-history.md`). The uplift pipeline is tested on synthetic data with a known effect,
    labelled synthetic. The ask to ABP / southamptonships.org is in SOT-21 for the humans to send.
+3. **Holidays forecast too low.** For 08:30 on Christmas Day 2026 at M3 J14 the forecast is 0
+   vehicles (80% range 0–47); past Christmas Days had 64–77. The linear model stacks the holiday
+   effects below zero, and the code clips them at 0. `python -m sotonship26.flow_forecast
+   --sites 20025 --forecast 2026-12-24 2026-12-28`, then read `runs/flow_forecast/20025.csv`.
+   Fix to try: fit on log flow (`notes/ml-walkthrough.md`, item 2).
 
 ## Responsibility points (15)
 

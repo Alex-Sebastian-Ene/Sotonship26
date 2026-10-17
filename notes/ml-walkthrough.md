@@ -74,17 +74,18 @@ honest about uncertainty.
 ## 7. What the numbers say tonight
 
 - **Everyday traffic** (`notes/flow-forecast.md`): at M3 J14 (355 test days) the learned model
-  beats a careful planner (year_median) by **7%** MAE (35.0 vs 37.4 vehicles per 15 min, WAPE
+  beats a careful planner (year_median) by **7%** MAE (34.9 vs 37.4 vehicles per 15 min, WAPE
   9.4% vs 10.1%; week-block bootstrap 90% CI for the skill 0.5% to 12%). It beats the one-day
   year-ago lookup by 19% and the recent median by 28%. Its 80% intervals cover 84%, a little
   wide; year_median's own intervals are narrower (106 vs 124 vehicles) at 80%.
   Where the win comes from: on the 62 school-holiday weekdays year_median is badly off (MAE 55.7
-  against 39.1 for ridge), because holiday dates shift and a year-ago lookup lands on term time
+  against 38.9 for ridge), because holiday dates shift and a year-ago lookup lands on term time
   or the other way round. On ordinary days year_median is slightly better (33.6 vs 34.1).
   Adding the school-holiday flag cut ridge's error by 2.7% (90% CI 1.8% to 3.7%). Before the
   flag the skill was 4% and its interval included zero.
-  At M271 NB it beats the recent median by 11% over 147 days, but the year-ago baselines exist
-  for only 17 test days there, so we cannot say it beats a planner. Sites with under 30
+  At M271 NB it beats the recent median by 11% over 147 days (CI 1% to 21%) and the planner
+  rule by 9% (CI -3% to 19%, not clear of zero). The year-ago median exists for only 17 test
+  days there, and on those it wins by 30%, so we cannot say ridge beats a planner at the M271. Sites with under 30
   comparable days are noise (20313 went from +10% to -8% on 29 days when the flag was added).
   Honest headline: the model is a small, real improvement on the best hand rule, not a big one,
   and it wins exactly where calendars shift.
@@ -100,9 +101,14 @@ honest about uncertainty.
    19974 (147 days), which is too small to be worth an extra moving part (no CI computed). Script:
    `blend_check.py` in the session scratchpad, not committed. Lesson: don't add a part for a
    gain you can't show is real.
-2. Add a **lagged-year feature** to ridge (last year's value in the same bin), so the model
+2. Fit ridge on **log or square-root flow**. Ridge is linear, so on 25-26 Dec and 1 Jan the
+   bank-holiday, school-holiday and Christmas dummies add up below zero. Predictions are now
+   clipped at 0 (`predict_flow`), but the forecast for 08:30 on 25 Dec 2026 at M3 J14 is still
+   0 (80% range 0-47), when past Christmas Days had 64-77 vehicles. On a log scale the effects
+   multiply instead, and can't go negative.
+3. Add a **lagged-year feature** to ridge (last year's value in the same bin), so the model
    can beat `last_year` where a year of history exists.
-3. Replace ridge with **gradient-boosted trees with quantile loss** (scikit-learn
+4. Replace ridge with **gradient-boosted trees with quantile loss** (scikit-learn
    `HistGradientBoostingRegressor(loss="quantile")`) and compare skill and coverage.
-4. Plot a **reliability diagram** for `p_event`: bin the predicted probabilities, then compare
+5. Plot a **reliability diagram** for `p_event`: bin the predicted probabilities, then compare
    each bin with the observed frequency.
