@@ -133,6 +133,39 @@ def test_score_by_lead_buckets_coverage_and_one_sidedness():
     assert nonempty == {(15, 30): 1, (60, 120): 1}
 
 
+def test_naive_captured_at_raises():
+    # The logger writes offset-aware timestamps; a naive one is corruption. Silently
+    # assuming UTC would shift the lead by up to an hour, so build_pairs must fail loudly.
+    naive = (T0_LONDON - timedelta(minutes=30)).replace(tzinfo=None)
+    rows = [_fused("L1", T0_LONDON, 60.0), _pred("L1", T0_LONDON, naive, 58.0)]
+    with pytest.raises(ValueError, match="timezone-aware"):
+        ns.build_pairs(rows)
+
+
+def test_lead_uses_wall_clock_across_dst_fallback():
+    # Clocks go back at 02:00 on 2026-10-25. Captured 00:00 (BST, +01:00), target 03:00
+    # (GMT, +00:00): 3h apart on the clock but 4h of real elapsed time. The scorer works
+    # in the London wall-clock frame, so the lead is the clock difference, 180 min.
+    target = datetime(2026, 10, 25, 3, 0, tzinfo=LONDON)
+    captured = datetime(2026, 10, 25, 0, 0, tzinfo=LONDON)
+    rows = [_fused("L1", target, 60.0), _pred("L1", target, captured, 55.0)]
+    pairs = ns.build_pairs(rows)
+    assert len(pairs) == 1
+    assert pairs[0]["lead_min"] == pytest.approx(180.0, abs=0.5)
+
+
+def test_nearest_actual_tie_break_keeps_first_seen():
+    # Two fused actuals equidistant (+-5 min) from the target, both within tolerance. The
+    # first-seen one wins deterministically.
+    before = T0_LONDON - timedelta(minutes=5)
+    after = T0_LONDON + timedelta(minutes=5)
+    rows = [_fused("L1", before, 60.0), _fused("L1", after, 70.0),
+            _pred("L1", T0_LONDON, T0_LONDON - timedelta(minutes=30), 58.0)]
+    pairs = ns.build_pairs(rows)
+    assert len(pairs) == 1
+    assert pairs[0]["actual"] == 60.0
+
+
 def test_render_report_states_inferred_units_and_handles_empty():
     empty = ns.render_report([], [], ns.score_by_lead([]))
     assert "No scored pairs yet" in empty
