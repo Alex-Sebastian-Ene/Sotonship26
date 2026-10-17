@@ -147,6 +147,9 @@ data improves it by about 4% a day (not significant) and 2% per 15 minutes.
   `demo/synthetic_demo.py`), the ships-only profiles exported by `demo/webtris_backtest.py`, the
   page panel showing the fit, and `cluster/iridis/forecast.slurm` were written with Claude Code
   on Sat 17 Oct 2026.
+- **AI-generated (past-flow check):** `demo/ridge_history.py` (ridge and boosted models with
+  past-flow features, refit at publication delays of 1, 7, 28 and 105 days, week-block bootstrap)
+  and `docs/ridge-history.md` were written with Claude Code on Sat 17 Oct 2026 (SOT-25).
 - **AI-generated:** `demo/external_data.py`, the census commuter gateways (`census_od`), through
   traffic and other county trips from DfT gateway counts (`cordon_od`), the DfT count fit
   (`calibrate_external`) and the motorway repairs (`repair_motorways`) in `demo/traffic_model.py`
