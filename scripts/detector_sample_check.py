@@ -34,7 +34,8 @@ CONF = float(os.environ.get("CONF", "0.25"))
 MODEL = os.environ.get("MODEL", "yolo11n-obb.pt")
 WEIGHTS = SAT / "data" / "cache" / "models" / MODEL
 # optional box (x0,y0,x1,y1 in 25 cm pixels) whose cars were counted by eye, scored separately
-PATCH25 = [float(x) for x in os.environ["PATCH25"].split(",")] if os.environ.get("PATCH25") else None
+_P = os.environ.get("PATCH25")
+PATCH25 = [float(x) for x in _P.split(",")] if _P else None
 OUT = SAT / "data" / "raw" / "oam_sample"
 OUT.mkdir(parents=True, exist_ok=True)
 aoi = {"type": "Polygon", "coordinates": [[[w, s], [e, s], [e, n], [w, n], [w, s]]]}
