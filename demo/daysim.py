@@ -115,8 +115,10 @@ def page_data(path: Path) -> dict | None:
 
 
 def fitted_cruise(page: dict | None) -> dict | None:
-    """Cruise assumptions fitted to the learned M271 uplift, when the page has them."""
-    fit = ((page or {}).get("meta") or {}).get("cruise_fit") or {}
+    """Cruise assumptions fitted to the learned M271 uplift, when the page has them (top-level
+    ``cruise_fit``; older pages kept it in ``meta``)."""
+    page = page or {}
+    fit = page.get("cruise_fit") or (page.get("meta") or {}).get("cruise_fit") or {}
     return fit.get("params")
 
 

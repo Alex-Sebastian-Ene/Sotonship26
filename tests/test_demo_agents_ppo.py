@@ -207,6 +207,14 @@ def test_traverse_free_flow_and_queue(ctx):
     assert hold is not None and hold[2] > hold[1] and times[-1] > 490.0
 
 
+def test_fitted_cruise_reads_top_level_and_meta():
+    params = {"road": 1.15, "county": 0.6, "dis_shift": 0.0}
+    assert daysim.fitted_cruise({"cruise_fit": {"params": params}, "meta": {}}) == params
+    assert daysim.fitted_cruise({"meta": {"cruise_fit": {"params": params}}}) == params  # older
+    assert daysim.fitted_cruise({"cruise_fit": None, "meta": {}}) is None  # fit skipped
+    assert daysim.fitted_cruise(None) is None
+
+
 def test_encoding_round_trip():
     import agents
 
