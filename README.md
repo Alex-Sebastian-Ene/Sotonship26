@@ -241,7 +241,10 @@ data improves it by about 4% a day (not significant) and 2% per 15 minutes.
   with its landing page, plus the Focus, Officer and Wallboard layouts) were written by Claude Code
   (Edward's session) on Sat 17 Oct 2026. The cruise icons in `demo/assets/` (ship, life ring,
   anchor, wheel, seagull, lighthouse, captain's hat) were made with Canva's AI image generator on
-  Sat 17 Oct 2026 and cut out of their white backgrounds by script.
+  Sat 17 Oct 2026 and cut out of their white backgrounds by script. `demo/sprites.py` (written by
+  Claude Code) animates them into the sprite sheets in `demo/assets/sprites/`. The landing page's
+  sound is synthesised in the browser: gull cries, waves, a horn and "Drunken Sailor", a traditional
+  tune in the public domain; no recordings are used.
 - **AI-assisted research:** `notes/local-evidence.md` (local evidence, scale and business numbers)
   was compiled by Claude Code (Edward's session, with a research subagent) on Sat 17 Oct 2026 from
   the public sources cited on each line.
