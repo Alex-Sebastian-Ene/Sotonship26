@@ -524,6 +524,57 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
 .act[data-state="declined"] { opacity: .5; }
 .act[data-state="declined"] .act-title { text-decoration: line-through; }
 .fx-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.act[hidden] { display: none !important; }
+.acts.clamped.filtering > .act:nth-child(n+5) { display: grid; }
+/* plan bar: running total of what is arranged, filters, multi-select */
+.plan-bar { display: grid; gap: 10px; }
+.plan-sum { display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px; }
+.ps { display: grid; gap: 1px; align-content: center; padding: 8px 14px; border-radius: 12px; background: var(--sunk); min-width: 110px; transition: background .25s, transform .25s; }
+.ps .k { font-size: .7rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.ps .v { font-family: var(--font-data); font-variant-numeric: tabular-nums; font-weight: 750; font-size: 1.3rem; line-height: 1.15; }
+.ps .v small { font-size: .75rem; color: var(--muted); font-weight: 600; margin-left: 2px; }
+.ps .s { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ps.good { background: color-mix(in srgb, #1A9E6E 22%, var(--sunk)); }
+.ps.bump { transform: scale(1.05); }
+.ps-ring { display: flex; align-items: center; gap: 10px; }
+.ps-ring > span:last-child { display: grid; }
+.ring { width: 44px; height: 44px; border-radius: 50%; flex: none; background: conic-gradient(#1A9E6E 0 var(--a), #C8462D 0 calc(var(--a) + var(--d)), var(--line) 0); -webkit-mask: radial-gradient(circle 14px, transparent 98%, #000); mask: radial-gradient(circle 14px, transparent 98%, #000); transition: background .3s; }
+.plan-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.plan-tools .seg-ctl button { min-width: 40px; }
+.kind-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.kchip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px 4px 6px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--surface); cursor: pointer; font-size: var(--step--1); font-weight: 650; color: var(--ink); }
+.kchip svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.kchip b { font-family: var(--font-data); font-size: .75rem; color: var(--muted); }
+.kchip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.kchip[aria-pressed="true"] b { color: inherit; }
+#sel-mode[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 12px; background: var(--accent-soft); position: sticky; top: 64px; z-index: 5; }
+.bulk[hidden] { display: none; }
+.bulk .dec { width: 64px; height: 40px; }
+.selecting .act { cursor: pointer; }
+.selecting .act:not(.sel) { outline: 2px dashed var(--line-strong); outline-offset: 3px; }
+.act.sel { outline: 3px solid var(--accent); outline-offset: 3px; }
+:root[data-theme="steam"] .ps { border: 2px solid #1D2B45; box-shadow: 3px 3px 0 #1D2B45; }
+:root[data-theme="steam"] .kchip { border: 2px solid #1D2B45; }
+/* speed dial: drag, scroll or arrow keys */
+.dial { width: 56px; height: 56px; flex: none; cursor: grab; touch-action: none; border-radius: 50%; }
+.dial:active { cursor: grabbing; }
+.dial svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.dial-face { fill: var(--sunk); stroke: var(--line-strong); stroke-width: 2; }
+.dial-tick { stroke: var(--muted); stroke-width: 1.6; stroke-linecap: round; }
+.dial-tick.on { stroke: var(--accent); stroke-width: 2.4; }
+.dial-arc { fill: none; stroke: var(--accent); stroke-width: 3.5; stroke-linecap: round; opacity: .55; }
+.dial-needle { stroke: var(--accent); stroke-width: 3.5; stroke-linecap: round; transition: transform .25s cubic-bezier(.3, 1.5, .5, 1); transform-origin: 32px 32px; }
+.dial-hub { fill: var(--ink); }
+.dial-read { display: grid; line-height: 1.1; min-width: 4.6em; }
+.dial-read b { font-family: var(--font-data); font-variant-numeric: tabular-nums; font-size: 1.05rem; }
+.dial-read small { font-size: .72rem; color: var(--muted); }
+:root[data-theme="steam"] .dial-face { fill: #F2B84B; stroke: #1D2B45; stroke-width: 2.5; }
+:root[data-theme="steam"] .dial-tick { stroke: #1D2B45; }
+:root[data-theme="steam"] .dial-needle, :root[data-theme="steam"] .dial-arc { stroke: #D8473A; }
+/* observed buses */
+.bl-note { padding: 8px 12px; border-radius: 10px; background: var(--warn-bg); color: var(--warn-ink); font-size: var(--step--1); }
+.bl-tiles { display: flex; flex-wrap: wrap; gap: 10px; }
 .fx { display: grid; gap: 1px; padding: 8px 14px; border-radius: 12px; background: var(--sunk); }
 .fx .k { font-size: .7rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .fx .v { font-family: var(--font-data); font-variant-numeric: tabular-nums; font-weight: 700; font-size: 1.05rem; }
@@ -656,6 +707,20 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
 
     <div class="block" id="row-actions">
       <div class="block-head"><h3>What to do</h3><p class="foot-note">Suggestions only: the duty officer decides. Tick when arranged, cross when not needed.</p></div>
+      <div class="plan-bar" id="plan-bar">
+        <div class="plan-sum" id="plan-sum" aria-live="polite"></div>
+        <div class="plan-tools">
+          <div class="seg-ctl" role="group" aria-label="Show" id="f-state"><button data-f="all" aria-pressed="true">All</button><button data-f="open" aria-pressed="false">Open</button><button data-f="done" aria-pressed="false" aria-label="Arranged" title="Arranged">✓</button><button data-f="declined" aria-pressed="false" aria-label="Not needed" title="Not needed">✗</button></div>
+          <div class="kind-chips" id="f-kind" role="group" aria-label="Filter by kind"></div>
+          <button type="button" class="v-more" id="sel-mode" aria-pressed="false">Select</button>
+        </div>
+        <div class="bulk" id="bulk" hidden><strong id="bulk-n"></strong>
+          <button type="button" class="v-more" data-bulk="all">All shown</button>
+          <button type="button" class="dec dec-yes" data-bulk="yes" aria-label="Arrange the selected" title="Arrange the selected"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+          <button type="button" class="dec dec-no" data-bulk="no" aria-label="Mark the selected not needed" title="Mark the selected not needed"><svg viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></button>
+          <button type="button" class="v-more" data-bulk="clear">Clear</button></div>
+        <p class="muted f-empty" id="f-empty" hidden>Nothing matches these filters.</p>
+      </div>
       <div id="actions"></div>
     </div>
 
@@ -693,8 +758,11 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
         </div>
         <div class="veh-row" id="veh-row" hidden>
           <button class="btn" id="veh-play">Play vehicles</button>
-          <label class="foot-note" for="veh-speed">Speed</label>
-          <select id="veh-speed"><option value="2">2 min a second</option><option value="5" selected>5 min a second</option><option value="15">15 min a second</option></select>
+          <div class="dial" id="veh-dial" role="slider" tabindex="0" aria-label="Playback speed" aria-valuemin="0.5" aria-valuemax="30" aria-valuenow="1">
+            <svg viewBox="0 0 64 64" aria-hidden="true"><circle class="dial-face" cx="32" cy="32" r="28"/><g id="dial-ticks"></g><path class="dial-arc" id="dial-arc" d=""/><line class="dial-needle" id="dial-needle" x1="32" y1="32" x2="32" y2="11"/><circle class="dial-hub" cx="32" cy="32" r="4.5"/></svg>
+          </div>
+          <span class="dial-read"><b id="dial-val">1 min</b><small>a second</small></span>
+          <input type="hidden" id="veh-speed" value="1">
           <label class="check"><input type="checkbox" id="veh-trails" checked> Flow trails</label>
           <span class="clock" id="veh-clock"></span>
           <span class="foot-note" id="veh-count"></span>
@@ -1449,11 +1517,104 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
   };
   const actIcon = k => `<span class="act-ico" aria-hidden="true"><svg viewBox="0 0 24 24">${ACT_ICON[k] || ACT_ICON.Event}</svg></span>`;
   const timeChips = ts => ts.length ? `<span class="todo-time">${ts.join(' · ')}</span>` : '';
+  // hours covered by "HH:MM–HH:MM" windows
+  const winHours = ts => ts.reduce((s, t) => { const m = String(t).match(/(\d\d):(\d\d)–(\d\d):(\d\d)/); return m ? s + ((+m[3] * 60 + +m[4]) - (+m[1] * 60 + +m[2])) / 60 : s; }, 0);
   function decideBtns(st, yes, yesLabel, noLabel) {
     return `<div class="decide" role="group" aria-label="Decision">
       <button type="button" class="dec dec-yes" data-dec="${yes}" aria-pressed="${st === yes}" aria-label="${yesLabel}" title="${yesLabel}"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
       <button type="button" class="dec dec-no" data-dec="declined" aria-pressed="${st === 'declined'}" aria-label="${noLabel}" title="${noLabel}"><svg viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></button></div>`;
   }
+  /* ---------- the plan: decisions, running totals, filters, multi-select ---------- */
+  const filt = { state: 'all', kinds: new Set() };
+  const planCards = () => [...document.querySelectorAll('#actions .act, #ppo-body .act')];
+  const isDone = c => c.dataset.state === 'accepted' || c.dataset.state === 'approved';
+  function setDecision(card, want, force) {
+    const yes = card.closest('#ppo-body') ? 'approved' : 'accepted';
+    if (want === 'yes') want = yes;
+    const now = force ? want : (decisions[card.dataset.key] === want ? 'open' : want);
+    decisions[card.dataset.key] = now; card.dataset.state = now;
+    card.querySelectorAll('[data-dec]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.dec === now)));
+    // arranging the works move puts it on the map; undoing it puts the permit back
+    if (card.dataset.scen && day().whatif[card.dataset.scen]) {
+      if (now === 'accepted') setScenario(card.dataset.scen);
+      else if (state.scenario === card.dataset.scen) setScenario('base');
+    }
+  }
+  function refreshPlan() { buildKindChips(); updatePlan(); applyFilters(); }
+  function updatePlan() {
+    const cards = planCards(), done = cards.filter(isDone), no = cards.filter(c => c.dataset.state === 'declined').length;
+    const el = $('#plan-sum'); if (!el) return;
+    $('#plan-bar').hidden = !cards.length;
+    if (!cards.length) return;
+    const sum = (arr, k) => arr.reduce((t, c) => t + (+c.dataset[k] || 0), 0);
+    const mh = sum(done.filter(c => c.dataset.kind === 'Marshals'), 'hours'), sh = sum(done.filter(c => c.dataset.kind === 'Sign message'), 'hours');
+    const fx = sum(done, 'fx'), rate = PPO && PPO.costs ? PPO.costs.marshal_hour : 120, n = cards.length;
+    const prev = updatePlan.last || {};
+    el.innerHTML = `<div class="ps ps-ring"><span class="ring" style="--a:${done.length / n * 100}%;--d:${no / n * 100}%"></span><span><span class="k">Arranged</span><span class="v">${done.length}<small>of ${n}</small></span></span></div>
+      <div class="ps" data-m="mh"><span class="k">Marshals</span><span class="v">${fmt1(mh)}<small>gate-h</small></span><span class="s">£${int(mh * rate)}</span></div>
+      <div class="ps" data-m="sh"><span class="k">Signs</span><span class="v">${fmt1(sh)}<small>h</small></span></div>
+      <div class="ps${fx > 0.05 ? ' good' : ''}" data-m="fx"><span class="k">Congestion saved</span><span class="v">${fx > 0.05 ? fmt1(fx) : '0'}<small>road-h</small></span></div>
+      <p class="foot-note">Totals cover both lists. Only retiming ships and moving roadworks have a modelled effect on congestion here; marshals and signs show their time and cost only. Marshals are costed at £${int(rate)} a gate-hour, our assumption.</p>`;
+    for (const [k, v] of Object.entries({ mh, sh, fx })) if (prev[k] !== undefined && prev[k] !== v) { const t = el.querySelector(`[data-m="${k}"]`); t.classList.add('bump'); setTimeout(() => t.classList.remove('bump'), 250); }
+    updatePlan.last = { mh, sh, fx };
+  }
+  function buildKindChips() {
+    const host = $('#f-kind'); if (!host) return;
+    const counts = {};
+    planCards().forEach(c => { counts[c.dataset.kind] = (counts[c.dataset.kind] || 0) + 1; });
+    for (const k of [...filt.kinds]) if (!counts[k]) filt.kinds.delete(k);
+    host.innerHTML = Object.entries(counts).map(([k, n]) => `<button type="button" class="kchip" data-kind="${esc(k)}" aria-pressed="${filt.kinds.has(k)}"><svg viewBox="0 0 24 24">${ACT_ICON[k] || ACT_ICON.Event}</svg>${esc(k)} <b>${n}</b></button>`).join('');
+  }
+  function applyFilters() {
+    let shown = 0;
+    const active = filt.state !== 'all' || filt.kinds.size;
+    for (const c of planCards()) {
+      const okS = filt.state === 'all' || (filt.state === 'done' ? isDone(c) : c.dataset.state === filt.state);
+      const okK = !filt.kinds.size || filt.kinds.has(c.dataset.kind);
+      c.hidden = !(okS && okK); if (!c.hidden) shown++;
+      if (c.hidden) c.classList.remove('sel');
+    }
+    document.querySelectorAll('.acts').forEach(u => u.classList.toggle('filtering', !!active));
+    const e = $('#f-empty'); if (e) e.hidden = shown > 0 || !planCards().length;
+    updateBulk();
+  }
+  function updateBulk() {
+    const n = document.querySelectorAll('.act.sel').length, on = document.body.classList.contains('selecting');
+    $('#bulk').hidden = !on; $('#bulk-n').textContent = `${n} selected`;
+    $('#bulk').querySelectorAll('.dec').forEach(b => { b.disabled = !n; });
+  }
+  $('#f-state').addEventListener('click', e => {
+    const b = e.target.closest('[data-f]'); if (!b) return;
+    filt.state = b.dataset.f; $('#f-state').querySelectorAll('[data-f]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); applyFilters();
+  });
+  $('#f-kind').addEventListener('click', e => {
+    const b = e.target.closest('[data-kind]'); if (!b) return;
+    const k = b.dataset.kind; filt.kinds.has(k) ? filt.kinds.delete(k) : filt.kinds.add(k);
+    b.setAttribute('aria-pressed', String(filt.kinds.has(k))); applyFilters();
+  });
+  $('#sel-mode').addEventListener('click', () => {
+    const on = !document.body.classList.contains('selecting');
+    document.body.classList.toggle('selecting', on); $('#sel-mode').setAttribute('aria-pressed', String(on));
+    if (!on) document.querySelectorAll('.act.sel').forEach(c => c.classList.remove('sel'));
+    updateBulk();
+  });
+  $('#bulk').addEventListener('click', e => {
+    const b = e.target.closest('[data-bulk]'); if (!b) return;
+    const sel = [...document.querySelectorAll('.act.sel')];
+    if (b.dataset.bulk === 'all') planCards().filter(c => !c.hidden).forEach(c => c.classList.add('sel'));
+    if (b.dataset.bulk === 'clear') sel.forEach(c => c.classList.remove('sel'));
+    if (b.dataset.bulk === 'yes' || b.dataset.bulk === 'no') {
+      sel.forEach(c => { setDecision(c, b.dataset.bulk === 'yes' ? 'yes' : 'declined', true); c.classList.remove('sel'); });
+      updatePlan(); applyFilters();
+    }
+    updateBulk();
+  });
+  document.addEventListener('click', e => {
+    const b = e.target.closest('.act [data-dec]');
+    if (b) { setDecision(b.closest('.act'), b.dataset.dec); updatePlan(); applyFilters(); return; }
+    const c = e.target.closest('.act');
+    if (c && document.body.classList.contains('selecting') && !e.target.closest('button, a, .qwrap')) { c.classList.toggle('sel'); updateBulk(); }
+  });
   function renderActions() {
     const d = day(), p = added(d), acts = [];
     for (const c of DATA.corridors.filter(c => c.group === 'Dock gates')) {
@@ -1479,7 +1640,7 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
     }
     if (d.timing && d.timing.best < d.timing.base - 0.15) {
       const moves = d.timing.shifts.map((sh, i) => [sh, d.calls[i]]).filter(([sh]) => sh[0] || sh[1]);
-      acts.push({ id: 'timing', kind: 'Ship timing', title: `Retime ${moves.length === 1 ? 'one ship' : moves.length + ' ships'}`, times: [],
+      acts.push({ id: 'timing', kind: 'Ship timing', title: `Retime ${moves.length === 1 ? 'one ship' : moves.length + ' ships'}`, times: [], fx: d.timing.base - d.timing.best,
         detail: `${moves.map(([sh, c]) => esc(c.ship) + (sh[0] ? ` off ${sh[0] > 0 ? '+' : '−'}${Math.abs(sh[0])} min` : '') + (sh[1] ? ` check-in ${sh[1] > 0 ? '+' : '−'}${Math.abs(sh[1])} min` : '')).join(', ')}: congested road-hours <span class="mono">${fmt1(d.timing.base)}</span> → <span class="mono">${fmt1(d.timing.best)}</span>.` });
     }
     for (const id of d.permits) {
@@ -1487,17 +1648,17 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
       const ws = CORR[pm.corridor] ? runs(d.p85[pm.corridor], 30, 1) : [];
       const road = CORR[pm.corridor] ? CORR[pm.corridor].name : pm.corridor;
       const detail = `${esc(pm.what)} (permit ${esc(id)})${moved ? `; moving it takes congested road-hours from <span class="mono">${fmt1(d.score)}</span> to <span class="mono">${fmt1(moved.score)}</span>` : ''}.`;
-      acts.push({ id: 'p-' + id, kind: 'Roadworks', title: `Move works on ${road}`, times: ws.length ? windowsText(ws).split(', ') : [], detail, scenario: moved ? 'move_permit' : null });
+      acts.push({ id: 'p-' + id, kind: 'Roadworks', title: `Move works on ${road}`, times: ws.length ? windowsText(ws).split(', ') : [], detail, scenario: moved ? 'move_permit' : null, fx: moved ? d.score - moved.score : 0 });
     }
     if (d.match) {
       const hits = DATA.corridors.filter(c => c.group === 'North and east' && runs(p[c.id], 40).length);
       if (hits.length) acts.push({ id: 'match', kind: 'Event', title: 'Match-day plan with the club', times: [`Kick-off ${d.match}`], detail: `Roads at risk: ${esc(hits.map(h => h.name).join(', '))}.` });
     }
     const el = $('#actions');
-    if (!acts.length) { el.innerHTML = '<p class="muted">Nothing to arrange. The ships do not make any main road congested for 30 minutes or more on most simulated days.</p>'; return; }
+    if (!acts.length) { el.innerHTML = '<p class="muted">Nothing to arrange. The ships do not make any main road congested for 30 minutes or more on most simulated days.</p>'; refreshPlan(); return; }
     el.innerHTML = `<ul class="acts">${acts.map(a => {
       const key = `${state.date}:${a.id}`, st = decisions[key] || 'open';
-      return `<li class="act" data-key="${esc(key)}" data-state="${st}">${actIcon(a.kind)}
+      return `<li class="act" data-key="${esc(key)}" data-state="${st}" data-kind="${esc(a.kind)}" data-hours="${winHours(a.times)}" data-fx="${a.fx || 0}"${a.scenario ? ` data-scen="${a.scenario}"` : ''}>${actIcon(a.kind)}
         <div class="act-body"><span class="act-kind">${esc(a.kind)}</span><strong class="act-title">${esc(a.title)}</strong>
           <div class="act-meta">${timeChips(a.times)}<p class="todo-detail">${a.detail}</p></div>
           ${a.scenario ? `<button class="linkbtn" data-scenario="${a.scenario}">See it moved</button>` : ''}
@@ -1505,12 +1666,10 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
         ${decideBtns(st, 'accepted', 'Arranged', 'Not needed')}</li>`;
     }).join('')}</ul>`;
     el.querySelectorAll('[data-scenario]').forEach(b => b.addEventListener('click', () => setScenario(b.dataset.scenario)));
-    el.querySelectorAll('[data-dec]').forEach(b => b.addEventListener('click', () => {
-      const li = b.closest('.act'), want = b.dataset.dec;
-      decisions[li.dataset.key] = decisions[li.dataset.key] === want ? 'open' : want;
-      li.dataset.state = decisions[li.dataset.key];
-      li.querySelectorAll('[data-dec]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.dec === li.dataset.state)));
-    }));
+    // a works move already arranged for this day shows on the map
+    const sc = el.querySelector('.act[data-scen][data-state="accepted"]');
+    if (sc && d.whatif[sc.dataset.scen]) { state.scenario = sc.dataset.scen; $('#scenario').value = sc.dataset.scen; }
+    refreshPlan();
   }
 
   /* ---------- activities and ship timings ---------- */
@@ -1992,19 +2151,25 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
     const dates = BL && BL.days ? Object.keys(BL.days).sort() : [];
     card.hidden = !dates.length;
     if (!dates.length) return;
-    const D = busLiveDay(state.date), el = $('#bus-live-body');
+    // a day with no readings (every forecast day is in the future) shows the latest day that has them
+    const own = busLiveDay(state.date), shownDay = own ? state.date : dates[dates.length - 1], D = BL.days[shownDay], el = $('#bus-live-body');
     $('#bus-live-src').textContent = `Collected ${dates.map(shortDate).join(', ')}; not live`;
-    if (!D) { el.innerHTML = `<p class="muted">Observed bus lateness was collected on ${chips(dates)}</p>`; wireChips(el); return; }
-    const from = D.collected_from.slice(11, 16), to = D.collected_to.slice(11, 16), W = Math.max(280, Math.floor(el.clientWidth || card.clientWidth || 600));
-    const lines = D.day_lines.slice().sort((a, b) => b.n - a.n).slice(0, 16);
-    const legend = Object.keys(AREA_NAME).filter(k => D.areas.some(p => p.key === k)).map(k => `<span><i class="bl-f-${AREA_CLS[k]}"></i>${esc(AREA_NAME[k])}</span>`).join('');
-    el.innerHTML = `<p><strong>Observed, not modelled.</strong> Every bus in the city box, read from bustimes.org once a minute, ${from}–${to} ${esc(shortDate(state.date))}: ${int(D.journeys)} journeys in ${int(D.polls)} readings. Lateness = bustimes.org's delay against the timetable; one count per journey per hour.</p>
-      <div class="bl-legend">${legend}</div>
-      <div class="bus-live-chart">${busLiveChart(D, W)}<div class="map-tip bl-tip" hidden></div></div>
+    const from = D.collected_from.slice(11, 16), to = D.collected_to.slice(11, 16), W = Math.max(280, Math.floor(el.clientWidth || card.clientWidth || $('.wrap').clientWidth - 80 || 600));
+    const lines = (D.day_lines || []).slice().sort((a, b) => b.n - a.n).slice(0, 16), areas = D.areas || [];
+    const legend = Object.keys(AREA_NAME).filter(k => areas.some(p => p.key === k)).map(k => `<span><i class="bl-f-${AREA_CLS[k]}"></i>${esc(AREA_NAME[k])}</span>`).join('');
+    const nJ = lines.reduce((t, p) => t + p.n, 0), mean = nJ ? lines.reduce((t, p) => t + p.mean_min * p.n, 0) / nJ : null;
+    const late5 = nJ ? lines.reduce((t, p) => t + p.share_over_5_min * p.n, 0) / nJ : null, chart = busLiveChart({ ...D, areas }, W);
+    el.innerHTML = `${own ? '' : `<p class="bl-note">No buses were read on ${esc(shortDate(state.date))}. Showing ${esc(shortDate(shownDay))}, the latest day collected.</p>`}
+      <div class="bl-tiles"><div class="ps"><span class="k">Journeys read</span><span class="v">${int(D.journeys || 0)}</span><span class="s">${from}–${to}, ${esc(shortDate(shownDay))}</span></div>
+        <div class="ps"><span class="k">Mean lateness</span><span class="v">${mean == null ? '–' : lateTxt(mean)}<small>min</small></span></div>
+        <div class="ps"><span class="k">5+ min late</span><span class="v">${late5 == null ? '–' : Math.round(late5 * 100) + '%'}</span></div></div>
+      <p><strong>Observed, not modelled.</strong> Every bus in the city box, read from bustimes.org once a minute, ${from}–${to} ${esc(shortDate(shownDay))}: ${int(D.journeys || 0)} journeys in ${int(D.polls || 0)} readings. Lateness = bustimes.org's delay against the timetable; one count per journey per hour.</p>
+      ${chart ? `<div class="bl-legend">${legend}</div><div class="bus-live-chart">${chart}<div class="map-tip bl-tip" hidden></div></div>` : `<p class="muted">${nJ ? 'Too few hours read to draw the hourly chart.' : 'No line had enough journeys for a lateness figure; buses ran but none were scored.'}</p>`}
       <p class="foot-note">Mean minutes late per hour in each area (boxes drawn by hand round each place). Hover a point for the spread.</p>
       <div class="table-scroll"><table><thead><tr><th>Line</th><th>Journeys</th><th>Mean min late</th><th>90% no later than</th><th>5+ min late</th></tr></thead><tbody>${lines.map(p => `<tr><td><strong>${esc(p.key)}</strong></td><td class="num">${p.n}</td><td class="num">${lateTxt(p.mean_min)}</td><td class="num">${lateTxt(p.p90_min)}</td><td class="num">${Math.round(p.share_over_5_min * 100)}%</td></tr>`).join('')}</tbody></table></div>
       <p class="foot-note">Source: ${esc(BL.source)}. Collected ${esc(D.collected_from.slice(0, 10))} ${from}–${to} by <span class="mono">scripts/bustimes.py</span>; raw readings are not published. Lines with fewer than 5 journeys are left out.</p>`;
-    const host = el.querySelector('.bus-live-chart'), tip = host.querySelector('.bl-tip');
+    const host = el.querySelector('.bus-live-chart'); if (!host) return;
+    const tip = host.querySelector('.bl-tip');
     host.addEventListener('mousemove', e => {
       const t = e.target.closest('[data-tip]');
       if (!t) { tip.hidden = true; return; }
@@ -2024,12 +2189,12 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
   }
   function renderPPO() {
     $('#ppo-card').hidden = !PPO;
-    if (!PPO) return;
+    if (!PPO) { refreshPlan(); return; }
     const R = PPO.days[state.date], el = $('#ppo-body');
-    if (!R) { el.innerHTML = `<p class="muted">The learned plan is worked out for ${chips(Object.keys(PPO.days))}</p>`; wireChips(el); return; }
+    if (!R) { el.innerHTML = `<p class="muted">The learned plan is worked out for ${chips(Object.keys(PPO.days))}</p>`; wireChips(el); refreshPlan(); return; }
     const E = R.effect, acts = R.actions.map((a, i) => {
       const [title, times, note] = ppoText(a), key = `ppo:${state.date}:${i}`, st = decisions[key] || 'open';
-      return `<li class="act" data-key="${esc(key)}" data-state="${st}">${actIcon(PPO_KIND[a.kind])}
+      return `<li class="act" data-key="${esc(key)}" data-state="${st}" data-kind="${esc(PPO_KIND[a.kind])}" data-hours="${a.kind === 'marshals' || a.kind === 'signs' ? winHours(times) : 0}" data-fx="0">${actIcon(PPO_KIND[a.kind])}
         <div class="act-body"><span class="act-kind">${esc(PPO_KIND[a.kind])}</span><strong class="act-title">${esc(title)}</strong>
           <div class="act-meta">${timeChips(times)}<p class="todo-detail">${note}; PPO chose it on ${Math.round(a.share * 100)}% of ${R.k} sampled days.</p></div>
           <span class="act-owner">Owner: ${esc(a.owner)}</span></div>
@@ -2053,10 +2218,7 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
         <p class="foot-note">Without the plan, then with it, averaged over ${R.k} sampled days of this date.</p></div>`;
     $('#ppo-why').innerHTML = `Trained by reinforcement learning (PPO) on simulated days; each step needs its owner's approval. ${verdict} The port and cruise lines own disembarkation and check-in, and the council owns the signs.`;
     if ($('#ppo-more')) $('#ppo-more').addEventListener('click', () => { renderPPO.all = true; renderPPO(); });
-    el.querySelectorAll('[data-dec]').forEach(b => b.addEventListener('click', () => {
-      const key = b.closest('.act').dataset.key, want = b.dataset.dec;
-      decisions[key] = decisions[key] === want ? 'open' : want; renderPPO();
-    }));
+    refreshPlan();
   }
   function renderPPOTest() {
     if (!PPO || !PPO.summary || !PPO.summary.all) return;
@@ -2480,6 +2642,30 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
   }
   $('#day-prev').addEventListener('click', () => { const i = DATES.indexOf(state.date); if (i > 0) selectDay(DATES[i - 1], false); });
   $('#day-next').addEventListener('click', () => { const i = DATES.indexOf(state.date); if (i < DATES.length - 1) selectDay(DATES[i + 1], false); });
+
+  /* ---------- playback speed dial ---------- */
+  (() => {
+    const SPEEDS = [0.5, 1, 2, 5, 10, 15, 30], A0 = -135, A1 = 135, dial = $('#veh-dial'), inp = $('#veh-speed');
+    if (!dial) return;
+    const ang = i => A0 + (A1 - A0) * i / (SPEEDS.length - 1), rad = a => (a - 90) * Math.PI / 180;
+    const pt = (a, r) => `${(32 + r * Math.cos(rad(a))).toFixed(2)},${(32 + r * Math.sin(rad(a))).toFixed(2)}`;
+    $('#dial-ticks').innerHTML = SPEEDS.map((v, i) => `<line class="dial-tick" data-i="${i}" x1="${pt(ang(i), 22).split(',')[0]}" y1="${pt(ang(i), 22).split(',')[1]}" x2="${pt(ang(i), 27).split(',')[0]}" y2="${pt(ang(i), 27).split(',')[1]}"/>`).join('');
+    let idx = 1;
+    function set(i) {
+      idx = Math.max(0, Math.min(SPEEDS.length - 1, i)); const v = SPEEDS[idx];
+      inp.value = v; $('#dial-needle').style.transform = `rotate(${ang(idx)}deg)`;
+      $('#dial-arc').setAttribute('d', idx ? `M${pt(A0, 25)} A25 25 0 ${ang(idx) - A0 > 180 ? 1 : 0} 1 ${pt(ang(idx), 25)}` : '');
+      dial.querySelectorAll('.dial-tick').forEach(t => t.classList.toggle('on', +t.dataset.i <= idx));
+      const txt = `${v < 1 ? '30 s' : v + ' min'}`; $('#dial-val').textContent = txt;
+      dial.setAttribute('aria-valuenow', v); dial.setAttribute('aria-valuetext', `${txt} of the day a second`);
+    }
+    const fromPointer = e => { const r = dial.getBoundingClientRect(); let a = Math.atan2(e.clientY - r.top - r.height / 2, e.clientX - r.left - r.width / 2) * 180 / Math.PI + 90; if (a > 180) a -= 360; set(Math.round((Math.max(A0, Math.min(A1, a)) - A0) / (A1 - A0) * (SPEEDS.length - 1))); };
+    dial.addEventListener('pointerdown', e => { dial.setPointerCapture(e.pointerId); fromPointer(e); });
+    dial.addEventListener('pointermove', e => { if (dial.hasPointerCapture(e.pointerId)) fromPointer(e); });
+    dial.addEventListener('wheel', e => { e.preventDefault(); set(idx + (e.deltaY < 0 ? 1 : -1)); }, { passive: false });
+    dial.addEventListener('keydown', e => { const k = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1 }[e.key]; if (k) { e.preventDefault(); set(idx + k); } });
+    set(1);
+  })();
 
   /* ---------- explanations behind a ? button ---------- */
   const TUCK = ['.provenance', '.sec-head > p', 'p.foot-note', 'div.foot-note', '.head-more', '#veh-body > p', '#ppo-body > p',

@@ -129,7 +129,7 @@ on a login node and `sbatch cluster/iridis/gpu_check.slurm`.
 
 | Path | What is there |
 | --- | --- |
-| `demo/` | The product: traffic model (`traffic_model.py`), forecast build (`synthetic_demo.py`), real inputs (`collect_schedule.py`, `external_data.py`, `freight_days.py`), the page (`page.html`, `page_extras.py`, layout variants in `ui_variants.py`, icons in `assets/`), individual vehicles and buses (`daysim.py`, `agents.py`, `buses.py`), the PPO layer (`ppo_env.py`, `ppo_gpu.py`, `train_ppo.py`, `ppo_stats.py`), and checks (`webtris_backtest.py`, `ridge_history.py`, `bus_check.py`, `queue_report.py`, `sumo_*.py`) |
+| `demo/` | The product: traffic model (`traffic_model.py`), forecast build (`synthetic_demo.py`), real inputs (`collect_schedule.py`, `external_data.py`, `freight_days.py`), the page (`page.html`, `page_extras.py`, layout variants in `ui_variants.py`, icons and sprite sheets in `assets/` built by `sprites.py`), individual vehicles and buses (`daysim.py`, `agents.py`, `buses.py`), the PPO layer (`ppo_env.py`, `ppo_gpu.py`, `train_ppo.py`, `ppo_stats.py`), and checks (`webtris_backtest.py`, `ridge_history.py`, `bus_check.py`, `queue_report.py`, `sumo_*.py`) |
 | `src/sotonship26/data/` | Loaders: VTS schedule (`vts.py`) and freight (`vts_freight.py`), DfT counts (`dft.py`), WebTRIS (`observed.py`), past cruise calls (`cruise_history.py`), road network (`roads.py`), cameras (`cameras.py`), observed bus lateness (`bus_lateness.py`) |
 | `src/sotonship26/` | Everyday traffic forecast (`flow_forecast.py`), cruise uplift and backtest (`uplift.py`, `uplift_model.py`, `backtest.py`, `run_backtest.py`), corridors (`corridors.py`), vehicle counting from imagery (`imagery/`, `vision/`), NTIS scoring (`ntis_score.py`) |
 | `src/sotonship26/` (parked) | The first design, pedestrians and the waterway: `data/streets.py`, `data/waterway.py`, `data/tides.py`, `demand/`, `routing/`, `forecast/`, `rl/`, `train.py`, `evaluate.py`, `synthetic.py`. It is tested but not used by the product. |
@@ -231,13 +231,16 @@ data and its permitted use, and reviewed the methods and results. No one outside
   - The page's PPO charts and observed-bus panel: `demo/ppo_stats.py`, `demo/page.html`.
   - The app UI: the app shell, themes (including Steamship), action cards, `?` pop-ups and
     live-map styling in `demo/page.html`; `demo/ui_variants.py` (the Story app with its landing
-    page, plus the Focus, Officer and Wallboard layouts).
+    page, plus the Focus, Officer and Wallboard layouts); `demo/sprites.py`, which animates the
+    icons into the sprite sheets in `demo/assets/sprites/`.
   - Their tests.
   - `notes/local-evidence.md`, compiled from the public sources cited on each line.
   - `docs/brief.md`, `docs/decisions.md` and this README.
 - **Images:** the cruise icons in `demo/assets/` (ship, life ring, anchor, wheel, seagull,
   lighthouse, captain's hat) were made with Canva's AI image generator on Sat 17 Oct 2026 and
-  cut out of their white backgrounds by script.
+  cut out of their white backgrounds by script. The landing page's sound is synthesised in the
+  browser: gull cries, waves, a horn and "Drunken Sailor", a traditional tune in the public
+  domain; no recordings are used.
 - **Trained models:** the PPO policy in `models/ppo/` was trained by Stable-Baselines3 on our
   simulator. The microsimulation check uses Eclipse SUMO 1.28.0 (EPL-2.0). The vehicle detector
   uses pre-trained YOLO weights (not committed).
