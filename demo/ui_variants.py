@@ -341,6 +341,8 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
   $('#story-next').addEventListener('click', () => showStep(step + 1));
   bar.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => showStep(+b.dataset.step)));
   $('#cal').addEventListener('click', e => { if (e.target.closest('button[data-date]') && step === 0) setTimeout(() => showStep(1), 250); });
+  // a new day on a map step (stepper, calendar or the map's own day chips) starts its vehicles straight away
+  new MutationObserver(() => { if (STEPS[step].map && !document.querySelector('.landing')) setTimeout(() => mapLive(true), 60); }).observe($('#day-chip'), { childList: true, characterData: true, subtree: true });
   // sources stay one ? away, beside the step question
   setTimeout(() => { const pw = $('.provenance') && $('.provenance').closest('.qwrap'); if (pw) $('#story-src').append(pw); }, 0);
 
