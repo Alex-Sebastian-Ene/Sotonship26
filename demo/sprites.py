@@ -1,5 +1,7 @@
 """Sprite sheets for the Story app, drawn from the generated icons in demo/assets/.
 
+The steamship itself is vector art in demo/ui_variants.py, so it stays sharp at any size.
+
 Each sheet is one row of equal frames (demo/assets/sprites/<name>.webp) and sprites.json records the
 frame count, frame size and loop time that demo/ui_variants.py turns into CSS steps() animations.
 
@@ -83,7 +85,7 @@ def rotate_frames(name, angles, centre=None, padding=0):
     return [im.rotate(-ang, resample=Image.BICUBIC, center=c) for ang in angles]
 
 
-def lighthouse(n=16):
+def lighthouse(n=32):
     """The drawn beam is cut off and replaced by one that sweeps round the lantern."""
     base = load("lighthouse")
     a = np.array(base)
@@ -111,32 +113,6 @@ def lighthouse(n=16):
             ImageDraw.Draw(fr).ellipse([cx - r, cy - r, cx + r, cy + r], fill=(255, 245, 200, 255))
         frames.append(fr)
     return frames, 3.2
-
-
-def puff(d, x, y, r, alpha=255):
-    d.ellipse([x - r, y - r, x + r, y + r], fill=CREAM[:3] + (alpha,), outline=NAVY[:3] + (alpha,), width=2)
-
-
-def ship(n=12):
-    """Rocks on the swell; fresh puffs rise from both funnels and drift astern."""
-    a = np.array(load("ship"))
-    a[:27, 60:160] = 0                                           # the drawn smoke above the funnels
-    base = pad(Image.fromarray(a), 8, 46, 8, 6)
-    funnels = [(8 + 80, 46 + 28), (8 + 123, 46 + 28)]
-    frames = []
-    for i in range(n):
-        t = i / n
-        fr = Image.new("RGBA", base.size)
-        d = ImageDraw.Draw(fr)
-        for fx, fy in funnels:
-            for j in range(3):
-                u = (t + j / 3 + (0.15 if fx > 100 else 0)) % 1
-                puff(d, fx - 30 * u, fy - 6 - 44 * u, 5 + 9 * u, int(255 * min(1, (1 - u) * 2.2)))
-        body = base.rotate(1.6 * math.sin(2 * math.pi * t), resample=Image.BICUBIC, center=(base.width / 2, base.height - 10),
-                           translate=(0, round(2 * math.sin(2 * math.pi * t + 1))))
-        fr.alpha_composite(body)
-        frames.append(fr)
-    return frames, 2.4
 
 
 def spray(n=10, w=150, h=96):
@@ -178,7 +154,6 @@ def main():
     meta = {
         "gull": sheet("gull", *gull()),
         "lighthouse": sheet("lighthouse", *lighthouse()),
-        "ship": sheet("ship", *ship()),
         "spray": sheet("spray", *spray()),
         "anchor": sheet("anchor", rotate_frames("anchor", wob(12, 9), lambda im: (im.width / 2, 22), 24), 2.2),
         "wheel": sheet("wheel", rotate_frames("wheel", [45 * i / 8 for i in range(8)]), 1.2),
