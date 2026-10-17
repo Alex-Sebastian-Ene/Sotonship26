@@ -14,17 +14,47 @@ part of the product.
 
 ## How it fits together
 
-```
-VTS cruise schedule ──┐
-Saints fixtures, term ├─► vehicle trips per 15-min bin ─► OSM road network (directed, lanes,
-dates, permits        │   (cars, taxis, coaches, lorries)  dock gates) ─► route choice + queues
-port freight calls ───┘                                     carried between 15-min bins
-                                         │
-                Monte Carlo over sampled days, paired with and without ships
-                                         ▼
-         P(congestion) per corridor per 15 min + the cruise effect with a 10/50/90% range
-                                         ▲
-     fitted to observed traffic: WebTRIS (M271, M3 J14), DfT counts, council counts
+```mermaid
+flowchart TD
+    subgraph inputs["Inputs, real, dated, cited"]
+        vts["VTS cruise schedule<br/>ships · berths · passengers"]
+        cal["Saints fixtures · school terms<br/>bank holidays"]
+        permits["Street Manager<br/>roadworks permits"]
+        freight["Port freight calls<br/>container + RoRo"]
+        census["Census + DfT gateway<br/>commuter / through traffic"]
+    end
+
+    subgraph model["Traffic model on the real road network"]
+        trips["Vehicle trips per 15-min bin<br/>cars · taxis · coaches · lorries · buses"]
+        net["OSM directed road graph<br/>lanes · dock gates"]
+        route["Route choice + queues<br/>carried between bins"]
+        mc["Monte Carlo over sampled days<br/>paired with / without ships"]
+    end
+
+    subgraph calib["Fitted + checked against observed traffic"]
+        webtris["WebTRIS 15-min<br/>M271 · M3 J14"]
+        dft["DfT AADF + hourly counts"]
+        imagery["Aerial car-park occupancy<br/>+ camera vehicle counts"]
+    end
+
+    out(["P(congestion) per corridor per 15 min<br/>+ cruise uplift, 10 / 50 / 90% range"])
+
+    subgraph product["demo/page.html, what the council sees"]
+        calendar["Calendar<br/>days coloured by risk"]
+        dayview["Day view<br/>corridor × 15-min heatmap + map"]
+        whatif["What-if<br/>close a road, rerun before/after"]
+    end
+
+    vts --> trips
+    cal --> trips
+    permits --> trips
+    freight --> trips
+    census --> trips
+    trips --> net --> route --> mc --> out
+    calib -. "calibrate / backtest" .-> model
+    out --> calendar
+    out --> dayview
+    out --> whatif
 ```
 
 | Module | What it does |
