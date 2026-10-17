@@ -6,6 +6,75 @@ time:
   day_start: "05:00"
   day_end: "20:00"
 
+roads:  # directed vehicle network for the cruise-day forecast (data/roads.py, corridors.py)
+  # Same box as demo/osm_base.py, so both read one cached OSM download. It reaches the M271 /
+  # M27 J3, A35 at Totton, A33 at Chilworth, A335 to M27 J5 and A3024 to M27 J8.
+  bbox: [-1.53, 50.855, -1.29, 50.975]  # west, south, east, north (WGS84)
+  crs: "EPSG:27700"
+  # OSM highway -> [capacity per lane (veh/h, mid-link), default free-flow km/h, default lanes
+  # per direction]. Starting values from demo/traffic_model.py; calibrate.
+  classes:
+    motorway: [2000, 100, 2]
+    motorway_link: [1600, 60, 1]
+    trunk: [1800, 70, 1]
+    trunk_link: [1400, 50, 1]
+    primary: [1400, 45, 1]
+    primary_link: [1200, 40, 1]
+    secondary: [1200, 40, 1]
+    secondary_link: [1000, 35, 1]
+    tertiary: [1000, 35, 1]
+    tertiary_link: [900, 30, 1]
+  access_radius_m: 400  # also keep any drivable road this close to a dock gate
+  gates:  # (lat, lon) of OSM features named "Dock Gate N", found 16 Oct 2026. OSM has no Gate 5.
+    "Dock Gate 4": [50.89625, -1.39855]
+    "Dock Gate 8": [50.89950, -1.41107]
+    "Dock Gate 10": [50.90410, -1.41742]
+    "Dock Gate 20": [50.91330, -1.46095]
+  # terminal -> mode -> {gate: share}; "default" covers every mode not listed (car, park, coach).
+  # Source: ABP "Travelling to your cruise terminal" PDFs on southamptonvts.co.uk and ABParking,
+  # retrieved 16 Oct 2026 (SOT-19). Keys match vts.py. Sources give the way in only; leaving by
+  # the same gate is assumed. No source gives a coach gate, so coaches use the car gate.
+  terminal_gates:
+    "Ocean Cruise Terminal": {default: {"Dock Gate 4": 1.0}}
+    "QEII Cruise Terminal": {default: {"Dock Gate 4": 1.0}}
+    "City Cruise Terminal": {default: {"Dock Gate 8": 1.0}, taxi: {"Dock Gate 10": 1.0}}
+    "Horizon Cruise Terminal": {default: {"Dock Gate 10": 1.0}}
+    # ABP recommends Gate 20 for cars, Gate 10 as the alternative: split is a guess; calibrate
+    "Mayflower Cruise Terminal":
+      default: {"Dock Gate 20": 0.7, "Dock Gate 10": 0.3}
+      taxi: {"Dock Gate 10": 1.0}
+  # Where cruise traffic enters and leaves the network. Each point (lat, lon) snaps to the
+  # nearest node on a road with one of the refs (any road if no refs). Shares are SimParams.
+  approaches:
+    m271: {point: [50.9450, -1.4700], refs: [M271]}  # from M27 J3
+    a35: {point: [50.9180, -1.4950], refs: [A35]}  # from Totton and the New Forest
+    a33: {point: [50.9500, -1.4050], refs: [A33]}  # from M3 J14 / Chilworth
+    a335: {point: [50.9480, -1.3700], refs: [A335]}  # from M27 J5 / Swaythling
+    a3024: {point: [50.9050, -1.3250], refs: [A3024]}  # from M27 J8 / Bitterne
+    centre: {point: [50.9037, -1.4067]}  # city centre (Westquay)
+    station: {point: [50.9075, -1.4142]}  # Southampton Central
+  # Named corridors (design.md 3.5), matched to OSM edges by name or ref. Ids match the demo.
+  # Each dock gate also gets a "gate approach" corridor of roads within gate_approach_m of it.
+  corridors:
+    - {id: m271, label: "M271", refs: [M271]}
+    - {id: redbridge, label: "A35 Redbridge Road", names: ["Redbridge Road"]}
+    - {id: millbrook, label: "A33 Millbrook Road", names: ["Millbrook Road West", "Millbrook Road East"]}
+    - {id: mountbatten, label: "Mountbatten Way", names: ["Mountbatten Way"]}
+    - {id: wqr, label: "West Quay Road", names: ["West Quay Road"]}
+    - {id: esplanade, label: "Western Esplanade", names: ["Western Esplanade"]}
+    - {id: platform, label: "Platform Road", names: ["Platform Road"]}
+    - {id: canute, label: "Canute Road", names: ["Canute Road"]}
+    - {id: terminus, label: "Terminus Terrace", names: ["Terminus Terrace"]}
+    - {id: queensway, label: "Queensway", names: ["Queensway"]}
+    - {id: avenue, label: "A33 The Avenue", names: ["The Avenue"]}
+    - {id: northam, label: "Northam Road / Bridge", names: ["Northam Road", "Northam Bridge"]}
+    - {id: itchen, label: "Itchen Bridge", names: ["Itchen Bridge"]}
+  gate_approach_m: 400
+  candidate_paths:  # per (approach, gate, direction); routing picks among these
+    k: 5
+    max_overlap: 0.8  # drop a path sharing more than this share of its length with a kept one
+    max_detour: 1.5  # drop paths slower than this multiple of the quickest
+
 streets:
   centre: "Town Quay, Southampton, UK"  # walking network pulled from OSM within radius_m of here
   radius_m: 2500
