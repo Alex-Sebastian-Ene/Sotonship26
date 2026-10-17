@@ -2,7 +2,24 @@
 
 Checked Fri 16 – Sat 17 Oct 2026 by Keanu's Claude. Code: `src/sotonship26/data/cruise_history.py`.
 
-## Result
+## Correction, Sat 17 Oct 2026 08:00
+
+The "dead end" verdict on Wayback copies of the schedule *page* below was wrong. Only the 2023–24
+captures were checked, and those have no rows. Seb's session found four later captures of the VTS
+cruise schedule HTML pages (2024-01-13, 2024-09-25, 2025-07-04, 2025-12-08) that do list calls: 792
+calls on 625 of 912 days. That is now on main in `demo/webtris_backtest.py`, with the method and
+results in `docs/backtest.md`. The raw captures and call list stay in gitignored `data/raw/`.
+
+Two things still stand:
+
+- **Whether we may use them is for the humans to decide.** ABP's terms allow personal reference
+  with ABP acknowledged; this is a public hackathon product that publishes aggregates.
+- These are provisional plans captured months ahead, not actual berthings. 2026 calls come from the
+  8 Dec 2025 plan, so late changes and cancellations are missing.
+
+The table below is the original check, kept for the record.
+
+## Result (original, Fri 16 Oct)
 
 **No source we're allowed to collect automatically has day-by-day Southampton calls for
 2024 – Jun 2026.** The loader is built and tested, but the historic table is empty: 0 calls and 0
