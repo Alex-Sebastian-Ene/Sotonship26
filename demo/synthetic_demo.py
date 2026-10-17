@@ -286,7 +286,7 @@ def build_ctx(log=print) -> tuple[Ctx, dict]:
     freight_rows = tm.calibrate_freight(m, dft["sites"], log=log)
     # the council-count grid steps by about 15%; settle the city scale more finely
     calibration = tm.calibrate_to_counts(m, COUNT_SITES, log=log, grid=(0.9, 0.95, 1.0, 1.05, 1.1))
-    near =tuple(round(m.scale_ext * f, 3) for f in (0.85, 0.92, 1.0, 1.08, 1.17))
+    near = tuple(round(m.scale_ext * f, 3) for f in (0.85, 0.92, 1.0, 1.08, 1.17))
     dft_rows = tm.calibrate_external(m, dft["sites"], log=log, grid=near)
     capacity_notes = tm.anchor_counts(m, COUNT_SITES, calibration, log=log)
     for row in calibration:
