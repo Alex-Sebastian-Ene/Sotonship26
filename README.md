@@ -172,6 +172,9 @@ data improves it by about 4% a day (not significant) and 2% per 15 minutes.
   lorry counts (`freight_totals`, `freight_demand`, `modelled_lorries`, `calibrate_freight` and the
   freight parts of `build`, `cordon_od`, `modelled_aadf` and `count_point_edges` in
   `demo/traffic_model.py`), its wiring in `demo/synthetic_demo.py` and the page's freight table
-  were written with Claude Code on Sat 17 Oct 2026 (SOT-24).
+  were written with Claude Code on Sat 17 Oct 2026 (SOT-24). So were the lorry day ratios and
+  hourly shapes measured from WebTRIS site 19974, and the day-to-day scaling by VTS container and
+  ro-ro calls (`demo/freight_days.py`, `load_freight_days`, `tests/test_freight_days.py`), which
+  uses Keanu's VTS freight loader.
 - **Existed before the event:** TODO, confirm with the organisers.
 - **Who helped:** TODO.

@@ -99,12 +99,15 @@ CORDON_DAILY = {"through": 57063, "other": 266294}
 CORDON_DAYS = (1.0, 0.8, 0.7)  # assumed weekday, Saturday, Sunday ratio
 
 # Port freight (SOT-24): lorries between the county gateways and the port gates, in car-equivalents
-# (PCU). Daily lorries per direction on a weekday before calibration; calibrate_freight() scales
-# them to DfT HGV counts on the M271 between the A35 and junction 1, which lead only to the
-# Western Docks and Redbridge. Gate shares and the port share of that count are assumptions.
+# (PCU 2.5, DfT TAG M3.1 for motorways and dual carriageways). Daily lorries per direction on a
+# weekday before calibration; calibrate_freight() scales them to DfT HGV counts on the M271 between
+# the A35 and junction 1, which lead only to the Western Docks and Redbridge. Gate shares and the
+# port share of that count are assumptions. The day ratios and hourly shapes are articulated
+# lorries (over 11.6 m) on the M271 northbound from the docks, WebTRIS site 19974, 410 complete
+# days 8 Oct 2024 to 29 Jun 2026: 2,570 on a weekday, 672 on a Saturday, 488 on a Sunday.
 HGV_PCU = 2.5
 FREIGHT_LORRIES = 2600  # per direction on a weekday, before calibration
-FREIGHT_DAYS = (1.0, 0.55, 0.35)  # weekday, Saturday, Sunday (container terminal works weekends)
+FREIGHT_DAYS = (1.0, 0.26, 0.19)  # weekday, Saturday, Sunday
 PORT_GATE_SHARE = {"Dock Gate 20": 0.70, "Dock Gate 10": 0.15, "Dock Gate 4": 0.15}
 PORT_SHARE_M271 = 0.85  # share of M271 (A35-J1) lorries going to or from the port
 # Lorries keep to the roads the port signs for them (M27, M271, M3 and the trunk A33/A35): their
@@ -141,11 +144,15 @@ PROFILES = {
     "school_am_back": [0, 0, 0, 0, 0, 0, 0, .2, 8, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     "school_pm": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, .8, 10, .8, 0, 0, 0, 0, 0, 0, 0],
     "school_pm_back": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, .2, 8, 3, .3, 0, 0, 0, 0, 0, 0],
-    # container terminal gate: 24 hours, busiest in working hours (booking slots), quiet at night
-    "freight": [2, 1.6, 1.4, 1.5, 2.2, 3.5, 5.5, 7, 7.6, 7.8, 7.8, 7.6, 7.2, 7.4, 7.5, 7.2, 6.5,
-                5.5, 4.5, 3.8, 3.2, 2.8, 2.5, 2.2],
+    # port lorries (WebTRIS 19974, see FREIGHT_DAYS): early-morning booking slots, then steady
+    "freight_wk": [.9, 1.1, 1.7, 2.8, 5, 6.8, 7, 7.4, 6.9, 6.4, 6, 5.7, 5.6, 5.7, 5.6, 5.4, 5, 4,
+                   2.8, 2.3, 1.9, 1.5, 1.3, 1.1],
+    "freight_we": [2.6, 2.6, 2.7, 3.2, 4.4, 5.1, 5.1, 6.2, 7, 7, 5.6, 5.4, 5.4, 5.5, 4.8, 4.4, 4.1,
+                   3.7, 3, 2.8, 2.8, 2.4, 2.2, 2],
 }
-FREIGHT_WINDOW_SHARE = sum(PROFILES["freight"][5:20]) / sum(PROFILES["freight"])  # 05:00-20:00
+# share of a day's port lorries between 05:00 and 20:00, per day type
+FREIGHT_WINDOW_SHARE = tuple(sum(PROFILES[k][5:20]) / sum(PROFILES[k])
+                             for k in ("freight_wk", "freight_we", "freight_we"))
 
 # key, chart group, origins, destinations, daily car trips (weekday, Saturday, Sunday),
 # profile (weekday, weekend). County and outbound totals and origin-destination pairs come from
@@ -169,8 +176,10 @@ PURPOSES = [
     ("school_pick", "school", "homes", "schools", (6000, 0, 0), ("school_pm", "school_pm")),
     ("school_pick_home", "school", "schools", "homes", (9000, 0, 0), ("school_pm_back", "school_pm_back")),
     # port freight in car-equivalents, county gateways (by DfT lorry counts) to and from the port
-    ("freight_in", "freight", "freight_from", "port", freight_totals(), ("freight", "freight")),
-    ("freight_out", "freight", "port", "freight_from", freight_totals(), ("freight", "freight")),
+    ("freight_in", "freight", "freight_from", "port", freight_totals(),
+     ("freight_wk", "freight_we")),
+    ("freight_out", "freight", "port", "freight_from", freight_totals(),
+     ("freight_wk", "freight_we")),
 ]
 FREIGHT_KEYS = {"freight_in", "freight_out"}
 SCHOOL_KEYS = {"school_drop", "school_drop_home", "school_pick", "school_pick_home"}
@@ -1241,7 +1250,7 @@ def modelled_aadf(m: Model, sites: list[dict], edges: list[list[int]]) -> np.nda
         v = v - lorry_pcu * (1 - 1 / HGV_PCU)  # count a lorry once, not as 2.5 cars
         daily = np.array([v[:, ks].sum() / 4.0 for ks in edges])
         lorries = np.array([lorry_pcu[:, ks].sum() / 4.0 / HGV_PCU for ks in edges])
-        out += wd * (daily - lorries) / DAY_WINDOW_SHARE + wd * lorries / FREIGHT_WINDOW_SHARE
+        out += wd * (daily - lorries) / DAY_WINDOW_SHARE + wd * lorries / FREIGHT_WINDOW_SHARE[dt]
     return out
 
 
@@ -1263,7 +1272,7 @@ def modelled_lorries(m: Model, edges: list[list[int]]) -> np.ndarray:
         res, _ = run_day(m, D, m.cap, initial_shares(m), 8, cruise=freight_demand(m, dt),
                          want=("cruise_edge",), pre=m.pre.get(dt))
         lorries = np.array([res["cruise_edge"][:, ks].sum() / 4.0 / HGV_PCU for ks in edges])
-        out += wd * lorries / FREIGHT_WINDOW_SHARE
+        out += wd * lorries / FREIGHT_WINDOW_SHARE[dt]
     return out
 
 

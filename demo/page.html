@@ -461,7 +461,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       </div>
       <div class="card" id="freight-card" hidden style="grid-column: 1 / -1">
         <h3>Port freight checked against DfT lorry counts</h3>
-        <p class="foot-note">Lorries run between the county gateways (shared by each gateway road's DfT lorry count) and the port: <span id="fr-gates"></span>. Their number is scaled so that the M271 between the A35 and junction 1, which leads only to the Western Docks and Redbridge, carries <span id="fr-share"></span> of its DfT lorry count (assumed port share). The other points also carry lorries that are not going to the port, so they are checks: modelled port lorries should sit below the count. Weekend days run at <span id="fr-days"></span> of a weekday (assumed). The port's own gate counts would replace these assumptions. Counted lorries are all HGVs, both directions. Source: <span id="fr-src"></span>.</p>
+        <p class="foot-note">Lorries run between the county gateways (shared by each gateway road's DfT lorry count) and the port: <span id="fr-gates"></span>. Their number is scaled so that the M271 between the A35 and junction 1, which leads only to the Western Docks and Redbridge, carries <span id="fr-share"></span> of its DfT lorry count (assumed port share). The other points also carry lorries that are not going to the port, so they are checks: modelled port lorries should sit below the count. Weekend days run at <span id="fr-days"></span> of a weekday, and lorries follow the hour-by-hour pattern of articulated lorries leaving the docks on the M271 (National Highways WebTRIS site 19974, 410 complete days, Oct 2024 to Jun 2026).<span id="fr-vts"></span> The port's own gate counts would replace these assumptions. Counted lorries are all HGVs, both directions. Source: <span id="fr-src"></span>.</p>
         <div class="table-scroll"><table id="calib-freight"></table></div>
       </div>
       <div class="card">
@@ -609,6 +609,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     if (works) real.push(`roadworks from DfT Street Manager (${S.permits.short})`); else made.push('roadworks permits');
     if (S.matches) real.push('home matches from Southampton FC'); else made.push('match fixtures');
     if (S.terms) real.push('school holidays from Southampton City Council');
+    if (S.freight) real.push(`container and ro-ro ship calls from ${S.freight.label.split(':')[0]} (${S.freight.short})`);
     const list = a => a.length < 2 ? a.join('') : `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}`;
     const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
     $('#m-banner-label').textContent = sc.synthetic ? 'Real map, synthetic traffic' : 'Real map and inputs, modelled traffic';
@@ -663,6 +664,8 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       $('#fr-share').textContent = `${Math.round(fr.port_share_m271 * 100)}%`;
       $('#fr-days').textContent = `${Math.round(fr.day_ratio[1] * 100)}% (Saturday) and ${Math.round(fr.day_ratio[2] * 100)}% (Sunday)`;
       $('#fr-src').textContent = dft ? `${dft.source}, downloaded ${dft.collected}` : '';
+      const fv = (M.sources || {}).freight;
+      $('#fr-vts').textContent = fv ? ` On ${fv.days.length} days the VTS feed covers in full, the day's container and ro-ro ship calls move port lorries up or down (half the swing in calls; an assumption, not fitted). Source: ${fv.label}.` : ' Ship calls do not change the lorry numbers yet: no VTS freight snapshot was available for this build.';
       $('#calib-freight').innerHTML = `<thead><tr><th>Count point</th><th>Year</th><th>Lorries counted (AADF)</th><th>Modelled port lorries</th><th>Port share</th></tr></thead><tbody>${fr.rows.map(r =>
         `<tr><td>${esc(r.road)} <span class="muted mono">#${r.count_point}</span>${r.fitted ? ' <strong>(fitted)</strong>' : ' <span class="muted">(check)</span>'}</td><td>${r.year}</td><td class="num">${int(r.observed_hgv)}</td><td class="num">${int(r.modelled_port_lorries)}</td><td class="num">${Math.round(r.modelled_port_lorries / r.observed_hgv * 100)}%</td></tr>`).join('')}</tbody>`;
     }
@@ -1287,6 +1290,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     d.calls.filter(c => c.pax == null).forEach(c => notes.push(`<div class="notice notice-warn"><span class="tag">Missing data</span><span><strong>${esc(c.ship)}</strong> has no published passenger figure. The forecast assumes ${int(M.unknown_pax_range[0])} to ${int(M.unknown_pax_range[1])} passengers, so its gate traffic has a wider range than usual.</span></div>`));
     const wd = dateOf(d.date).getDay();
     if (wd >= 1 && wd <= 5 && !d.term) notes.push('<div class="notice"><span class="tag">Half-term</span><span>No school run this week (Southampton City Council half-term), so the 08:15 and 15:00 peaks are lighter.</span></div>');
+    if (d.freight) notes.push(`<div class="notice${d.freight.unconfirmed ? ' notice-warn' : ''}"><span class="tag">Freight</span><span>Port lorries ×${d.freight.factor.toFixed(2)}: ${d.freight.moves} container and ro-ro ship arrivals and departures planned today, against ${d.freight.mean_moves} a day over the days the feed covers (Southampton VTS, ABP). Scaling lorries by ship calls is an assumption, not fitted, so the swing is halved.${d.freight.unconfirmed ? ` ${d.freight.unconfirmed} of today's times are not yet confirmed.` : ''}</span></div>`);
     if (!d.calls.length) notes.push('<div class="notice"><span class="tag">No ships</span><span>No turnarounds today. The map shows everyday traffic only.</span></div>');
     $('#notices').innerHTML = notes.join('');
     $('#notices').querySelectorAll('[data-scenario]').forEach(b => b.addEventListener('click', () => setScenario(b.dataset.scenario)));

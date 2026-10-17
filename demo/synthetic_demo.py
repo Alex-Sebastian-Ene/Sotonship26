@@ -38,6 +38,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "src"))
 sys.path.insert(0, str(HERE))
 import external_data as ext  # noqa: E402
+import freight_days as fd  # noqa: E402
 import traffic_model as tm  # noqa: E402
 
 from sotonship26.demand.passengers import TurnaroundParams  # noqa: E402
@@ -526,6 +527,35 @@ def day_multipliers(d: date, wet: bool) -> dict:
             "through": hol, "visitors": visitors * w, "school": w, "freight": hol}
 
 
+def load_freight_days(log=print) -> tuple[dict, dict | None]:
+    """Port lorry factors per day from the cached VTS freight snapshots (see freight_days.py),
+    and their source for the page. Without snapshots every day keeps the DfT-fitted average."""
+    try:
+        import pandas as pd
+        from sotonship26.data import vts_freight as vf
+    except ImportError as exc:
+        log(f"VTS freight: loader unavailable ({exc}); port lorries stay at the DfT-fitted average")
+        return {}, None
+    frames = [f for f in vf.load_extracts() if len(f)]
+    if not frames:
+        log(f"VTS freight: no snapshots in {vf.RAW_DIR}; "
+            "port lorries stay at the DfT-fitted average")
+        return {}, None
+    factors = fd.freight_day_factors(vf.daily_freight_calls(frames))
+    stamps = [pd.Timestamp(f["collected_at"].max()) for f in frames]
+    taken = max(t if t.tzinfo else t.tz_localize("UTC") for t in stamps).tz_convert("Europe/London")
+    for d, f in sorted(factors.items()):
+        log(f"VTS freight {d}: {f['moves']} container and ro-ro movements (mean {f['mean_moves']}) "
+            f"-> port lorries x{f['factor']:.2f}"
+            + (f", {f['unconfirmed']} not confirmed" if f["unconfirmed"] else ""))
+    when = taken.strftime("%d %b %Y %H:%M")
+    return factors, {
+        "label": f"{fd.CREDIT}: planned container and ro-ro movements, {len(frames)} snapshot"
+                 f"{'s' if len(frames) > 1 else ''}, latest {when}",
+        "short": f"latest snapshot {when}", "synthetic": False, "url": vf.SOURCE_PAGE,
+        "checked": taken.date().isoformat(), "shrink": fd.SHRINK, "days": sorted(factors)}
+
+
 def forecast(task: dict) -> dict:
     """Monte Carlo forecast for one day.
 
@@ -572,8 +602,9 @@ def forecast(task: dict) -> dict:
             b0 = int(rng.integers(0, N_BINS - 4))
             events.append((np.asarray(seg["edges"]), b0, b0 + int(rng.integers(4, 9)), 0.55))
         noise = rng.lognormal(-PERCEPTION_SD**2 / 2, PERCEPTION_SD, len(m.t0))
-        Dbg, groups = tm.background(m, dtype, rng, term=term, spread=spread,
-                                    mult=day_multipliers(d, wet))
+        mult = day_multipliers(d, wet)
+        mult["freight"] = mult.get("freight", 1.0) * task.get("freight_f", 1.0)
+        Dbg, groups = tm.background(m, dtype, rng, term=term, spread=spread, mult=mult)
         Dm = tm.match_demand(m, kickoff_hours(kick), rng) if kick else np.zeros_like(Dbg)
         Dc = sample_cruise(ctx, calls, rng, params, shifts, task.get("cruise")) if calls else np.zeros_like(Dbg)
         want = ("x",)
@@ -888,6 +919,9 @@ def main(argv=None) -> None:
         pickle.dump(ctx, f)
 
     sched = make_schedule(np.random.default_rng(SEED))
+    freight_f, freight_src = load_freight_days(log)
+    if freight_src:
+        SOURCES["freight"] = freight_src
     tasks = []
     d = FIRST_DAY
     while d <= HORIZON and (args.days is None or len(tasks) < args.days):
@@ -896,7 +930,8 @@ def main(argv=None) -> None:
                  for c in sched[d]]
         tasks.append({"date": d.isoformat(), "key": "base", "calls": calls, "full": True,
                       "closed": [p["corridor"] for p in permits_on(d)], "match": match_on(d),
-                      "n": args.n, "term": in_term(d), "paired": True})
+                      "n": args.n, "term": in_term(d), "paired": True,
+                      "freight_f": fd.factor_on(freight_f, d)})
         d += timedelta(days=1)
     log(f"forecasting {len(tasks)} days on {args.workers} workers")
     with ProcessPoolExecutor(args.workers, initializer=_init, initargs=(str(ctx_path),)) as pool:
@@ -982,7 +1017,7 @@ def main(argv=None) -> None:
             for c in task["calls"]],
             "score": round(score(r["p85"]), 2), "bg_score": round(score(r["bg85"]), 2),
             "permits": [p["id"] for p in permits_on(date.fromisoformat(task["date"]))],
-            "match": task["match"], "term": task["term"],
+            "match": task["match"], "term": task["term"], "freight": freight_f.get(task["date"]),
             "delay": {c[0]: np.rint(r["delay50"][:, i]).astype(int).tolist() for i, c in enumerate(ctx.corr)},
             "delay90": {c[0]: np.rint(r["delay90"][:, i]).astype(int).tolist() for i, c in enumerate(ctx.corr)},
             "range": ranges(r["scores"]), "spread": round(r["spread"], 2),
