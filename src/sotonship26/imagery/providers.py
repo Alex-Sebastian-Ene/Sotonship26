@@ -100,7 +100,7 @@ def clip_to_geotiff(src_path, aoi_lonlat, out: Path, target_gsd: float | None = 
             finally:
                 for x in srcs:
                     x.close()
-            for k in ("blockxsize", "blockysize", "tiled"):
+            for k in ("blockxsize", "blockysize", "tiled", "photometric"):
                 profile.pop(k, None)
             mosaic = out.with_suffix(".mosaic.tif")
             mosaic.parent.mkdir(parents=True, exist_ok=True)
@@ -112,6 +112,8 @@ def clip_to_geotiff(src_path, aoi_lonlat, out: Path, target_gsd: float | None = 
 
     with rasterio.open(src_path) as src:
         geom = shape(aoi_lonlat) if isinstance(aoi_lonlat, dict) else aoi_lonlat
+        if src.crs and src.crs.is_geographic and target_gsd:
+            return _warp_metric(src, geom, out, target_gsd)
         to_src = Transformer.from_crs("EPSG:4326", src.crs, always_xy=True).transform
         bounds = shp_transform(to_src, geom).bounds
         win = from_bounds(*bounds, transform=src.transform).round_offsets().round_lengths()
@@ -123,7 +125,37 @@ def clip_to_geotiff(src_path, aoi_lonlat, out: Path, target_gsd: float | None = 
         tr = src.window_transform(win) * src.window_transform(win).scale(win.width / w, win.height / h)
         profile = src.profile | {"driver": "GTiff", "height": h, "width": w, "transform": tr,
                                  "compress": "deflate"}
-        profile.pop("blockxsize", None), profile.pop("blockysize", None), profile.pop("tiled", None)
+        for k in ("blockxsize", "blockysize", "tiled", "photometric"):  # JPEG/YCbCr sources: re-encode as RGB
+            profile.pop(k, None)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with rasterio.open(out, "w", **profile) as dst:
+        dst.write(data)
+    return out
+
+
+def _warp_metric(src, geom, out: Path, gsd: float) -> Path:
+    """Lon/lat sources (e.g. drone mosaics): resample the AOI into its UTM zone at ``gsd`` metres,
+    so pixels are square and the size of a car in pixels matches a projected scene."""
+    import math
+
+    import rasterio
+    from pyproj import Transformer
+    from rasterio.enums import Resampling
+    from rasterio.transform import from_origin
+    from rasterio.vrt import WarpedVRT
+    from shapely.ops import transform as shp_transform
+
+    lon, lat = geom.centroid.x, geom.centroid.y
+    epsg = (32600 if lat >= 0 else 32700) + int(math.floor((lon + 180) / 6)) + 1
+    minx, miny, maxx, maxy = shp_transform(
+        Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True).transform, geom).bounds
+    w, h = max(1, int((maxx - minx) / gsd)), max(1, int((maxy - miny) / gsd))
+    tr = from_origin(minx, maxy, gsd, gsd)
+    with WarpedVRT(src, crs=f"EPSG:{epsg}", transform=tr, width=w, height=h,
+                   resampling=Resampling.bilinear) as vrt:
+        data = vrt.read()
+        profile = {"driver": "GTiff", "height": h, "width": w, "count": vrt.count, "dtype": vrt.dtypes[0],
+                   "crs": f"EPSG:{epsg}", "transform": tr, "compress": "deflate"}
     out.parent.mkdir(parents=True, exist_ok=True)
     with rasterio.open(out, "w", **profile) as dst:
         dst.write(data)
@@ -147,6 +179,10 @@ class StacProvider:
         for it in items:
             p = it.properties
             gsd = p.get("gsd") or next((b.get("gsd") for b in p.get("eo:bands", []) if b.get("gsd")), None)
+            if gsd is None and self.asset in it.assets:  # STAC 1.0 puts it on the asset
+                ex = it.assets[self.asset].extra_fields
+                gsd = ex.get("gsd") or next((b.get("spatial_resolution") for b in ex.get("raster:bands", [])
+                                             if b.get("spatial_resolution")), None)
             out.append(Scene(it.id, self.name, it.datetime, gsd, p.get("eo:cloud_cover"),
                              it.geometry, {k: a.href for k, a in it.assets.items()},
                              p.get("license", "")))

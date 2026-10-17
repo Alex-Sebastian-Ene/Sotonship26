@@ -21,6 +21,26 @@ def tile(path, e0, n0, value, size=40, gsd=25.0):
         dst.write(np.full((3, size, size), value, dtype="uint8"))
 
 
+def test_lonlat_jpeg_source_is_clipped_to_metric_pixels(tmp_path):
+    # drone mosaics on OpenAerialMap are lon/lat, JPEG-compressed YCbCr; both broke the clip once
+    from sotonship26.imagery.providers import clip_to_geotiff
+
+    src = tmp_path / "drone.tif"
+    deg = 0.05 / 111_320  # about 5 cm
+    with rasterio.open(src, "w", driver="GTiff", height=400, width=400, count=3, dtype="uint8",
+                       crs="EPSG:4326", transform=from_origin(-1.40, 50.90, deg, deg),
+                       compress="jpeg", photometric="ycbcr", tiled=True, blockxsize=256, blockysize=256) as dst:
+        dst.write(np.full((3, 400, 400), 120, dtype="uint8"))
+    w, s, e, n = -1.40 + 50 * deg, 50.90 - 350 * deg, -1.40 + 350 * deg, 50.90 - 50 * deg
+    aoi = {"type": "Polygon", "coordinates": [[[w, s], [e, s], [e, n], [w, n], [w, s]]]}
+    out = clip_to_geotiff(str(src), aoi, tmp_path / "clip.tif", target_gsd=0.25)
+    with rasterio.open(out) as clip:
+        assert clip.crs.to_epsg() == 32630  # UTM zone 30N
+        assert abs(clip.transform.a - 0.25) < 1e-9
+        # 300 source pixels: 15 m north-south, 15 m x cos(50.9 deg) = 9.5 m east-west
+        assert 36 <= clip.width <= 41 and 57 <= clip.height <= 62
+
+
 def test_order_tiles_cover_the_docks():
     t = order_tiles()
     assert len(t) == 35 and t[0] == "SU3709" and t[-1] == "SU4313"
