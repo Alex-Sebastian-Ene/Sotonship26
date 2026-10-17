@@ -42,17 +42,30 @@ with the shares the model gave that pair in the agent's departure bin.
 **Trajectory.** The agent drives its path link by link through the day's link loads (`run_day`'s
 V/C per edge per bin), using the load of the 15 minutes in which it reaches each link:
 
-- running time = free-flow time x (1 + 0.15 x min(V/C, 1.5)^4), the BPR curve capped as in
-  `traffic_model.delay_minutes`;
+- running time = free-flow time / the driver's own speed factor x (1 + 0.15 x min(V/C, 1.5)^4),
+  the BPR curve capped as in `traffic_model.delay_minutes`. Each driver keeps their own speed
+  factor, drawn once per car: mean 92% of the free-flow speed (the speed limit), 10% of drivers
+  below 84%, none above 100% (assumed);
 - queuing follows the model's point-queue carry-over: in its first 15 minutes the trip's worst
   link has load x; with probability `CARRY x (1 - 1/x)` the agent does not get through that bin,
   waits at that link and leaves at a random minute of the next bin, and may be held again by the
   same rule (at most two hours).
 
+**Where trips start and end.** The model loads each zone at one node. On the page, a car going
+from or to a zone instead starts or ends on a random modelled road within 900 m of the zone's
+point (4,811 such points in the 70 zones), joined to the zone's node by the quickest short leg
+(free-flow, at most 400 s). Trips from gateways, dock gates, the station and the stadium keep
+their own node. About half of all trips start or end on such a street (41-56% per day).
+
+These two changes make the cars look and behave individually, but the cars still do not interact:
+a slow driver does not hold up the one behind, and the legs add no traffic to the model. For cars
+that interact (car-following, lanes, junctions, queues that spill back), a SUMO microsimulation
+fed by the same demand is proposed as separate work.
+
 The page stores each agent's position about every 45 seconds of free-flow driving and at queues,
 and draws the agents as dots on a canvas over the map. Click one to see its journey: from, to,
 route, departure, arrival, minutes on empty roads, extra minutes in slow traffic and minutes
-queuing.
+queuing, and the driver's speed.
 
 **Macro view, same traffic.** In the Vehicles layer the roads are coloured by the same sampled
 day, so dots and colours are the same traffic. The other layers stay the average of the forecast's
@@ -60,16 +73,16 @@ sampled days.
 
 **The days on the page** are the two with the most cruise traffic added (Sat 24 Oct and Sat 7 Nov,
 from the forecast's paired samples) and a term-time weekday without roadworks on Portswood Road
-for the bus check (Mon 16 Nov). Each has 7,000 to 9,700 agents. Everyday agents stand for 53 to 89
+for the bus check (Mon 16 Nov). Each has 7,300 to 9,700 agents. Everyday agents stand for 53 to 89
 vehicles each and cruise agents for 4, so cruise traffic is easy to see. Agents times weights match
 the model's trips per kind of trip within sampling error (within 3% for the big groups; 16% for
 the smallest, outbound commuters on a Saturday).
 
 | Day | Agents | Agents that queue | Median queue, if they queue | 1 in 10 queues longer than |
 | --- | --- | --- | --- | --- |
-| Sat 24 Oct | 9,728 | 27% | 22 min | 56 min |
-| Sat 7 Nov | 9,737 | 13% | 20 min | 48 min |
-| Mon 16 Nov | 7,177 | 29% | 23 min | 58 min |
+| Sat 24 Oct | 9,748 | 28% | 23 min | 55 min |
+| Sat 7 Nov | 9,695 | 13% | 20 min | 47 min |
+| Mon 16 Nov | 7,266 | 29% | 23 min | 60 min |
 
 Queues come in 15-minute steps because the model's queue does: a vehicle that does not get
 through its bottleneck in one 15-minute bin waits for the next. Cruise vehicles queue about as
