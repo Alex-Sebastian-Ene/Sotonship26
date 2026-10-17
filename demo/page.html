@@ -1435,7 +1435,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
   const geomCache = new Map();
   function geom(kind, i) {
     const key = kind + i; if (geomCache.has(key)) return geomCache.get(key);
-    const P = kind === 'a' ? AG.paths[i] : AG.bus.patterns[i];
+    const P = kind === 'a' ? AG.paths[i] : kind === 'l' ? AG.legs[i] : AG.bus.patterns[i];
     const g = dec(P.g), xs = [g[0]], ys = [g[1]];
     for (let k = 2; k < g.length; k += 2) { xs.push(xs[xs.length - 1] + g[k]); ys.push(ys[ys.length - 1] + g[k + 1]); }
     const cum = [0];
@@ -1457,8 +1457,16 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     const D = AG.days[iso], A = D.agents, ints = dec(A.t), list = [];
     let p = 0;
     for (let i = 0; i < A.n; i++) {
-      const n = geom('a', A.p[i]).bv.length, t = readTimes(ints, p, n); p += n;
-      list.push({ i, k: A.k[i], o: A.o[i], d: A.d[i], p: A.p[i], q: A.q[i] / 10, c: A.c[i], t, dep: t[0], arr: t[n - 1] });
+      // a trip is a leg from a street in its zone (if any), the model's route, and a leg to a street
+      const la = A.a ? A.a[i] : -1, le = A.e ? A.e[i] : -1, pieces = [];
+      if (la >= 0) pieces.push(['l', la]);
+      pieces.push(['a', A.p[i]]);
+      if (le >= 0) pieces.push(['l', le]);
+      const ns = pieces.map(([kind, idx]) => geom(kind, idx).bv.length), n = ns.reduce((x, v) => x + v, 0);
+      const t = readTimes(ints, p, n); p += n;
+      let off = 0;
+      const segs = pieces.map(([kind, idx], j) => { const ts = t.subarray(off, off + ns[j]); off += ns[j]; return { kind, idx, t: ts }; });
+      list.push({ i, k: A.k[i], o: A.o[i], d: A.d[i], p: A.p[i], q: A.q[i] / 10, c: A.c[i], s: A.s ? A.s[i] / 100 : null, segs, t, dep: t[0], arr: t[n - 1] });
     }
     const buses = [];
     if (D.buses) {
@@ -1483,6 +1491,11 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     const seg = G.cum[s + 1] - G.cum[s], g = seg > 0 ? Math.max(0, Math.min(1, (d - G.cum[s]) / seg)) : 0;
     return [G.xs[s] + g * (G.xs[s + 1] - G.xs[s]), G.ys[s] + g * (G.ys[s + 1] - G.ys[s])];
   }
+  function agentPos(a, now) {
+    for (const sg of a.segs) if (now <= sg.t[sg.t.length - 1]) return posAt(geom(sg.kind, sg.idx), sg.t, now);
+    const last = a.segs[a.segs.length - 1];
+    return posAt(geom(last.kind, last.idx), last.t, now);
+  }
   const cvs = $('#agent-canvas'), cx2 = cvs.getContext('2d');
   let drawn = [], selected = null, vehAnim = null;
   state.minute = 300 + 24 * 15 + 7.5;
@@ -1505,16 +1518,16 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     if (!A) return;
     const now = state.minute, rad = Math.max(1.8, Math.min(4.5, 1.4 + Math.log2(Math.max(1, T.k))));
     if (selected) {
-      const G = selected.type === 'a' ? geom('a', A.list[selected.i].p) : geom('b', A.buses[selected.i].p);
+      const Gs = selected.type === 'a' ? A.list[selected.i].segs.map(sg => geom(sg.kind, sg.idx)) : [geom('b', A.buses[selected.i].p)];
       cx2.lineCap = 'round'; cx2.lineJoin = 'round';
-      cx2.strokeStyle = PAL.casing; cx2.lineWidth = 6; tracePath(G);
-      cx2.strokeStyle = PAL.accent; cx2.lineWidth = 3; tracePath(G);
+      cx2.strokeStyle = PAL.casing; cx2.lineWidth = 6; Gs.forEach(tracePath);
+      cx2.strokeStyle = PAL.accent; cx2.lineWidth = 3; Gs.forEach(tracePath);
     }
     let na = 0, nb = 0;
     for (const a of A.list) {
       if (a.dep > now || a.arr < now) continue;
       na++;
-      const [x, y] = screen(...posAt(geom('a', a.p), a.t, now));
+      const [x, y] = screen(...agentPos(a, now));
       if (x < -6 || y < -6 || x > w + 6 || y > h + 6) continue;
       const P = AG.purposes[a.k];
       cx2.fillStyle = agentColor(a.k);
@@ -1536,7 +1549,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       const it = selected.type === 'a' ? A.list[selected.i] : A.buses[selected.i];
       const t0 = selected.type === 'a' ? it.dep : it.start, t1 = selected.type === 'a' ? it.arr : it.end;
       if (now >= t0 && now <= t1) {
-        const [x, y] = screen(...posAt(geom(selected.type, it.p), it.t, now));
+        const [x, y] = screen(...(selected.type === 'a' ? agentPos(it, now) : posAt(geom('b', it.p), it.t, now)));
         cx2.strokeStyle = PAL.ink; cx2.lineWidth = 2; cx2.beginPath(); cx2.arc(x, y, rad + 5, 0, 2 * Math.PI); cx2.stroke();
       }
     }
@@ -1564,7 +1577,8 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     if (!A || !selected) { el.innerHTML = '<p class="muted">Turn on the Vehicles layer and click a dot to follow one vehicle: where it came from and is going, its route, when it left and arrived, and how long it queued.</p>'; return; }
     if (selected.type === 'a') {
       const a = A.list[selected.i], P = AG.purposes[a.k], path = AG.paths[a.p];
-      const ff = path.ff / 10, total = a.arr - a.dep, slow = Math.max(0, total - ff - a.q);
+      const legs = a.segs.filter(sg => sg.kind === 'l').reduce((x, sg) => x + AG.legs[sg.idx].ff / 10, 0);
+      const ff = (path.ff / 10 + legs) / (a.s || 1), total = a.arr - a.dep, slow = Math.max(0, total - ff - a.q);
       const call = a.c >= 0 ? A.D.calls[a.c] : null;
       const w = P.cruise ? A.D.weights.cruise : A.D.weights.everyday;
       el.innerHTML = `<p><span class="sw" style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;background:${agentColor(a.k)}"></span><strong>${esc(P.label)}</strong>${call ? `, ${esc(call.ship)} at ${esc(call.terminal)}` : ''}</p>
@@ -1572,8 +1586,8 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
         <dt>Route</dt><dd>${path.v.length ? esc(path.v.map(i => AG.names[i]).join(' → ')) : 'local roads'}</dd>
         <dt>Leaves</dt><dd class="mono">${hhmm(a.dep)}</dd><dt>Arrives</dt><dd class="mono">${hhmm(a.arr)} (${mins(total)})</dd>
         <dt>On empty roads</dt><dd class="mono">${mins(ff)}</dd><dt>Slow traffic</dt><dd class="mono">+${mins(slow)}</dd>
-        <dt>Queuing</dt><dd class="mono">+${mins(a.q)}</dd><dt>Stands for</dt><dd>about ${int(w)} vehicles like it</dd></dl>
-        <p class="foot-note">One sampled day. The route is one of the model's up to three routes for this trip, drawn with the shares the model gave it at ${binTime(Math.max(0, Math.min(59, Math.floor((a.dep - 300) / 15))))}; queuing follows the model's 15-minute queue carry-over.</p>`;
+        <dt>Queuing</dt><dd class="mono">+${mins(a.q)}</dd>${a.s ? `<dt>Driver</dt><dd>keeps to about ${Math.round(a.s * 100)}% of the speed limit</dd>` : ''}<dt>Stands for</dt><dd>about ${int(w)} vehicles like it</dd></dl>
+        <p class="foot-note">One sampled day. The route is one of the model's up to three routes for this trip, drawn with the shares the model gave it at ${binTime(Math.max(0, Math.min(59, Math.floor((a.dep - 300) / 15))))}; queuing follows the model's 15-minute queue carry-over. Trips from or to a zone start or end on a nearby modelled road. Cars do not interact: a slow driver does not hold up the one behind.</p>`;
     } else {
       const b = A.buses[selected.i], R = AG.bus.routes[b.r], pat = AG.bus.patterns[b.p];
       const stops = pat.s.map(i => AG.names[i]);
