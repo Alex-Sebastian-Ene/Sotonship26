@@ -3,7 +3,7 @@
 The cruise ship schedule page (``SOURCE_PAGE``) loads ``FEED_URL``: every planned cruise call with
 ship, IMO number, berth, arrival and departure, usually three months or more ahead. ABP owns the
 content and does not permit redistribution, so the raw XML is cached under ``data/raw/vts/``
-(gitignored) and never committed. ``collected_at`` is when we fetched it, taken from the cache
+(gitignored) and never committed. ``collected_at`` is when we fetched it (UTC), from the cache
 file name.
 
 VTS fixes exact times only within about six days of a call. Before that a time reads "AM", "PM"
@@ -102,16 +102,38 @@ def latest_cached(raw_dir: str | Path = RAW_DIR) -> Path | None:
     return files[-1] if files else None
 
 
-def _parse_time(value: str | None, kind: str) -> tuple[pd.Timestamp, bool]:
-    """'17-Oct-26 05:45' -> (local time, True); '21-Oct-26 TBA' -> (stand-in time, False)."""
-    day_part, _, clock = (value or "").strip().partition(" ")
-    day = datetime.strptime(day_part, "%d-%b-%y").date()
-    clock = clock.strip().upper()
+def _day_of(value: str | None) -> date | None:
+    """'17-Oct-26 05:45' -> 17 Oct 2026; None when the value has no date ('TBA', '')."""
+    try:
+        return datetime.strptime((value or "").strip().partition(" ")[0], "%d-%b-%y").date()
+    except ValueError:
+        return None
+
+
+def _parse_time(
+    value: str | None, kind: str, default_day: date | None = None
+) -> tuple[pd.Timestamp, bool]:
+    """'17-Oct-26 05:45' -> (local time, True); '21-Oct-26 TBA' -> (stand-in time, False).
+
+    A value with no date (a bare 'TBA', or empty) falls on ``default_day``; with neither it raises
+    ValueError.
+    """
+    text = (value or "").strip()
+    day = _day_of(text)
+    clock = (text.partition(" ")[2] if day else text).strip().upper()
+    day = day or default_day
+    if day is None:
+        raise ValueError(f"no date in {kind} {value!r}")
     try:
         t, confirmed = datetime.strptime(clock, "%H:%M").time(), True
     except ValueError:
         t, confirmed = VAGUE_TIMES[kind].get(clock, VAGUE_TIMES[kind]["TBA"]), False
-    return pd.Timestamp(datetime.combine(day, t)).tz_localize(TZ), confirmed
+    # Clocks going back repeat 01:00-02:00: take the first (BST) pass. Clocks going forward skip
+    # 01:00-02:00: move to 02:00 BST.
+    local = pd.Timestamp(datetime.combine(day, t)).tz_localize(
+        TZ, ambiguous=True, nonexistent="shift_forward"
+    )
+    return local, confirmed
 
 
 def load_capacities(path: str | Path = CAPACITY_CSV) -> dict[str, tuple[int, str]]:
@@ -135,15 +157,24 @@ def parse_feed(
     collected: pd.Timestamp | datetime,
     capacities: dict[str, tuple[int, str]] | None = None,
 ) -> pd.DataFrame:
-    """Turn the VTS XML into one row per call, sorted by arrival. See ``COLUMNS``."""
+    """Turn the VTS XML into one row per call, sorted by arrival. See ``COLUMNS``.
+
+    Call times are Europe/London, ``collected_at`` is UTC. A row whose times can't be read is
+    skipped with a warning (count in ``df.attrs["skipped_rows"]``) rather than failing the load.
+    """
     root = ET.parse(xml).getroot() if isinstance(xml, Path) else ET.fromstring(xml)
     capacities = load_capacities() if capacities is None else capacities
-    collected = pd.Timestamp(collected).tz_convert(TZ)
-    rows = []
+    collected = pd.Timestamp(collected).tz_convert(UTC)
+    rows, skipped = [], []
     for r in root.iter("row"):
         f = {c.tag: (c.text or "").strip() for c in r}
-        arrival, arr_ok = _parse_time(f.get("arrival"), "arrival")
-        departure, dep_ok = _parse_time(f.get("departure"), "departure")
+        try:
+            # A dateless end of the call ('TBA') is taken to fall on the other end's day.
+            arrival, arr_ok = _parse_time(f.get("arrival"), "arrival", _day_of(f.get("departure")))
+            departure, dep_ok = _parse_time(f.get("departure"), "departure", arrival.date())
+        except ValueError:
+            skipped.append(f.get("visit_id") or "?")
+            continue
         if departure <= arrival:  # a stand-in time can land before a confirmed one
             departure = arrival + timedelta(hours=10)
             dep_ok = False
@@ -169,7 +200,15 @@ def parse_feed(
     df["passengers"] = df["passengers"].astype("Int64")
     df["time_confirmed"] = df["time_confirmed"].astype(bool)
     df = df.drop_duplicates("visit_id", keep="last")
-    return df.sort_values(["arrival", "ship"]).reset_index(drop=True)
+    df = df.sort_values(["arrival", "ship"]).reset_index(drop=True)
+    df.attrs["skipped_rows"] = len(skipped)
+    if skipped:
+        warnings.warn(
+            f"VTS feed: skipped {len(skipped)} row(s) with unreadable times, visit_id "
+            + ", ".join(skipped),
+            stacklevel=2,
+        )
+    return df
 
 
 def load_schedule(
@@ -178,7 +217,8 @@ def load_schedule(
     max_age: timedelta = timedelta(hours=12),
     raw_dir: str | Path = RAW_DIR,
 ) -> pd.DataFrame:
-    """The VTS cruise schedule as a DataFrame (columns in ``COLUMNS``, times tz-aware London).
+    """The VTS cruise schedule as a DataFrame (columns in ``COLUMNS``; call times tz-aware London,
+    ``collected_at`` tz-aware UTC).
 
     With ``path``, parse that cached file. Otherwise use the newest cache in ``raw_dir``, fetching
     a fresh copy if there is none, it is older than ``max_age``, or ``refresh`` is set. If the
@@ -207,10 +247,11 @@ def schedule_horizon(df: pd.DataFrame) -> date:
 def to_cruise_calls(df: pd.DataFrame, day: date | None = None) -> list[CruiseCall]:
     """Adapt to the ``CruiseCall`` list the demand code takes (naive London times).
 
-    Calls without a passenger figure are skipped with a warning, not guessed.
+    With ``day``, every call alongside that day, so a ship arriving the day before still brings
+    its embarkation peak. Calls without a passenger figure are skipped with a warning, not guessed.
     """
     if day is not None:
-        df = df[df["arrival"].dt.date == day]
+        df = df[(df["arrival"].dt.date <= day) & (df["departure"].dt.date >= day)]
     missing = df[df["passengers"].isna()]
     if len(missing):
         warnings.warn(

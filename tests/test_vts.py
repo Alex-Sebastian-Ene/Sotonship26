@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -104,3 +105,76 @@ def test_load_schedule_falls_back_to_cache_when_fetch_fails(tmp_path, monkeypatc
     assert len(df) == 3
     with pytest.raises(OSError):
         vts.load_schedule(raw_dir=tmp_path / "empty")
+
+
+def _feed(*rows: tuple[str, str]) -> bytes:
+    """SYNTHETIC feed with one made-up ship per (arrival, departure) pair; visit_id = 1, 2, ..."""
+    body = "".join(
+        f"<row><visit_id>{i}</visit_id><ship_name>TEST SHIP {i}</ship_name>"
+        f"<lloyds_no.>200000{i}</lloyds_no.><arrival>{arr}</arrival>"
+        f"<departure>{dep}</departure><berth>46</berth></row>"
+        for i, (arr, dep) in enumerate(rows, start=1)
+    )
+    return f"<exportResults><table><rows>{body}</rows></table></exportResults>".encode()
+
+
+def test_dateless_time_takes_the_date_of_the_other_end():
+    feed = _feed(
+        ("22-Oct-26 06:15", "TBA"), ("", "23-Oct-26 17:30"), ("24-Oct-26 am", "24-Oct-26 pm")
+    )
+    df = vts.parse_feed(feed, COLLECTED, capacities={}).set_index("visit_id")
+    assert df.loc["1", "departure"].tz_localize(None) == pd.Timestamp("2026-10-22 17:00")
+    assert df.loc["2", "arrival"].tz_localize(None) == pd.Timestamp("2026-10-23 06:00")
+    assert df.loc["3", "arrival"].time() == vts.VAGUE_TIMES["arrival"]["AM"]
+    assert not df["time_confirmed"].any()
+
+
+def test_rows_without_any_date_are_skipped_and_counted():
+    feed = _feed(("TBA", ""), ("garbage", "TBA"), ("22-Oct-26 06:15", "TBA"))
+    with pytest.warns(UserWarning, match="skipped 2 row"):
+        df = vts.parse_feed(feed, COLLECTED, capacities={})
+    assert list(df["visit_id"]) == ["3"]
+    assert df.attrs["skipped_rows"] == 2
+
+
+def test_clock_change_nights():
+    feed = _feed(
+        ("25-Oct-26 01:30", "25-Oct-26 17:00"),  # clocks go back: 01:30 happens twice
+        ("28-Mar-27 01:30", "28-Mar-27 17:00"),  # clocks go forward: 01:30 never happens
+    )
+    df = vts.parse_feed(feed, COLLECTED, capacities={}).set_index("visit_id")
+    assert df.loc["1", "arrival"] == pd.Timestamp("2026-10-25 00:30", tz="UTC")  # first, BST
+    assert df.loc["2", "arrival"] == pd.Timestamp("2027-03-28 01:00", tz="UTC")  # 02:00 BST
+    assert df["time_confirmed"].all()
+
+
+def test_bad_row_in_a_fresh_fetch_does_not_break_loading(tmp_path, monkeypatch):
+    def fetch(raw_dir):
+        path = Path(raw_dir) / "sotcruiseship_20261017T060000Z.xml"
+        path.write_bytes(_feed(("TBA", "TBA"), ("22-Oct-26 06:15", "22-Oct-26 17:00")))
+        return path
+
+    monkeypatch.setattr(vts, "fetch_feed", fetch)
+    with pytest.warns(UserWarning, match="skipped 1 row"):
+        df = vts.load_schedule(raw_dir=tmp_path, refresh=True)
+    assert list(df["visit_id"]) == ["2"]
+
+
+def test_to_cruise_calls_keeps_overnight_call_on_departure_day():
+    feed = _feed(("20-Oct-26 06:00", "21-Oct-26 17:00"), ("22-Oct-26 06:00", "22-Oct-26 17:00"))
+    df = vts.parse_feed(feed, COLLECTED, capacities={"2000001": (1000, "lower_berth")})
+    with pytest.warns(UserWarning, match="no passenger figure"):
+        assert vts.to_cruise_calls(df, day=date(2026, 10, 22)) == []
+    for day in (date(2026, 10, 20), date(2026, 10, 21)):
+        assert [c.ship for c in vts.to_cruise_calls(df, day=day)] == ["TEST SHIP 1"]
+
+
+def test_collected_at_is_utc_and_call_times_london():
+    df = parse()
+    assert str(df["collected_at"].dt.tz) == "UTC"
+    assert str(df["departure"].dt.tz) == "Europe/London"
+
+
+def test_borealis_capacity_cites_borealis_not_balmoral():
+    caps = pd.read_csv(vts.CAPACITY_CSV).set_index("ship")
+    assert "balmoral" not in caps.loc["BOREALIS", "source_url"].lower()
