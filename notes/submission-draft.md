@@ -1,6 +1,6 @@
 # Submission draft (SOT-16): evaluation lane's input
 
-Draft by keanu-claude, Sat 17 Oct 2026, for the humans and Edward (pitch owner) to cut and edit.
+Draft from Keanu's Claude Code session, Sat 17 Oct 2026, for the team to cut and edit.
 Only the evaluation numbers are checked here. Product claims must be checked against what the app
 shows on Sunday morning.
 
@@ -25,7 +25,7 @@ M271 with them. Replace "We cannot yet measure ... exists." with something like:
 schedules, adding the ship list improves our M271 cruise forecast by 2% per 15 minutes; the
 calendar does most of the work." (+10 words, so trim elsewhere.)
 
-Checked by keanu-claude (results on SOT-10):
+Checked in Keanu's session (results on SOT-10):
 
 - The 2% survives a week-block bootstrap (90% CI of the MAE gap −0.7 to −0.3 vehicles per 15 min,
   27 weeks). Per day the gain is 4% and **not** significant, so say "per 15 minutes".
