@@ -207,6 +207,14 @@ def test_traverse_free_flow_and_queue(ctx):
     assert hold is not None and hold[2] > hold[1] and times[-1] > 490.0
 
 
+def test_fitted_cruise_reads_top_level_and_meta():
+    params = {"road": 1.15, "county": 0.6, "dis_shift": 0.0}
+    assert daysim.fitted_cruise({"cruise_fit": {"params": params}, "meta": {}}) == params
+    assert daysim.fitted_cruise({"meta": {"cruise_fit": {"params": params}}}) == params  # older
+    assert daysim.fitted_cruise({"cruise_fit": None, "meta": {}}) is None  # fit skipped
+    assert daysim.fitted_cruise(None) is None
+
+
 def test_encoding_round_trip():
     import agents
 
@@ -334,3 +342,21 @@ def test_recommended_windows_join_gaps_and_drop_blips():
     on = np.array([1, 0, 1, 0, 0, 1, 1, 0, 1], bool)
     assert train_ppo.windows(on) == [(0, 0), (2, 2), (5, 6), (8, 8)]
     assert train_ppo.windows(on, min_len=2, gap=1) == [(0, 2), (5, 8)]
+
+
+def test_street_legs_join_the_zone_node(ctx, monkeypatch):
+    import agents
+
+    monkeypatch.setattr(agents, "STREET_M", 1500.0)  # the toy grid is 1 km apart
+    m = ctx.m
+    streets = agents.Streets(m)
+    z = next(i for i, c in enumerate(m.centroids) if c.kind == "zone")
+    node = m.centroids[z].node
+    assert streets.options[z]
+    for v, access, egress in streets.options[z]:
+        assert m.eu[access[0]] == v and m.ev[access[-1]] == node
+        assert m.eu[egress[0]] == node and m.ev[egress[-1]] == v
+        for chain in (access, egress):
+            assert all(m.ev[a] == m.eu[b] for a, b in zip(chain[:-1], chain[1:], strict=False))
+    gw = next(i for i, c in enumerate(m.centroids) if c.kind == "gateway")
+    assert streets.pick(m, gw, np.random.default_rng(0)) is None  # gateways keep their node

@@ -279,9 +279,13 @@ def build_ctx(log=print) -> tuple[Ctx, dict]:
             gates["Eastern Docks gate"] = tuple(np.mean(east, axis=0).round().astype(int))
     m = tm.build(CACHE / "network.pkl", gates, log=log, port_gates=dict(base.get("gates") or {}))
     dft = ext.count_points(log=log)
-    tm.calibrate_external(m, dft["sites"], log=log, grid=(0.6, 0.8, 1.0, 1.25, 1.6))
-    calibration = tm.calibrate_to_counts(m, COUNT_SITES, log=log)
+    # county and city traffic both load the count points, so fit the two scales in turn
+    for _ in range(2):
+        tm.calibrate_external(m, dft["sites"], log=log, grid=(0.6, 0.8, 1.0, 1.25, 1.6))
+        calibration = tm.calibrate_to_counts(m, COUNT_SITES, log=log)
     freight_rows = tm.calibrate_freight(m, dft["sites"], log=log)
+    # the council-count grid steps by about 15%; settle the city scale more finely
+    calibration = tm.calibrate_to_counts(m, COUNT_SITES, log=log, grid=(0.9, 0.95, 1.0, 1.05, 1.1))
     near = tuple(round(m.scale_ext * f, 3) for f in (0.85, 0.92, 1.0, 1.08, 1.17))
     dft_rows = tm.calibrate_external(m, dft["sites"], log=log, grid=near)
     capacity_notes = tm.anchor_counts(m, COUNT_SITES, calibration, log=log)
@@ -607,7 +611,8 @@ def forecast(task: dict) -> dict:
         Dbg, groups = tm.background(m, dtype, rng, term=term, spread=spread, mult=mult)
         Dm = tm.match_demand(m, kickoff_hours(kick), rng) if kick else np.zeros_like(Dbg)
         Dc = sample_cruise(ctx, calls, rng, params, shifts, task.get("cruise")) if calls else np.zeros_like(Dbg)
-        want = ("x",)
+        probe = task.get("probe") if paired and calls else None  # edges for the M271 fit
+        want = base_want = ("x",) + (("count",) if probe is not None else ())
         if full:
             want += ("queue", "held")
             if calls:
@@ -624,12 +629,15 @@ def forecast(task: dict) -> dict:
         sc = float((cx > tm.AT_RISK).sum() * BIN_MIN / 60)
         if paired:
             if calls:
-                rb, _ = tm.run_day(m, Dbg + Dm, cap, sh0, 3, want=("x",), pre=pre, noise=noise,
+                rb, _ = tm.run_day(m, Dbg + Dm, cap, sh0, 3, want=base_want, pre=pre, noise=noise,
                                    events=events)
                 cxb, _ = corridor_stats(rb["x"])
-                if task.get("probe") is not None:  # paired cruise flow on chosen edges, veh/h
-                    pe = np.asarray(task["probe"])
-                    diff = (x[:, pe] - rb["x"][:, pe]) * m.cap[pe]
+                if probe is not None:  # paired cruise flow on chosen edges, veh/h
+                    # what a counter there sees, each vehicle once and at most capacity, as the
+                    # WebTRIS site the learned uplift comes from (SOT-30)
+                    pe = np.asarray(probe)
+                    diff = (np.minimum(res["count"][:, pe], cap[pe])
+                            - np.minimum(rb["count"][:, pe], cap[pe]))
                     acc["probe"] = acc["probe"] + diff.mean(axis=1)
             else:
                 cxb = cx
@@ -1109,6 +1117,7 @@ def main(argv=None) -> None:
                  "scale": round(m.scale, 3), "scale_ext": round(m.scale_ext, 3),
                  "scale_freight": round(m.scale_freight, 3),
                  "capacity_notes": ctx.extra["capacity"], "uni_term": tm.UNI_TERM,
+                 "count_headroom": tm.COUNT_HEADROOM,
                  "uncertainty": {"p_wet": P_WET, "wet_capacity": WET_CAPACITY, "wet_demand": WET_DEMAND,
                                  "incident_p": INCIDENT_P, "perception_sd": PERCEPTION_SD,
                                  "logit_beta": tm.LOGIT_BETA, "noise": tm.NOISE,
@@ -1127,6 +1136,7 @@ def main(argv=None) -> None:
                                          "estimated_weight": tm.ESTIMATED_WEIGHT},
                                  "freight": {"rows": ctx.extra["freight"], "hgv_pcu": tm.HGV_PCU,
                                              "port_share_m271": tm.PORT_SHARE_M271,
+                                             "hgv_limit": tm.FREIGHT_HGV_LIMIT,
                                              "gate_share": tm.PORT_GATE_SHARE,
                                              "day_ratio": tm.FREIGHT_DAYS,
                                              "lorries_each_way":

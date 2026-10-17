@@ -803,9 +803,9 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
         <div class="fold-body">
           <ol class="steps">
             <li><strong>The network is Southampton's.</strong> <span id="m-edges"></span> one-way road links from OpenStreetMap, with lanes and speed limits, from motorways down to unclassified roads.</li>
-            <li><strong>Zones and gateways come from geography.</strong> <span id="m-zones"></span> zones from OpenStreetMap places, sized by nearby homes, jobs, shops and port land; <span id="m-gw"></span> county gateways where the M27, M3, A35, A33 and others enter. M27/M3 links broken at the map edge, and the missing M3 to M27 eastbound link, are joined up.</li>
-            <li><strong>Everyday traffic is generated from data.</strong> County commuters, residents working outside, trips between zones (more between big, close ones), through traffic, county shoppers and port lorries (fitted to DfT lorry counts on the M271), each with its own day and weekend pattern. Term-time weekdays add the school run (half-term 26–30 Oct); match days add fans to St Mary's.</li>
-            <li><strong>Counted roads use the counts.</strong> On Portswood Road, Highfield Lane and Bevois Hill, measured peak speeds of 16–20 mph on 30 mph roads show they are at their limit, so the counted peak-hour flow sets their capacity. Local traffic the zones miss is added so flows match the counts, plus <span id="m-uni"></span> for university term, because the counts were taken in July.</li>
+            <li><strong>Zones and gateways come from geography.</strong> <span id="m-zones"></span> zones built from OpenStreetMap places. Each zone's homes, jobs and shops come from nearby residential, commercial, industrial, port and retail land. <span id="m-gw"></span> county gateways sit where the M27, M3, A35, A33 and other roads cross into the area. Where cutting the map to the area broke the M27 and M3, and where OpenStreetMap lacks the M3 to M27 eastbound link, the model joins them up.</li>
+            <li><strong>Everyday traffic is generated from data.</strong> Commuters from the county and back, residents working outside, trips between zones (more between big, close zones), through traffic, county visitors to the shops, and lorries to and from the port (fitted to DfT lorry counts on the M271). Each has its own pattern over the day, different at weekends. The school run adds drop-off and pick-up peaks on term-time weekdays (city council half-term 26–30 Oct). Match days add fans to St Mary's.</li>
+            <li><strong>Counted roads use the counts.</strong> On Portswood Road and Bevois Hill, where the model's own traffic falls short of the July 2024 counts, capacity is the counted peak-hour flow plus <span id="m-headroom"></span>: peak speeds there were close to the all-day average and buses ran 0–4 minutes behind timetable, so the roads were busy but not full. Highfield Lane and St Denys Road, where the model already carries the counted traffic, keep their road-class capacity. That margin makes modelled bus run times on Portswood Road match the council's on a July-like weekday. Local traffic the zones miss is added so each link's flow matches the counts, plus <span id="m-uni"></span> for university term, because the counts were taken in July.</li>
             <li><strong>Cruise traffic is added ship by ship.</strong> Car drop-offs, park and cruise, taxis and coaches, timed by disembarkation and boarding and sent to the terminal's nearest dock gate.</li>
             <li><strong>Drivers choose routes as roads fill.</strong> Every 15 minutes each of the <span id="m-ods"></span> origin–destination flows splits over up to three real routes and shifts towards the quickest. Traffic that cannot get through a full road waits for the next 15 minutes, so queues build and clear.</li>
             <li><strong>Days vary.</strong> Drivers misjudge speeds together; everyday traffic swings by day, trip type, area and hour; each ship's passengers share its delay and travel mix. Wet days and incidents occur at their usual rates, and dates further ahead get wider ranges.</li>
@@ -1063,6 +1063,7 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
     const cz = M.census;
     if (cz && cz.drivers) $('#m-census').textContent = `${int(cz.drivers.county)} in and ${int(cz.drivers.outbound)} out per weekday in 2021, ${Math.round(cz.commute_day * 100)}% assumed to travel on a given weekday`;
     $('#m-uni').textContent = `+${Math.round((M.uni_term - 1) * 100)}%`;
+    $('#m-headroom').textContent = `${Math.round(((M.count_headroom || 1) - 1) * 100)}%`;
     $('#legend').innerHTML = '<span>Extra hours of congested road the ships add:</span>' + LEVELS.map(l => {
       const nx = LEVELS[l.n + 1];
       return `<span><span class="sw lv-${l.key}"></span>${l.label}, ${nx ? (l.min === 0 ? `under ${nx.min}` : `${l.min} to ${nx.min}`) : `${l.min} or more`}</span>`;
@@ -1695,7 +1696,7 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
   const geomCache = new Map();
   function geom(kind, i) {
     const key = kind + i; if (geomCache.has(key)) return geomCache.get(key);
-    const P = kind === 'a' ? AG.paths[i] : AG.bus.patterns[i];
+    const P = kind === 'a' ? AG.paths[i] : kind === 'l' ? AG.legs[i] : AG.bus.patterns[i];
     const g = dec(P.g), xs = [g[0]], ys = [g[1]];
     for (let k = 2; k < g.length; k += 2) { xs.push(xs[xs.length - 1] + g[k]); ys.push(ys[ys.length - 1] + g[k + 1]); }
     const cum = [0];
@@ -1717,8 +1718,16 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
     const D = AG.days[iso], A = D.agents, ints = dec(A.t), list = [];
     let p = 0;
     for (let i = 0; i < A.n; i++) {
-      const n = geom('a', A.p[i]).bv.length, t = readTimes(ints, p, n); p += n;
-      list.push({ i, k: A.k[i], o: A.o[i], d: A.d[i], p: A.p[i], q: A.q[i] / 10, c: A.c[i], t, dep: t[0], arr: t[n - 1] });
+      // a trip is a leg from a street in its zone (if any), the model's route, and a leg to a street
+      const la = A.a ? A.a[i] : -1, le = A.e ? A.e[i] : -1, pieces = [];
+      if (la >= 0) pieces.push(['l', la]);
+      pieces.push(['a', A.p[i]]);
+      if (le >= 0) pieces.push(['l', le]);
+      const ns = pieces.map(([kind, idx]) => geom(kind, idx).bv.length), n = ns.reduce((x, v) => x + v, 0);
+      const t = readTimes(ints, p, n); p += n;
+      let off = 0;
+      const segs = pieces.map(([kind, idx], j) => { const ts = t.subarray(off, off + ns[j]); off += ns[j]; return { kind, idx, t: ts }; });
+      list.push({ i, k: A.k[i], o: A.o[i], d: A.d[i], p: A.p[i], q: A.q[i] / 10, c: A.c[i], s: A.s ? A.s[i] / 100 : null, segs, t, dep: t[0], arr: t[n - 1] });
     }
     const buses = [];
     if (D.buses) {
@@ -1742,6 +1751,12 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
     if (s >= G.xs.length - 1) return [G.xs[G.xs.length - 1], G.ys[G.ys.length - 1]];
     const seg = G.cum[s + 1] - G.cum[s], g = seg > 0 ? Math.max(0, Math.min(1, (d - G.cum[s]) / seg)) : 0;
     return [G.xs[s] + g * (G.xs[s + 1] - G.xs[s]), G.ys[s] + g * (G.ys[s + 1] - G.ys[s])];
+  }
+  function agentPos(a, now) {
+    if (!a.segs) return posAt(geom('a', a.p), a.t, now);  // pages built before agents had segments
+    for (const sg of a.segs) if (now <= sg.t[sg.t.length - 1]) return posAt(geom(sg.kind, sg.idx), sg.t, now);
+    const last = a.segs[a.segs.length - 1];
+    return posAt(geom(last.kind, last.idx), last.t, now);
   }
   const cvs = $('#agent-canvas'), cx2 = cvs.getContext('2d');
   let drawn = [], selected = null, vehAnim = null;
@@ -1777,10 +1792,10 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
     if (!A) return;
     const now = state.minute, rad = Math.max(1.8, Math.min(4.5, 1.4 + Math.log2(Math.max(1, T.k))));
     if (selected) {
-      const G = selected.type === 'a' ? geom('a', A.list[selected.i].p) : geom('b', A.buses[selected.i].p);
+      const Gs = selected.type === 'a' ? A.list[selected.i].segs.map(sg => geom(sg.kind, sg.idx)) : [geom('b', A.buses[selected.i].p)];
       cx2.lineCap = 'round'; cx2.lineJoin = 'round';
-      cx2.strokeStyle = PAL.casing; cx2.lineWidth = 6; tracePath(G);
-      cx2.strokeStyle = PAL.accent; cx2.lineWidth = 3; tracePath(G);
+      cx2.strokeStyle = PAL.casing; cx2.lineWidth = 6; Gs.forEach(tracePath);
+      cx2.strokeStyle = PAL.accent; cx2.lineWidth = 3; Gs.forEach(tracePath);
     }
     const tails = !fade || !trailsOn();
     let na = 0, nb = 0, cruiseOn = 0;
@@ -1788,14 +1803,14 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
     for (const a of A.list) {
       if (a.dep > now || a.arr < now) continue;
       na++;
-      const G = geom('a', a.p), [x, y] = screen(...posAt(G, a.t, now));
+      const [x, y] = screen(...agentPos(a, now));
       if (x < -6 || y < -6 || x > w + 6 || y > h + 6) continue;
       const P = AG.purposes[a.k], col = agentColor(a.k);
       if (P.cruise) cruiseOn++;
       // fade in after leaving and out before arriving, so trips appear and finish rather than blink
       cx2.globalAlpha = Math.max(0.25, Math.min(1, (now - a.dep) / 1.5, (a.arr - now) / 1.5));
       if (tails) {
-        const [px, py] = screen(...posAt(G, a.t, Math.max(a.dep, now - 1.2)));
+        const [px, py] = screen(...agentPos(a, Math.max(a.dep, now - 1.2)));
         cx2.strokeStyle = col; cx2.lineWidth = rad * 0.9; cx2.globalAlpha *= 0.45;
         cx2.beginPath(); cx2.moveTo(px, py); cx2.lineTo(x, y); cx2.stroke();
         cx2.globalAlpha /= 0.45;
@@ -1834,8 +1849,8 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
       const it = selected.type === 'a' ? A.list[selected.i] : A.buses[selected.i];
       const t0 = selected.type === 'a' ? it.dep : it.start, t1 = selected.type === 'a' ? it.arr : it.end;
       if (now >= t0 && now <= t1) {
-        const [x, y] = screen(...posAt(geom(selected.type, it.p), it.t, now));
-        cx2.strokeStyle = PAL.ink; cx2.lineWidth = 2; cx2.beginPath(); cx2.arc(x, y, rad + 6, 0, 2 * Math.PI); cx2.stroke();
+        const [x, y] = screen(...(selected.type === 'a' ? agentPos(it, now) : posAt(geom('b', it.p), it.t, now)));
+        cx2.strokeStyle = PAL.ink; cx2.lineWidth = 2; cx2.beginPath(); cx2.arc(x, y, rad + 5, 0, 2 * Math.PI); cx2.stroke();
       }
     }
     $('#veh-clock').textContent = hhmm(now);
@@ -1864,7 +1879,8 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
     if (!A || !selected) { el.innerHTML = '<p class="muted">Turn on Vehicles and click a dot or bus to follow it: from, to, route, timings, queueing.</p>'; return; }
     if (selected.type === 'a') {
       const a = A.list[selected.i], P = AG.purposes[a.k], path = AG.paths[a.p];
-      const ff = path.ff / 10, total = a.arr - a.dep, slow = Math.max(0, total - ff - a.q);
+      const legs = a.segs.filter(sg => sg.kind === 'l').reduce((x, sg) => x + AG.legs[sg.idx].ff / 10, 0);
+      const ff = (path.ff / 10 + legs) / (a.s || 1), total = a.arr - a.dep, slow = Math.max(0, total - ff - a.q);
       const call = a.c >= 0 ? A.D.calls[a.c] : null;
       const w = P.cruise ? A.D.weights.cruise : A.D.weights.everyday;
       el.innerHTML = `<p><span class="sw" style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;background:${agentColor(a.k)}"></span><strong>${esc(P.label)}</strong>${call ? `, ${esc(call.ship)} at ${esc(call.terminal)}` : ''}</p>
@@ -1872,8 +1888,8 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
         <dt>Route</dt><dd>${path.v.length ? esc(path.v.map(i => AG.names[i]).join(' → ')) : 'local roads'}</dd>
         <dt>Leaves</dt><dd class="mono">${hhmm(a.dep)}</dd><dt>Arrives</dt><dd class="mono">${hhmm(a.arr)} (${mins(total)})</dd>
         <dt>On empty roads</dt><dd class="mono">${mins(ff)}</dd><dt>Slow traffic</dt><dd class="mono">+${mins(slow)}</dd>
-        <dt>Queuing</dt><dd class="mono">+${mins(a.q)}</dd><dt>Stands for</dt><dd>about ${int(w)} vehicles like it</dd></dl>
-        <p class="foot-note">One sampled day. The route is one of the model's up to three routes for this trip, drawn with the shares the model gave it at ${binTime(Math.max(0, Math.min(59, Math.floor((a.dep - 300) / 15))))}; queuing follows the model's 15-minute queue carry-over.</p>`;
+        <dt>Queuing</dt><dd class="mono">+${mins(a.q)}</dd>${a.s ? `<dt>Driver</dt><dd>keeps to about ${Math.round(a.s * 100)}% of the speed limit</dd>` : ''}<dt>Stands for</dt><dd>about ${int(w)} vehicles like it</dd></dl>
+        <p class="foot-note">One sampled day. The route is one of the model's up to three routes for this trip, drawn with the shares the model gave it at ${binTime(Math.max(0, Math.min(59, Math.floor((a.dep - 300) / 15))))}; queuing follows the model's 15-minute queue carry-over. Trips from or to a zone start or end on a nearby modelled road. Cars do not interact: a slow driver does not hold up the one behind.</p>`;
     } else {
       const b = A.buses[selected.i], R = AG.bus.routes[b.r], pat = AG.bus.patterns[b.p];
       const stops = pat.s.map(i => AG.names[i]);

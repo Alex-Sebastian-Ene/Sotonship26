@@ -170,6 +170,7 @@ data improves it by about 4% a day (not significant) and 2% per 15 minutes.
 | DfT road traffic statistics, AADF by direction and hourly raw manual counts (API, Southampton LA 137) | Background traffic and hourly profile on counted roads, fetched by `data/dft.py`, cached in `data/raw/dft/`, not committed | At run time (first pull 16 Oct 2026) | Open Government Licence v3.0 |
 | [Bus Open Data Service](https://data.bus-data.dft.gov.uk/timetable/download/) timetables, GTFS for the South West region (Southampton's operators are there) | Demo: Bluestar routes and timetables (and First's X4/X5; Unilink is not in BODS) run on the modelled link speeds (`demo/buses.py`); modelled bus delays per route compared with the council's Portswood bus run times (Table 3-5). Reduced to `data/cache/bods/southampton_buses.json`, not committed; the download time is in `gtfs_south_west.source.json`. Fallback if BODS is unreachable: OpenStreetMap route=bus relations (ODbL), stops only, and the page says so | 17 Oct 2026 | Open Government Licence v3.0 |
 | [bustimes.org](https://bustimes.org) live vehicle positions (`/vehicles.json` only; its robots.txt disallows `/api/` and `/trips/`, which we don't use), which republish the BODS live feed | Observed bus lateness on the day: delay against the timetable per line, and per hour near the docks, in the city centre and on Portswood Road (`src/sotonship26/data/bus_lateness.py`, `scripts/bustimes.py`). Raw readings stay in `data/raw/buses/`, not committed; the page shows aggregates with the collection window | From 17 Oct 2026, polled once a minute | BODS data, Open Government Licence v3.0, via bustimes.org |
+| OpenStreetMap roads via the [Overpass API](https://overpass-api.de/) (motorway to unclassified and their slip roads, traffic signals, turn restrictions, in the study box) | SUMO check: the microsimulation's road network (`demo/sumo_net.py`, built with Eclipse SUMO's netconvert; `data/cache/sumo`, not committed), compared with the macro model in `docs/sumo-check.md` | 17 Oct 2026 (OSM base 11:57 UTC) | ODbL 1.0 |
 
 ## Provenance
 
@@ -212,6 +213,13 @@ data improves it by about 4% a day (not significant) and 2% per 15 minutes.
   and everything in `notes/`)
   was written with Claude Code in Keanu's session on Fri 16 and Sat 17 Oct 2026. Keanu reviewed
   the method and the honest-baseline corrections (`notes/ml-walkthrough.md`).
+- **AI-generated (NTIS self-skill + calibration):** the NTIS predicted-vs-actual diagnostics
+  (`src/sotonship26/ntis_score.py`, `tests/test_ntis_score.py`, `notes/ntis-selfskill.md`) and
+  the SOT-8 calibration harness (`src/sotonship26/calibrate.py`, `tests/test_calibrate.py`) were
+  written with Claude Code in Keanu's session on Fri 16 and Sat 17 Oct 2026. The NTIS skill
+  numbers are provisional, units unconfirmed, labelled "do not quote as validated NTIS skill".
+  The calibration `best.json` is synthetic (`source: "synthetic"`) and gitignored; the real
+  cruise calibration is blocked on the parametric simulator (SOT-10).
 - **AI-generated (port freight):** the port lorry trip type, lorry route costs and the fit to DfT
   lorry counts (`freight_totals`, `freight_demand`, `modelled_lorries`, `calibrate_freight` and the
   freight parts of `build`, `cordon_od`, `modelled_aadf` and `count_point_edges` in
@@ -228,8 +236,31 @@ data improves it by about 4% a day (not significant) and 2% per 15 minutes.
   `tests/test_bus_lateness.py` and the "Buses observed on the day" fold of `demo/page.html` were
   written by Claude Code (Edward's session) on Sat 17 Oct 2026, porting the bustimes.org pipeline
   from the parked Gangway branch (`claude/wizardly-thompson-ybdvds`, b8a77c4) onto main.
+- **AI-generated (app UI and images):** the app shell, themes (including Steamship), action cards,
+  `?` pop-ups and live-map styling in `demo/page.html`, and `demo/ui_variants.py` (the Story app
+  with its landing page, plus the Focus, Officer and Wallboard layouts) were written by Claude Code
+  (Edward's session) on Sat 17 Oct 2026. The cruise icons in `demo/assets/` (ship, life ring,
+  anchor, wheel, seagull, lighthouse, captain's hat) were made with Canva's AI image generator on
+  Sat 17 Oct 2026 and cut out of their white backgrounds by script.
 - **AI-assisted research:** `notes/local-evidence.md` (local evidence, scale and business numbers)
   was compiled by Claude Code (Edward's session, with a research subagent) on Sat 17 Oct 2026 from
   the public sources cited on each line.
+- **AI-generated (queues at bottlenecks):** the counted-road capacity and local-traffic change in `demo/traffic_model.py` (`COUNT_HEADROOM`, per-link top-up in `anchor_counts`), `demo/bus_check.py`, `demo/queue_report.py`, `cluster/iridis/bus_check.slurm`, `tests/test_demo_queues.py` and `docs/queues.md` were written with Claude Code on Sat 17 Oct 2026. The headroom is fitted to the council's July 2024 bus run times on Portswood Road (Portswood Project Baseline Data Report, Table 3-5) and its peak speeds (Table 3-10).
+- **AI-generated (SUMO check):** `demo/sumo_net.py`, `demo/sumo_demand.py`, `demo/sumo_compare.py`, `cluster/iridis/sumo.slurm`, `tests/test_sumo_check.py` and `docs/sumo-check.md` were written with Claude Code on Sat 17 Oct 2026. The microsimulation itself is Eclipse SUMO 1.28.0 (EPL-2.0, the official container image) run on Iridis.
+- **AI-generated (west-side counts, SOT-27):** counting each vehicle once at the count points
+  (`run_day`'s `count` output, used by `flows`, `modelled_aadf` and `modelled_lorries`), the
+  M271 cruise probe capped at capacity, the network repairs for the M27 eastbound through
+  junction 3, the A326 northbound into M27 junction 2 and the M3 southbound lanes
+  (`MISSING_LINKS`, `LANE_FIXES`), the count-point link choice at the A33 Redbridge Road, the
+  refitted through share and other-trip decay, the alternating DfT and council fits in
+  `build_ctx`, the lorry fit's limit of 95% port lorries at any HGV count point
+  (`FREIGHT_HGV_LIMIT`), the refit of `COUNT_HEADROOM` and the `anchor_counts` skip rule after
+  it (scan by the queues session), and `docs/west-side-counts.md` were written with Claude Code
+  on Sat 17 Oct 2026.
+- **AI-generated (queues at the bottleneck, SOT-30):** `traffic_model.Queues` (queued traffic
+  waits at its route's bottleneck and loads only the links from there on), its use in `run_day`,
+  `daysim.DaySim` and `ppo_gpu.py`, the M271 cruise probe on counted flow,
+  `tests/test_demo_bottleneck_queues.py` and `docs/bottleneck-queues.md` were written with Claude
+  Code on Sat 17 Oct 2026.
 - **Existed before the event:** TODO, confirm with the organisers.
 - **Who helped:** TODO.
