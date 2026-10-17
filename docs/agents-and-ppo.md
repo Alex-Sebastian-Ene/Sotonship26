@@ -55,20 +55,64 @@ queuing.
 day, so dots and colours are the same traffic. The other layers stay the average of the forecast's
 sampled days.
 
-**Buses.** Routes and timetables for Bluestar, First and Unilink come from the Bus Open Data
-Service GTFS download for the South West region, which is where Southampton's operators are
-(Open Government Licence v3.0; the download date is recorded in
-`data/cache/bods/gtfs_south_west.source.json` and on the page). If BODS cannot be
-reached the script falls back to OpenStreetMap route=bus relations (ODbL), which have stops but
-no timetable, and says so. Each trip's stops are snapped to the model network (within 250 m) and
-joined by the quickest free-flow path. Buses run through the same link loads and queues as the
-cars, at 80% of a car's free-flow speed, 20 seconds at each stop, waiting at a stop if early.
-The model has no bus lanes or bus gates. The page's bus table gives, per route, the extra minutes
-from traffic by period and the minutes behind timetable, and for Portswood Road by direction and
-peak. That is the figure to hold against the council's baseline report (Table 3-5: buses ran 0:24
-to 4:22 behind timetable in the July 2024 peaks; a quarter of Bluestar 2 southbound buses were 5
-or more minutes late). The council's figures are weekday, out of university term; the model's days
-are in term and the busiest are weekends, so they are a sense check, not a calibration.
+**The days on the page** are the two with the most cruise traffic added (Sat 24 Oct and Sat 7 Nov,
+from the forecast's paired samples) and a term-time weekday without roadworks on Portswood Road
+for the bus check (Mon 16 Nov). Each has 7,000 to 9,700 agents. Everyday agents stand for 53 to 89
+vehicles each and cruise agents for 4, so cruise traffic is easy to see. Agents times weights match
+the model's trips per kind of trip within sampling error (within 3% for the big groups; 16% for
+the smallest, outbound commuters on a Saturday).
+
+| Day | Agents | Agents that queue | Median queue, if they queue | 1 in 10 queues longer than |
+| --- | --- | --- | --- | --- |
+| Sat 24 Oct | 9,728 | 27% | 22 min | 56 min |
+| Sat 7 Nov | 9,737 | 13% | 20 min | 48 min |
+| Mon 16 Nov | 7,177 | 29% | 23 min | 58 min |
+
+Queues come in 15-minute steps because the model's queue does: a vehicle that does not get
+through its bottleneck in one 15-minute bin waits for the next. Cruise vehicles queue about as
+often as everyone else; the dock-gate approaches are among the worst bottlenecks around midday.
+
+**Buses.** Routes and timetables come from the Bus Open Data Service GTFS download for the
+South West region, which is where Southampton's operators are (downloaded 17 Oct 2026, 297 MB,
+Open Government Licence v3.0; recorded in `data/cache/bods/gtfs_south_west.source.json` and on
+the page). The South East file has none of them. Of the three operators asked for:
+
+- **Bluestar**: 62 routes with stops in the study area (all city routes, the 6xx school routes,
+  PR1 park and ride);
+- **First**: only the X4 and X5 Portsmouth expresses ("First Portsmouth, Fareham & Gosport");
+- **Unilink**: not in the BODS GTFS at all (neither the South West nor the South East file), so
+  it is missing. Its routes would need the operator's own timetable or the OSM fallback.
+
+If BODS cannot be reached the script falls back to OpenStreetMap route=bus relations (ODbL),
+which have stops but no timetable, and says so. Each trip's stops are snapped to the model network
+(within 250 m) and joined by the quickest free-flow path. Buses run through the same link loads
+as the cars, at 80% of a car's free-flow speed, 20 seconds at each stop, waiting at a stop if
+early. A bus route is many car trips long, so a bus gets the car's queue rule once per continuous
+stretch of links over capacity (one queue), not once per stop. The model has no bus lanes or bus
+gates. The page's bus table gives, per route, the extra minutes from traffic by period and the
+minutes behind timetable, and for Portswood Road by direction and peak, to hold against the
+council's baseline report (Table 3-5: buses ran 0:24 to 4:22 behind timetable in the July 2024
+peaks; a quarter of Bluestar 2 southbound buses were 5 or more minutes late).
+
+**What the buses show: the model's queues are too long in places.** On the weekday check day
+(Mon 16 Nov, term time, no roadworks on Portswood Road), one sampled day:
+
+| Portswood Road | AM peak: extra min on the road / min behind at the next stop | PM peak |
+| --- | --- | --- |
+| Bluestar 2 northbound | 7.0 / 6.9 (13 trips) | 18.6 / 16.1 (8) |
+| Bluestar 2 southbound | 19.8 / 78 (5) | 10.2 / 118 (10) |
+| Bluestar 20 northbound | 1.8 / 3.8 (9) | 6.0 / 7.7 (11) |
+| Bluestar 20 southbound | 3.3 / 15.6 (9) | 11.4 / 8.7 (14) |
+
+Only Bluestar 20 northbound in the morning falls inside the council's range. Elsewhere the
+modelled delay on Portswood Road alone is 2 to 5 times the observed lateness, and southbound buses
+arrive already far behind, from queues further north. On the Saturdays with the Street Manager
+permit for signals on Portswood Road (modelled as one lane closed all day) Bluestar 2 runs an hour
+or more late. The July counts were out of university term and the model adds 20% for term, but
+that does not explain a factor of several. So the macro model's point queues, with capacities
+anchored to peak counts, are too long at some bottlenecks, and the cruise forecast's delays there
+should be read as high. That is a calibration finding, not a bus result. The fix is in
+`traffic_model.py` (queue spill-back, capacities), and it is not part of this work.
 
 **Limits.**
 

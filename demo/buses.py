@@ -1,4 +1,7 @@
-"""Buses on the modelled roads: Bluestar, First and Unilink services through Southampton.
+"""Buses on the modelled roads: the Bluestar, First and Unilink services through Southampton.
+
+In the BODS file (Oct 2026) Southampton is Bluestar's; First appears only as the X4/X5 expresses
+and Unilink is not there at all.
 
 Routes and timetables come from the Bus Open Data Service (BODS) timetable download in GTFS
 format for the South West region (Open Government Licence v3.0; Southampton's operators are in
