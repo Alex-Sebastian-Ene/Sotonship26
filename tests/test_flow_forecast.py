@@ -12,6 +12,7 @@ from sotonship26.flow_forecast import (
     last_year,
     recent_median,
     site_days,
+    skill_ci,
     year_median,
 )
 
@@ -81,3 +82,13 @@ def test_lagged_split_leaves_a_publication_gap():
     proper, cal = lagged_split(dates, np.arange(500), 105)
     assert len(cal) == 100
     assert (dates[cal[0]] - dates[proper[-1]]).days >= 105
+
+
+def test_skill_ci_resamples_whole_weeks():
+    days = [date(2025, 7, 1) + timedelta(days=i) for i in range(140)]
+    rng = np.random.default_rng(1)
+    base = rng.uniform(20, 60, len(days))
+    lo, hi = skill_ci(days, base / 2, base)
+    assert abs(lo - 0.5) < 1e-9 and abs(hi - 0.5) < 1e-9  # same ratio every day
+    lo, hi = skill_ci(days, rng.permutation(base), base)
+    assert lo < 0 < hi  # no real difference, so the interval straddles zero

@@ -132,6 +132,24 @@ def lagged_split(dates: np.ndarray, idx: np.ndarray, lag: int,
     return proper, cal
 
 
+def skill_ci(days: list[date], model_err: np.ndarray, base_err: np.ndarray,
+             n_boot: int = 2000, seed: int = 0) -> tuple[float, float]:
+    """90% CI of skill = 1 - MAE(model)/MAE(base) from per-day errors, resampling whole weeks.
+
+    Days in the same week share weather and roadworks, so resampling single days would make the
+    interval too narrow.
+    """
+    rng = np.random.default_rng(seed)
+    week = np.array([(d - days[0]).days // 7 for d in days])
+    blocks = [np.flatnonzero(week == k) for k in np.unique(week)]
+    skills = []
+    for _ in range(n_boot):
+        pick = np.concatenate([blocks[k] for k in rng.integers(0, len(blocks), len(blocks))])
+        skills.append(1 - model_err[pick].mean() / base_err[pick].mean())
+    lo, hi = np.percentile(skills, [5, 95])
+    return float(lo), float(hi)
+
+
 def backtest_site(site: int, dates: np.ndarray, y: np.ndarray, cutoff: date,
                   lag: int = LAG_DAYS) -> pd.DataFrame:
     """Score the three models on every test day at one site, refitting ridge once a month."""
@@ -176,12 +194,12 @@ def backtest_site(site: int, dates: np.ndarray, y: np.ndarray, cutoff: date,
         if len(common) < 10:
             continue
         yt = np.stack([by_date[d] for d in common])[:, DAYTIME]
-        scores = {}
+        scores, day_err = {}, {}
         for name in (base, "ridge"):
             pt = np.stack([preds[name][d] for d in common])[:, DAYTIME]
             h = np.stack([halves[name][d] for d in common])[:, DAYTIME]
             err = np.abs(yt - pt)
-            scores[name] = err.mean()
+            scores[name], day_err[name] = err.mean(), err.mean(axis=1)
             rows.append({"site_id": site, "versus": base, "model": name,
                          "n_test_days": len(common), "first_test_day": str(common[0]),
                          "last_test_day": str(common[-1]),
@@ -190,6 +208,8 @@ def backtest_site(site: int, dates: np.ndarray, y: np.ndarray, cutoff: date,
                          "coverage80": float((err <= h).mean()),
                          "width80_veh": float(2 * h.mean())})
         rows[-1]["skill_vs_baseline"] = float(1 - scores["ridge"] / scores[base])
+        rows[-1]["skill_ci5"], rows[-1]["skill_ci95"] = skill_ci(common, day_err["ridge"],
+                                                                 day_err[base])
     table = pd.DataFrame(rows)
     return table
 
@@ -246,10 +266,11 @@ def main(argv: list[str] | None = None) -> int:
     out_dir = ROOT / "notes"
     table.to_csv(out_dir / "flow_forecast_table.csv", index=False)
     cols = ["site_id", "versus", "model", "n_test_days", "mae_veh_per_15min",
-            "skill_vs_baseline", "wape_pct", "coverage80", "width80_veh"]
+            "skill_vs_baseline", "skill_ci5", "skill_ci95", "wape_pct", "coverage80",
+            "width80_veh"]
     worst = (table.dropna(subset=["skill_vs_baseline"])
              .sort_values("skill_vs_baseline").groupby("site_id").head(1)
-             [["site_id", "versus", "n_test_days", "skill_vs_baseline"]]
+             [["site_id", "versus", "n_test_days", "skill_vs_baseline", "skill_ci5", "skill_ci95"]]
              .rename(columns={"versus": "strongest_baseline",
                               "skill_vs_baseline": "ridge_skill_vs_strongest"}))
     text = "\n".join([
@@ -263,7 +284,8 @@ def main(argv: list[str] | None = None) -> int:
         f"{args.lag} days before it, because WebTRIS lags about 3.5 months. Scores cover "
         "05:00-22:00. Ridge is compared with each baseline on the days both can forecast "
         "(sensor gaps differ). `skill` = 1 - MAE(ridge) / MAE(baseline): above 0 means the "
-        "learned model wins. `coverage80` should be near 0.80.",
+        "learned model wins. `skill_ci5`-`skill_ci95` is its 90% interval from resampling whole "
+        "test weeks. `coverage80` should be near 0.80.",
         "",
         "## Headline: ridge against the strongest baseline at each site",
         "",
