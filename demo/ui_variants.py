@@ -635,7 +635,8 @@ AI_JS = r"""
   addEventListener('resize', () => setTimeout(sizeFrames, 50));
   showStep(step);
 """
-AI_PAIRS = {"race": ("policy-race", "map"), "days": ("every-test-day", "ladder"), "saves": ("where-ppo-saves", "board")}
+AI_PAIRS = {"race": ("policy-race", "map"), "days": ("every-test-day", "ladder"), "saves": ("where-ppo-saves", "board"),
+            "verdict": ("verdict", "clock"), "fleet": ("pictogram", "stops"), "logbook": ("logbook", "gauge")}
 EMBEDS = Path(sys.argv[4]) if len(sys.argv) > 4 else None
 if EMBEDS:
     for key, (ai, bus) in AI_PAIRS.items():
