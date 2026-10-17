@@ -108,7 +108,7 @@ Fill in the date collected and the licence for every source before submission.
 | Southampton City Council [school year calendar 2026-27](https://www.southampton.gov.uk/schools-learning/school-information/school-term-dates/school-year-calendar-2026-27/) | `HALF_TERM` (26 to 30 Oct 2026) and `TERM_ENDS` (18 Dec 2026). The calendar is for maintained and voluntary-controlled schools; academies may differ. | 16 Oct 2026 | No licence stated on the page; dates cited to the council |
 | DfT Street Manager open data, [permit archive](https://department-for-transport-streetmanager.github.io/street-manager-docs/archived-notifications/) `permit/2026/08.zip` and `09.zip` (written 1 Sep and 1 Oct 2026) | `PERMITS` in `demo/synthetic_demo.py`: five granted daytime works with signals or a lane closure on the corridors (Platform Road 19-23 Oct and 2-6 Nov, Portswood Road 19-30 Oct and 20-23 Oct, M271 29-30 Oct). Left out: overnight-only lane closures (M271, Millbrook Road West, Mountbatten Way, Redbridge Road, 4-7 Nov), a 07:00-09:00 closure on Northam Bridge (Sun 18 Oct), applications not granted by 30 Sep (Western Esplanade 19-24 Oct and 2-3 Nov, The Avenue 24 Nov, M27 overnight 22-23 Oct) and works that only encroach on the carriageway. Permits granted in October are not archived until 1 Nov, so later short-notice works are missing. | 16 Oct 2026 (events up to 30 Sep 2026) | Open Government Licence v3.0 |
 | UKHO ADMIRALTY UK Tidal API (Discovery tier, key in `UKHO_API_KEY`) | High/low water predictions | TODO | TODO |
-| OpenStreetMap via osmnx | Walking network around the terminals | TODO | ODbL |
+| OpenStreetMap via osmnx | Walking network around the terminals; directed road network and dock gate locations (`data/roads.py`) | Roads: 16 Oct 2026 (OSM base 21:45 UTC) | ODbL |
 | Bathymetry + water polygon for Southampton Water | Replace the synthetic lattice | TODO | TODO |
 | Footway widths, pedestrian counts on turnaround days | Calibrate capacities | TODO | TODO |
 | Red Funnel / Hythe ferry timetables, leisure-craft activity | Waterway demand | TODO | TODO |
@@ -148,5 +148,8 @@ data improves it by about 4% a day (not significant) and 2% per 15 minutes.
   traffic and other county trips from DfT gateway counts (`cordon_od`), the DfT count fit
   (`calibrate_external`) and the motorway repairs (`repair_motorways`) in `demo/traffic_model.py`
   were written with Claude Code on 16-17 Oct 2026.
+- **AI-generated (road network):** the directed road network, corridors and candidate paths
+  (`src/sotonship26/data/roads.py`, `src/sotonship26/corridors.py`, their tests, the `roads:`
+  block in `configs/default.yaml`) were written with Claude Code on Sat 17 Oct 2026 (SOT-9).
 - **Existed before the event:** TODO, confirm with the organisers.
 - **Who helped:** TODO.
