@@ -118,7 +118,8 @@ Fill in the date collected and the licence for every source before submission.
   Fri 16 Oct 2026.
 - **AI-generated:** the learning and evaluation code (`src/sotonship26/data/observed.py`,
   `data/cruise_history.py`, `uplift.py`, `uplift_model.py`, `backtest.py`, `run_backtest.py`,
-  `flow_forecast.py`, `scripts/plot_flow_forecast.py`, their tests and everything in `notes/`)
+  `flow_forecast.py`, `scripts/plot_flow_forecast.py`, `scripts/observed_noise.py`, their tests
+  and everything in `notes/`)
   was written with Claude Code in Keanu's session on Fri 16 and Sat 17 Oct 2026. Keanu reviewed
   the method and the honest-baseline corrections (`notes/ml-walkthrough.md`).
 - **Existed before the event:** TODO, confirm with the organisers.
