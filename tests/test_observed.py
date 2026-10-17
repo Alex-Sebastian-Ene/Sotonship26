@@ -108,3 +108,41 @@ def test_load_flows_reads_cache_and_flags_good_days(tmp_path, monkeypatch):
 def test_sites_cover_both_dock_approaches():
     approaches = {s["approach"] for s in observed.SITES.values()}
     assert approaches == {"western", "eastern"}
+
+
+def _day_flows(site_id: int, day: str, flow: int) -> pd.DataFrame:
+    """One full non-DST day: 96 fifteen-minute bins at a constant flow, flagged a good day."""
+    bins = pd.date_range(f"{day} 00:00", periods=96, freq="15min", tz="Europe/London")
+    return pd.DataFrame({"site_id": site_id, "bin_start": bins, "flow_veh": flow,
+                         "good_day": True})
+
+
+def test_observed_uplift_is_flow_minus_same_weekday_time_median_on_non_cruise_days():
+    # Five Mondays in Sep 2025 (no DST change); the middle one is a cruise day. A Tuesday with a
+    # huge flow is a non-cruise day of a different weekday, so it must not touch the baseline.
+    site = 19974
+    ref_mondays = {"2025-09-01": 100, "2025-09-08": 102, "2025-09-22": 104, "2025-09-29": 106}
+    cruise_monday, cruise_flow = "2025-09-15", 150
+    other_weekday = "2025-09-16"  # Tuesday
+    flows = pd.concat(
+        [_day_flows(site, day, flow) for day, flow in ref_mondays.items()]
+        + [_day_flows(site, cruise_monday, cruise_flow), _day_flows(site, other_weekday, 999)],
+        ignore_index=True,
+    )
+    all_days = [*ref_mondays, cruise_monday, other_weekday]
+    days = pd.DataFrame({
+        "date": [date.fromisoformat(d) for d in all_days],
+        "n_calls": [0] * len(ref_mondays) + [1, 0],  # only the cruise Monday has a ship
+        "covered": True,
+    })
+
+    up = observed.observed_uplift(flows, days)
+    day_rows = up[(up["site_id"] == site)
+                  & (up["date"] == date.fromisoformat(cruise_monday))]
+
+    # median of the four reference Mondays' flows (100, 102, 104, 106) = 103, per bin
+    assert (day_rows["baseline_veh"] == 103.0).all()
+    assert (day_rows["uplift_veh"] == cruise_flow - 103.0).all()  # 150 - 103 = 47
+    assert (day_rows["n_refs"] == 4).all()  # the Tuesday is excluded: different weekday
+    assert day_rows["is_cruise_day"].all()
+    assert len(day_rows) == 96
