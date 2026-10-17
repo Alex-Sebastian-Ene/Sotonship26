@@ -30,6 +30,7 @@ from sotonship26.data.bus_lateness import (  # noqa: E402
     SOUTHAMPTON_BBOX,
     BustimesClient,
     append_csv,
+    clean,
     profiles,
     read_csv,
 )
@@ -57,15 +58,19 @@ def cmd_collect(args) -> None:
 
 def summarise(rows: list) -> dict:
     coll = sorted(r.collected_at for r in rows)
+    kept, left_out = clean(rows)
     return {
         "collected_from": coll[0].astimezone(LONDON).isoformat(timespec="minutes"),
         "collected_to": coll[-1].astimezone(LONDON).isoformat(timespec="minutes"),
         "polls": len({r.collected_at for r in rows}),
         "sightings": len(rows),
-        "journeys": len({r.journey or r.vehicle for r in rows}),
-        "lines": [asdict(p) for p in profiles(rows, by="line")],
-        "areas": [asdict(p) for p in profiles(rows, by="area")],
-        "day_lines": [asdict(p) for p in profiles(rows, by="line", min_n=5, hourly=False)],
+        "kept": len(kept),
+        "left_out": left_out,
+        "journeys": len({r.journey or r.vehicle for r in kept}),
+        "all": [asdict(p) for p in profiles(kept, by="all", min_n=1, hourly=False)],
+        "lines": [asdict(p) for p in profiles(kept, by="line")],
+        "areas": [asdict(p) for p in profiles(kept, by="area")],
+        "day_lines": [asdict(p) for p in profiles(kept, by="line", min_n=5, hourly=False)],
     }
 
 
@@ -77,7 +82,8 @@ def cmd_export(args) -> None:
             days[path.stem.removeprefix("bustimes-")] = summarise(rows)
     data = {
         "source": "bustimes.org live vehicle positions (Bus Open Data Service, OGL v3.0); delay "
-                  "against the timetable as bustimes.org reports it",
+                  "against the timetable as bustimes.org reports it, less readings that can't be "
+                  "lateness (buses laid over, stale positions, buses switched to another trip)",
         "made": datetime.now(LONDON).isoformat(timespec="minutes"),
         "areas": {k: list(v) for k, v in AREAS.items()},
         "days": days,
@@ -86,9 +92,13 @@ def cmd_export(args) -> None:
     args.out.write_text(json.dumps(data), encoding="utf-8")
     for d, s in days.items():
         print(f"{d}: {s['collected_from'][11:]}-{s['collected_to'][11:]}, {s['polls']} polls, "
-              f"{s['journeys']} journeys")
+              f"{s['journeys']} journeys; kept {s['kept']} of {s['sightings']} readings, left out "
+              f"{s['left_out']}")
+        for p in s["all"]:
+            print(f"  all buses: median {p['p50_min']:+5.1f}  mean {p['mean_min']:+5.1f}  "
+                  f"p90 {p['p90_min']:+5.1f}  >=5 min {p['share_over_5_min']:.0%}")
         for p in s["areas"]:
-            print(f"  {p['key']:12s} {p['hour']:02d}:00  n {p['n']:3d}  mean {p['mean_min']:+5.1f}"
+            print(f"  {p['key']:12s} {p['hour']:02d}:00  n {p['n']:3d}  median {p['p50_min']:+5.1f}"
                   f"  p90 {p['p90_min']:+5.1f}  >=5 min {p['share_over_5_min']:.0%}")
     print(f"wrote {args.out}")
 
