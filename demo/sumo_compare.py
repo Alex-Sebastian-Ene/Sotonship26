@@ -375,7 +375,7 @@ def site_speeds(rows) -> list[dict]:
     return out
 
 
-def m271_flows(emap, mac, ed_all, keys, wt) -> dict:
+def m271_flows(emap, mac, ed_all, keys, wt, n_ok: int = BINS) -> dict:
     """Vehicles per hour at the WebTRIS 19974 links: macro (car-equivalents), SUMO, observed."""
     ki = {k: i for i, k in enumerate(keys)}
     probe = emap["m271_probe"]
@@ -386,6 +386,7 @@ def m271_flows(emap, mac, ed_all, keys, wt) -> dict:
     pe = [e for e in probe["sumo"] if e in ed_all]
     sflow = (np.median(np.stack([np.nan_to_num(ed_all[e][:, ki["left"]]) * 4 for e in pe]),
                        axis=0) if pe else np.zeros(BINS))
+    sflow[n_ok:] = np.nan  # a run that stopped early has no flows after the cut
     out = {"macro": np.round(mflow).tolist(), "macro_demand": np.round(mdemand).tolist(),
            "sumo": np.round(sflow).tolist(), "sumo_edges": pe}
     if wt:
@@ -439,7 +440,7 @@ def markdown(mode, res, macro_vh, mp, d) -> list[str]:
             obs = [np.mean(wt[k][sl]) for k in ("median", "p10", "p90")]
             md.append(f"| {h:02d}:00 | {obs[0]:.0f} ({obs[1]:.0f}-{obs[2]:.0f}) | "
                       f"{np.mean(m271['macro'][sl]):.0f} ({np.mean(m271['macro_demand'][sl]):.0f})"
-                      f" | {np.mean(m271['sumo'][sl]):.0f} |")
+                      f" | {fmt(np.mean(m271['sumo'][sl]), 0)} |")
     md += ["\nMean speeds, mph: the council's counters (July 2024, spot speeds at the count "
            "sites) against each model's mean speed along the whole corridor:\n",
            "| road | dir | peak | observed | macro running (with queue wait) | SUMO |",
@@ -491,12 +492,16 @@ def main(argv=None) -> None:
     # macro network total, vehicle-hours: slower running on every link (BPR, capped as in
     # delay_minutes) plus 15 minutes for every vehicle the point queues carry into the next bin
     x, cap, t0 = mac["x"], mac["cap"], mac["t0"]
-    run_vh = float((x * cap / 4.0 * t0 * 0.15 * np.minimum(x, 1.5) ** 4 / 3600.0).sum())
-    queue_vh = float(mac["held"].sum() * 0.25)
-    macro_vh = {"running": round(run_vh), "queues": round(queue_vh),
-                "total": round(run_vh + queue_vh)}
+    run_bin = (x * cap / 4.0 * t0 * 0.15 * np.minimum(x, 1.5) ** 4 / 3600.0).sum(axis=1)
+    queue_bin = mac["held"] * 0.25
+
+    def macro_vh(n_ok: int = BINS) -> dict:
+        """Up to the bins a SUMO run covered, so both totals span the same hours."""
+        r, q = float(run_bin[:n_ok].sum()), float(queue_bin[:n_ok].sum())
+        return {"running": round(r), "queues": round(q), "total": round(r + q)}
+
     report = {"date": args.date, "meta": meta, "modes": {},
-              "macro": {"delay_veh_h": macro_vh,
+              "macro": {"delay_veh_h": macro_vh(),
                         "held": np.round(mac["held"]).astype(int).tolist()}}
     wt = webtris_reference(d)
     mp = macro_portswood(mj.get("bus_table"))
@@ -516,14 +521,15 @@ def main(argv=None) -> None:
                "corridors": rows, "agreement": agreement(pairs), "n_pairs": len(pairs),
                "site_speeds": site_speeds(rows), "bins_covered": n_ok,
                "spearman_delay": spearman([a for a, _ in delays], [b for _, b in delays]),
-               "series": series, "m271": m271_flows(emap, mac, ed_all, keys, wt),
+               "series": series, "m271": m271_flows(emap, mac, ed_all, keys, wt, n_ok),
                "buses": portswood_buses(bus, stop_events(R / f"{mode}.stops.xml.gz"), ps_dir),
                "tripinfo": tripinfo(tip) if tip.exists() else {},
                "summary": summary_series(R / f"{mode}.summary.xml")}
         trips = res["stats"].get("vehicleTripStatistics", {})
         res["depart_delay_veh_h"] = round(float(trips.get("totalDepartDelay", 0)) / 3600)
+        res["macro_delay_veh_h"] = macro_vh(n_ok)
         report["modes"][mode] = res
-        md += markdown(mode, res, macro_vh, mp, d)
+        md += markdown(mode, res, res["macro_delay_veh_h"], mp, d)
 
     def default(o):
         return o.tolist() if hasattr(o, "tolist") else str(o)
