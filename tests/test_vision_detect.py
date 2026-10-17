@@ -171,6 +171,43 @@ def test_aerial_tiling_counts_each_vehicle_once():
     assert out["model"].iloc[0] == "yolo11s-obb.pt"
 
 
+class FixedModel:
+    """Returns the same detections (crop pixels) for every crop and records each crop's shape."""
+
+    def __init__(self, rows, names):
+        self.rows, self.names, self.shapes = rows, names, []
+
+    def predict(self, crop, conf=0.25, imgsz=640, verbose=False):
+        self.shapes.append(crop.shape[:2])
+        arr = np.array([[x, y, 20.0, 10.0, 0.3] for x, y, _ in self.rows]).reshape(-1, 5)
+        cls = np.array([c for *_, c in self.rows], dtype=float)
+        boxes = SimpleNamespace(xywhr=arr, cls=cls, conf=np.full(len(self.rows), 0.9))
+        return [SimpleNamespace(names=self.names, obb=boxes, boxes=None)]
+
+
+def test_upsample_enlarges_input_and_maps_centres_back():
+    model = FixedModel([(80.0, 40.0, 10), (10.0, 10.0, 9)], DOTA)
+    rgb = np.zeros((60, 100, 3), dtype=np.uint8)
+    det = detect.detect(rgb, model, "aerial", upsample=2.0)
+    assert model.shapes == [(120, 200)]
+    assert sorted(zip(det["cx"], det["cy"], strict=True)) == [(5.0, 5.0), (40.0, 20.0)]
+    # Polygons stay in the original image's pixels.
+    out = detect.count_vehicles(
+        rgb, mode="aerial", polygons={"lot": box(30, 10, 50, 30)}, model=model, upsample=2.0
+    )
+    assert out.set_index("polygon_id").loc["lot", ["cars", "large_vehicles"]].tolist() == [1, 0]
+
+
+def test_upsample_default_is_native_and_bad_values_raise():
+    model = FixedModel([], DOTA)
+    rgb = np.zeros((60, 100, 3), dtype=np.uint8)
+    detect.detect(rgb, model, "aerial")
+    assert model.shapes == [(60, 100)]
+    for bad in (0, -1.0):
+        with pytest.raises(ValueError, match="upsample"):
+            detect.detect(rgb, model, "aerial", upsample=bad)
+
+
 def test_aerial_dota_hyphenated_names_also_map():
     model = StubModel([(5, 5, 1, 0.9), (9, 9, 2, 0.9)], {1: "small-vehicle", 2: "ship"}, True)
     out = detect.count_vehicles(coord_image(32, 32), mode="aerial", model=model)
