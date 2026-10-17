@@ -26,8 +26,9 @@ Cost of a step in pounds (stated assumptions, see COSTS):
           (BPR, load capped at 1.5 as in traffic_model.delay_minutes)
   +    15 x passenger-hours held in a terminal
   +   120 x gate-hours with marshals (four marshals at 30 pounds an hour)
+  +    25 x sign location-hours (operator time; and a sign left on all day gets ignored)
 
-Signs and check-in moves have no cost of their own. Reward = -(cost - cost of doing nothing on
+Check-in moves have no cost of their own. (A first run with free signs left them on all day.) Reward = -(cost - cost of doing nothing on
 the same sampled day in the same bin) / REWARD_SCALE. Subtracting doing nothing cannot change
 which policy is best, since no action affects it, but it removes most of the day-to-day noise.
 """
@@ -58,7 +59,7 @@ SIGN_FACTOR = 1.3  # assumed: signed links look 30% slower to drivers choosing a
 MARSHAL_CAP = 1.25  # assumed: marshals add 25% to a gate's access capacity
 MAX_HOLD_BINS = 6  # 90 minutes
 COSTS = {"corridor_hour": 5000.0, "vehicle_hour": 15.0, "held_pax_hour": 15.0,
-         "marshal_hour": 120.0}
+         "marshal_hour": 120.0, "sign_hour": 25.0}
 REWARD_SCALE = 10_000.0
 SHARES_PATH = sd.CACHE / "ppo_shares.pkl"
 DAY_KEY = 4242  # random streams: [DAY_KEY, split, day seed]
@@ -223,7 +224,7 @@ class CruiseDayEnv(gym.Env):
         self.E = np.zeros((self.nT, N_BINS))
         np.add.at(self.E, (self.veh_term[k], b[k]), veh["pcu"][k])
 
-    def _costs(self, out, cap, held_pax, marshals) -> dict:
+    def _costs(self, out, cap, held_pax, marshals, signs=0) -> dict:
         ctx, m = self.ctx, self.m
         x = out["x"]
         cx = np.maximum.reduceat(x[ctx.corr_idx], ctx.corr_ptr)
@@ -232,11 +233,13 @@ class CruiseDayEnv(gym.Env):
         queue = out["held"] * 0.25  # carried into the next 15 minutes
         c = {"corridor_hours": float((cx > tm.AT_RISK).sum()) * 0.25,
              "vehicle_hours": running + queue, "queue_hours": queue,
-             "held_pax_hours": held_pax * 0.25, "marshal_hours": marshals * 0.25}
+             "held_pax_hours": held_pax * 0.25, "marshal_hours": marshals * 0.25,
+             "sign_hours": signs * 0.25}
         c["cost"] = (COSTS["corridor_hour"] * c["corridor_hours"]
                      + COSTS["vehicle_hour"] * c["vehicle_hours"]
                      + COSTS["held_pax_hour"] * c["held_pax_hours"]
-                     + COSTS["marshal_hour"] * c["marshal_hours"])
+                     + COSTS["marshal_hour"] * c["marshal_hours"]
+                     + COSTS.get("sign_hour", 0.0) * c["sign_hours"])
         return c, cx
 
     def _nothing_costs(self) -> np.ndarray:
@@ -291,9 +294,8 @@ class CruiseDayEnv(gym.Env):
                 mask |= self.sign_mask[k]
             noise = noise * np.where(mask, SIGN_FACTOR, 1.0)
         out = self.sim.step(day.Dbg[b] + day.Dm[b] + Dc, cap, noise)
-        c, cx = self._costs(out, cap, held, int(self.marshals.sum()))
+        c, cx = self._costs(out, cap, held, int(self.marshals.sum()), int(self.signs.sum()))
         self.last_cx = cx
-        c["sign_hours"] = float(self.signs.sum()) * 0.25
         for k, v in c.items():
             self.totals[k] += v
         self.log.append({"meter": act["meter"].tolist(), "signs": self.signs.tolist(),

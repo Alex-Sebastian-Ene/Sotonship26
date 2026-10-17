@@ -70,8 +70,16 @@ def main(argv=None) -> None:
     ap.add_argument("--ppo", type=Path, default=HERE / "out" / "ppo.json")
     ap.add_argument("--out", type=Path, help="default: overwrite --page")
     ap.add_argument("--max-mb", type=float, default=15.5)
+    ap.add_argument("--template", type=Path,
+                    help="move the page's forecast data into this template first (a page built "
+                         "with an older demo/page.html)")
     args = ap.parse_args(argv)
     page = args.page.read_text(encoding="utf-8")
+    if args.template:
+        tag = '<script id="demo-data" type="application/json">'
+        i = page.index(tag) + len(tag)
+        forecast = page[i:page.index("</script>", i)]
+        page = args.template.read_text(encoding="utf-8").replace("__DEMO_DATA__", forecast)
     i = page.find(TAG)
     if i < 0:
         sys.exit(f"{args.page} has no extra-data block: rebuild it with demo/synthetic_demo.py "

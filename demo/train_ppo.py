@@ -203,10 +203,23 @@ def run_episode(job: dict) -> dict:
     done = False
     while not done:
         p = job["policy"]
+        nT, nS = env.nT, env.nS
         if p == "rule":
             a = env.rule()
-        elif p == "ppo":
+        elif p == "marshal_rule":  # the rule's marshals without its signs
+            a = env.rule()
+            a[2 * nT:2 * nT + nS] = 0
+        elif p.startswith("ppo"):  # PPO, or PPO with one lever switched off (ablation)
             a, _ = _MODEL.predict(obs, deterministic=True)
+            a = np.array(a)
+            if p == "ppo_no_meter":
+                a[:nT] = 0
+            elif p == "ppo_no_checkin":
+                a[nT:2 * nT] = pe.NOTHING_OPEN
+            elif p == "ppo_no_signs":
+                a[2 * nT:2 * nT + nS] = 0
+            elif p == "ppo_no_marshals":
+                a[2 * nT + nS:] = 0
         else:  # nothing, and the advisor (its plan is fixed in reset)
             a = env.nothing()
         obs, _, done, _, _ = env.step(a)
@@ -221,6 +234,38 @@ def run_episode(job: dict) -> dict:
 def _advise(task: dict) -> tuple[str, list]:
     r = sd.advise(task)
     return task["date"], r["shifts"]
+
+
+def ablation(args) -> None:
+    """PPO with one lever switched off at a time, and the rule's marshals alone, on the test days."""
+    cruise = cruise_assumptions()
+    split = pe.split_dates(daysim.day_tasks(cruise))
+    seen = split["train"][:: max(1, len(split["train"]) // args.n_seen_dates)][: args.n_seen_dates]
+    pols = ["nothing", "ppo", "ppo_no_meter", "ppo_no_checkin", "ppo_no_signs", "ppo_no_marshals",
+            "marshal_rule"]
+    jobs = [{"policy": p, "date": d, "seed": s, "split": "test", "held_out": d in split["test"]}
+            for d in split["test"] + seen for s in range(args.n_days) for p in pols]
+    with ProcessPoolExecutor(args.workers, initializer=_init_worker,
+                             initargs=(str(args.model), cruise)) as pool:
+        rows = list(pool.map(run_episode, jobs, chunksize=4))
+    base = {(r["date"], r["seed"]): r for r in rows if r["policy"] == "nothing"}
+    sign_cost = pe.COSTS.get("sign_hour", 0.0)
+    out = {}
+    for p in pols:
+        rs = [r for r in rows if r["policy"] == p]
+        d = {k: np.array([r[k] - base[(r["date"], r["seed"])][k] for r in rs])
+             for k in ("corridor_hours", "vehicle_hours", "held_pax_hours", "marshal_hours",
+                       "sign_hours", "cost")}
+        d["cost_signs_free"] = d["cost"] - sign_cost * d["sign_hours"]
+        out[p] = {k: {"mean": float(v.mean()), "se": float(v.std(ddof=1) / np.sqrt(len(v)))}
+                  for k, v in d.items()}
+        out[p]["n"] = len(rs)
+        log(f"{p:16s} n {len(rs)}  " + "  ".join(
+            f"{k} {v['mean']:+,.2f} (se {v['se']:.2f})" for k, v in out[p].items() if k != "n"))
+    Path(args.json).write_text(json.dumps({"model": str(args.model), "rows": out,
+                                           "made": datetime.now().isoformat(timespec="minutes")}),
+                               encoding="utf-8")
+    log(f"wrote {args.json}")
 
 
 def summary(rows: list[dict], boot: int = 2000) -> dict:
@@ -413,8 +458,10 @@ def results_md(data: dict) -> str:
          f"{data['n_advise']} of the forecast's own samples, as on the page.", ""]
     tr = data.get("train") or {}
     if tr:
+        sim = (f"simulator on the GPU, {tr['gpu_envs']} days per batch" if tr.get("gpu_envs")
+               else f"simulator in {tr.get('n_envs')} CPU processes")
         L += [f"Training: {tr.get('timesteps', 0):,} steps ({tr.get('days', 0):,} sampled days, "
-              f"{tr.get('n_envs')} simulator processes, policy on {tr.get('gpu') or tr.get('device')}, "
+              f"{sim}, policy on {tr.get('gpu') or tr.get('device')}, "
               f"{tr.get('seconds', 0) / 60:.0f} minutes).", ""]
     for part, title in (("all", "All test days"), ("held_out", "Held-out dates only"),
                         ("seen", "Training dates, new draws")):
@@ -494,8 +541,15 @@ def main(argv=None) -> None:
     e.add_argument("--n-page", type=int, default=8, help="sampled days per page day")
     e.add_argument("--json", default=str(OUT_JSON), help="results for the page")
     e.add_argument("--doc", default=str(DOC), help="the generated write-up")
+    a = sub.add_parser("ablation")
+    a.add_argument("--model", type=Path, required=True)
+    a.add_argument("--workers", type=int, default=cpus)
+    a.add_argument("--n-days", type=int, default=20)
+    a.add_argument("--n-seen-dates", type=int, default=6)
+    a.add_argument("--json", default=str(HERE / "out" / "ppo_ablation.json"))
     args = ap.parse_args(argv)
-    {"prepare": prepare, "train": train, "evaluate": evaluate}[args.cmd](args)
+    {"prepare": prepare, "train": train, "evaluate": evaluate,
+     "ablation": ablation}[args.cmd](args)
 
 
 if __name__ == "__main__":

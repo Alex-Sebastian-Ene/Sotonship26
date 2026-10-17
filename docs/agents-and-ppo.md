@@ -150,10 +150,10 @@ day in the same 15 minutes, divided by 10,000:
 | Vehicle-hour of delay | £15 | close to an average car value of time per vehicle (assumed). Delay = vehicles the model's point queue carries into the next 15 minutes (each waits 15 minutes) plus slower running of the traffic that gets through each link (the BPR curve, load capped at 1.5). |
 | Passenger-hour held in a terminal | £15 | the same value of time per person (assumed) |
 | Marshal gate-hour | £120 | four marshals at £30 an hour (assumed) |
+| Sign location-hour | £25 | operator time, and a sign left on all day gets ignored (assumed). Added after the first runs, in which signs were free and PPO left them on all day. |
 
-Signs and check-in moves have no cost of their own here. Subtracting doing nothing cannot change
-which policy is best (no action affects it) but takes most of the day-to-day noise out of the
-returns.
+Check-in moves have no cost of their own. Subtracting doing nothing cannot change which policy is
+best (no action affects it) but takes most of the day-to-day noise out of the returns.
 
 **Training** (`demo/train_ppo.py train`). Stable-Baselines3 PPO, MLP policy (256, 256), on an
 A100 GPU on Iridis. Dates with ships are split: every fourth date (from the third) is held out of
@@ -185,9 +185,61 @@ dates:
   the forecast's own samples. It is planned a day ahead and then fixed.
 - **PPO**, deterministic.
 
-The table in [ppo-results.md](ppo-results.md) gives the mean, the 10th to 90th percentile and the
-number of sampled days for corridor-hours above 85%, delay, passenger-hours held, marshal hours and
+The generated result files give the mean, the 10th to 90th percentile and the number of sampled
+days for corridor-hours above 85%, delay, queuing, passenger-hours held, marshal and sign hours and
 total cost, and the paired difference from doing nothing with a 95% bootstrap interval.
+
+### Results (17 Oct 2026, Iridis A100)
+
+Each policy played the same 260 sampled days: 7 held-out dates and 6 training dates, 20 new
+random draws each. Mean per sampled day; the difference is paired against doing nothing on the
+same day (95% bootstrap intervals and percentiles in the generated files). Signs were free in
+these two runs.
+
+| Policy | Corridor-hours above 85% | Delay (vehicle-hours) | Cost per day | Cheaper than doing nothing |
+| --- | --- | --- | --- | --- |
+| Do nothing | 75.7 | 65,494 | £1,361,113 | |
+| Rule (signs and marshals at 85%) | −0.30 | +648 | +£8,757 | 12% of days |
+| Ship-timing advisor | −0.41 | −182 | −£4,774 | 76% of days |
+| PPO run A (simulator on CPU cores, 1M steps, 68 min) | −2.31 | +137 | −£7,272 | 84% of days |
+| PPO run B (simulator on the GPU, 5M steps, 26 min) | −2.76 | +173 | −£9,769 | 91% of days |
+
+Files: [ppo-results.md](ppo-results.md) (run A, also on the page until run C) and
+[ppo-results-gpu.md](ppo-results-gpu.md) (run B). On the held-out dates alone, run B saves
+£10,596 a day and 3.1 corridor-hours, about as much as on the training dates, so it is not
+memorising dates.
+
+**Where PPO's gain comes from** (run B with one lever switched off at a time, same 260 days,
+`train_ppo.py ablation`; standard errors about 0.1 corridor-hours and £500):
+
+| | Corridor-hours | Delay (veh-h) | Cost per day |
+| --- | --- | --- | --- |
+| PPO, all levers | −2.76 | +173 | −£9,769 |
+| without metering | −2.76 | +173 | −£9,782 |
+| without its check-in move | −2.79 | +144 | −£10,310 |
+| without signs | −1.76 | +26 | −£7,013 |
+| without marshals | −0.95 | +194 | −£1,805 |
+| marshals-only rule (at 85%, no PPO) | −0.87 | −3 | −£3,861 |
+
+The honest reading:
+
+- **Most of the gain is marshals at the dock gates**, used far more than the rule uses them (12
+  gate-hours a day against 4.5, mostly at Dock Gate 4 from about 07:00 to 16:00). That rests on the
+  assumed 25% extra gate capacity, which is not measured. A plain marshals-only rule already gets
+  40% of PPO's saving.
+- **Signs trade delay for corridor-hours**: they push traffic off the signed corridors (fewer
+  corridors above 85%) onto longer routes (more delay). That pays only because a corridor-hour is
+  weighted at £5,000. The rule's signs do the same and lose money.
+- **PPO did not learn useful metering**: it holds almost no passengers.
+- **Its check-in move (open 30 minutes later everywhere) slightly hurts**: without it PPO does
+  better. PPO picks it at 05:00 and never sees its effect until hours later, a hard credit-
+  assignment problem for 60-step episodes.
+- **PPO adds delay** compared with doing nothing and with the advisor (which cuts delay by moving
+  disembarkation). On delay alone the advisor is better.
+- So against the simpler policies, PPO wins on total cost with these weights, but its edge is
+  mostly the marshal lever and the corridor-hour weight, not a subtle timing strategy.
+
+RUN_C_PLACEHOLDER
 
 **On the page.** For the days with agents, the learned policy is run on eight more sampled days
 and turned into actions with times (a lever is recommended in the 15 minutes where PPO used it on

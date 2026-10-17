@@ -300,14 +300,16 @@ class BatchedCruiseDayEnv(VecEnv):
         marsh = marshals.sum(dim=1) * 0.25
         C = pe.COSTS
         base = C["corridor_hour"] * c["corridor_hours"] + C["vehicle_hour"] * c["vehicle_hours"]
-        cost_pol = base[:B] + C["held_pax_hour"] * held + C["marshal_hour"] * marsh
+        sign_h = signs.sum(dim=1) * 0.25
+        cost_pol = (base[:B] + C["held_pax_hour"] * held + C["marshal_hour"] * marsh
+                    + C.get("sign_hour", 0.0) * sign_h)
         cost_nothing = base[B:]
         reward = -(cost_pol - cost_nothing) / pe.REWARD_SCALE
         for k in c:
             self.tot[k] += c[k][:B].double()
         self.tot["held_pax_hours"] += held.double()
         self.tot["marshal_hours"] += marsh.double()
-        self.tot["sign_hours"] += signs.sum(dim=1).double() * 0.25
+        self.tot["sign_hours"] += sign_h.double()
         self.tot["cost"] += cost_pol.double()
         self.tot["nothing_cost"] += cost_nothing.double()
         self.last_cx = cx[:, :B].T
