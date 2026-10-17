@@ -128,7 +128,9 @@ or more late. The July counts were out of university term and the model adds 20%
 that does not explain a factor of several. So the macro model's point queues, with capacities
 anchored to peak counts, are too long at some bottlenecks, and the cruise forecast's delays there
 should be read as high. That is a calibration finding, not a bus result. The fix is in
-`traffic_model.py` (queue spill-back, capacities), and it is not part of this work.
+`traffic_model.py` (queue spill-back, capacities), and it is not part of this work. It has since been
+made: capacities and local traffic on the counted roads ([queues.md](queues.md)); the figures here
+predate it.
 
 **Limits.**
 

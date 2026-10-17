@@ -1368,6 +1368,13 @@ def delay_minutes(m: Model, x: np.ndarray) -> np.ndarray:
 
 MIN_CAP = 350.0  # floor for a high street with parking, bus stops and crossings (veh/h each way)
 UNI_TERM = 1.2  # assumed: July counts miss university term traffic around Highfield and Portswood
+# The July 2024 counts are what the counted roads carried, not what they can carry: peak speeds
+# there were within 0-2 mph of the all-day average (Portswood Baseline Data Report, Table 3-10)
+# and buses on Portswood Road ran 0:24 to 4:22 behind timetable in the peaks (Table 3-5), which a
+# road at its limit for three hours would not show. Capacity is the counted peak hour times
+# COUNT_HEADROOM, chosen so modelled bus run times on a July-like weekday match Table 3-5
+# (demo/bus_check.py, docs/queues.md).
+COUNT_HEADROOM = 1.15  # the July peak hour then runs at about 92% of capacity
 
 
 def heading_north(m: Model, k: int) -> bool:
@@ -1378,12 +1385,13 @@ def heading_north(m: Model, k: int) -> bool:
 def anchor_counts(m: Model, sites: list[dict], fit_rows: list[dict], log=print) -> list[dict]:
     """Use the counts where we have them.
 
-    1. Capacity: measured peak speeds (16-20 mph on 30 mph roads) show these roads are at their
-       limit in the peaks, so the counted peak-hour flow is taken as the throughput per direction
-       (floor MIN_CAP). Skipped where the zones alone already put far more traffic on the road
-       than was counted, since a lower capacity there would only create a false jam.
-    2. Local traffic: traffic the zones do not generate (side streets, short hops) is added to the
-       counted roads so their flows match the counts, raised by UNI_TERM for university term.
+    1. Capacity: the busier peak hour per direction (floor MIN_CAP) times COUNT_HEADROOM, since the
+       counts show what the road carried in July, below its limit. It replaces the road-class
+       value only where lower. Skipped where the zones alone already put far more traffic on the
+       road than was counted, since a lower capacity there would only create a false jam.
+    2. Local traffic: traffic the zones do not generate (side streets, short hops) is added to
+       each link of the counted roads that carries less than the count, up to the count, raised by
+       UNI_TERM for university term. Links that already carry more get none.
     """
     over = {}
     for r in fit_rows:
@@ -1399,7 +1407,7 @@ def anchor_counts(m: Model, sites: list[dict], fit_rows: list[dict], log=print) 
             continue
         for d, north in ((0, True), (1, False)):
             peak = max(s_["weekday"][per][d] / 3.0 * 1.15 for per in ("am", "pm"))
-            cap = max(MIN_CAP, 0.95 * peak)
+            cap = max(MIN_CAP, 0.95 * peak) * COUNT_HEADROOM
             ks = [k for k in edges if heading_north(m, k) == north]
             for k in ks:
                 m.cap[k] = min(m.cap[k], cap)
@@ -1435,9 +1443,7 @@ def anchor_counts(m: Model, sites: list[dict], fit_rows: list[dict], log=print) 
                         w[a:b] = prof[a:b]
                         target += w / w.sum() * total * 4
                 target *= UNI_TERM
-                modelled = np.median(v[:, ks], axis=1)
-                extra = np.maximum(target - modelled, 0.0)
-                pre[:, ks] += extra[:, None]
+                pre[:, ks] += np.maximum(target[:, None] - v[:, ks], 0.0)
         m.pre[dt] = pre
     m.pre[2] = m.pre[1] * 0.85  # Sunday: no count, take Saturday a little lower
     log("local traffic added on counted roads")
