@@ -16,6 +16,10 @@ eight peak figures), down from 4.5. Corridor-hours at risk fall from 76.6 to 71.
 the 5.1 on Portswood Road and Highfield Lane. The cruise uplift (5.7 corridor-hours on ship
 days) and the DfT and council count fits do not change.
 
+Refitted after SOT-27 (count-once flows, new city and county scales): `COUNT_HEADROOM` = 1.3 (July
+peak hour at 81% of capacity), and roads the zones already fill (Highfield Lane, St Denys Road)
+keep road-class capacity; see [Refit after SOT-27](#refit-after-sot-27).
+
 ## The check
 
 `demo/bus_check.py` runs every Bluestar 2 and 20 trip from the Bus Open Data Service timetable
@@ -175,6 +179,61 @@ against the counts times 1.2, as the 80th-percentile link in `calibrate_to_count
 | Highfield Lane 16-19 | 1,802 | 1,928 (+7%) | 1,890 (+5%) |
 | Bevois Hill 07-10 / 16-19 | 1,228 / 1,591 | 1,229 / 1,591 | 1,226 / 1,588 |
 
+## Refit after SOT-27
+
+SOT-27 (`docs/west-side-counts.md`) counts each vehicle once in the count fits and mends the west
+side of the network, which raised the city scale from x0.95 to x1.42 and the county scale from
+x0.80 to x1.00. On that build the bus fit no longer held (Iridis job 1890804): Highfield Lane's
+zone traffic alone was 1.08 times its count, so its count-based capacity (the 350 veh/h floor
+x1.15) built a jam its July speeds do not show (Table 3-10: 24.5/24.9 mph AM, 21.0/24.5 PM).
+
+Refit by the queues session on a copy of that build, July-like Mon 16 Nov, 32 sampled days. Model
+minus timetable, minutes, AM / PM; the council's figures are in the first row:
+
+| Variant | B2 NB | B2 SB | B20 NB | B20 SB | Fit, all 8 | Fit without B20 NB | Corridor-hours |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Council, July 2024 | 0.9 / 1.1 | 4.4 / 4.2 | -0.2 / 1.8 | 0.4 / 1.2 | | | |
+| SOT-27 as built, x1.15 (job 1890804, 16 days) | 2.3 / 2.6 | 5.4 / 8.2 | 5.8 / 7.8 | -0.6 / 0.0 | 3.46 | 1.99 | 102.8 |
+| x1.3 | 0.8 / 2.5 | 3.1 / 6.1 | 6.3 / 5.4 | -0.4 / -1.7 | 2.97 | 1.65 | 102.4 |
+| x1.5 | 0.2 / 0.0 | 1.7 / 3.8 | 5.2 / 5.4 | -0.7 / -1.5 | 2.74 | 1.71 | 99.1 |
+| x1.75 | -0.3 / -0.9 | 1.3 / 0.9 | 5.6 / 4.8 | -0.2 / -1.6 | 3.07 | 2.38 | 94.9 |
+| x2 | -0.6 / -1.6 | 0.6 / 0.0 | 5.8 / 4.5 | -0.4 / -1.2 | 3.36 | | 91.4 |
+| road-class capacity | -0.7 / -2.0 | -0.6 / -1.6 | 5.9 / 3.9 | -0.3 / -1.3 | 3.83 | | 85.0 |
+| skip roads the zones already fill, x1.15 | 2.1 / 2.7 | 5.3 / 7.9 | 7.1 / 7.2 | -0.2 / -0.7 | 3.62 | 1.94 | 94.6 |
+| **skip roads the zones already fill, x1.3** | 0.7 / 1.1 | 4.4 / 5.4 | 6.8 / 5.2 | -0.6 / -0.5 | 2.86 | **0.95** | 93.6 |
+
+Adopted: `COUNT_HEADROOM` = 1.3 (was 1.15), and `anchor_counts` leaves a road at road-class
+capacity where the zones alone already carry at least its count (was more than 1.5 times). On
+SOT-27 that is Highfield Lane and St Denys Road.
+
+The full rebuild with the refit (Iridis job 1891089, `bus_check.slurm`, 16 sampled days), against
+SOT-27 as built (job 1890804):
+
+| | As built | Refit |
+| --- | --- | --- |
+| July-like fit, all 8 | 3.46 | 2.88 |
+| July-like fit without B20 NB | 1.99 | 1.20 |
+| B2 NB / B2 SB, AM / PM | 2.3 / 2.6, 5.4 / 8.2 | 0.4 / 0.7, 4.9 / 6.7 |
+| B20 NB / B20 SB, AM / PM | 5.8 / 7.8, -0.6 / 0.0 | 6.7 / 5.0, -0.3 / 0.1 |
+| Corridor-hours at risk with / without ships | 102.8 / 99.4 | 91.8 / 88.4 |
+| Highfield Lane corridor-hours | 10.52 | 0.24 |
+| Portswood Road corridor-hours | 11.72 | 10.92 |
+
+Served flows on the counted roads are within 1% of the counts x1.2 on Portswood Road and Bevois
+Hill, and +3% to +16% on Highfield Lane. The DfT, lorry and cruise fits run before
+`anchor_counts` and are unchanged (M271 cruise fit RMSE 13.7).
+
+**Bluestar 20 northbound** is 5 to 7 minutes behind at every capacity, even road class, so it is
+not the headroom. Its section in `bus_check` runs between its Portswood Road stops via St Denys
+Road, The Triangle and Thomas Lewis Way, where the links run at V/C 1.31 AM / 1.15 PM at
+road-class capacity, with St Denys Road served at 2.5 times its count. That comes from the city
+scale, which `calibrate_to_counts` fits to the sum over the four roads: Portswood Road and Bevois
+Hill, where the zones carry only 0.2 to 0.6 times the count before `anchor_counts` tops them up,
+pull it up. Fitting the scale on Highfield Lane and St Denys Road alone (job 1891090) gave a city
+scale of x0.33 and a county scale of x1.46. Bluestar 20 northbound improved (3.2 / 5.4), but the
+DfT error rose from 18.3% to 27.1% (M27 +39% to +43%) and the cruise fit from 13.7 to 15.2, so it
+was not adopted.
+
 ## Limits
 
 - The headroom is fitted to the same Table 3-5 the check compares against. It is one number for
@@ -190,9 +249,8 @@ against the counts times 1.2, as the 80th-percentile link in `calibrate_to_count
   southbound and runs over capacity in the peaks. That is where zone traffic converges in the
   model, and this change does not touch route choice.
 - Only the counted roads change. Other bottlenecks (dock-gate approaches, the M271) have no bus or
-  speed data in this check. The M271 / A35 over-prediction is a separate fix in the same file.
-  After it lands, `bus_check.slurm` should be re-run: it changes `flows()`, which `anchor_counts`
-  uses.
+  speed data in this check. The M271 / A35 over-prediction fix (SOT-27) changed `flows()`, which
+  `anchor_counts` uses, and the demand; the headroom was refitted for it (above).
 - The agent, bus and PPO figures in [agents-and-ppo.md](agents-and-ppo.md) were computed before
   this change, and their queue waits will be shorter on the new model.
 
