@@ -107,11 +107,19 @@ Fill in the date collected and the licence for every source before submission.
 | Bathymetry + water polygon for Southampton Water | Replace the synthetic lattice | TODO | TODO |
 | Footway widths, pedestrian counts on turnaround days | Calibrate capacities | TODO | TODO |
 | Red Funnel / Hythe ferry timetables, leisure-craft activity | Waterway demand | TODO | TODO |
+| National Highways [WebTRIS](https://webtris.nationalhighways.co.uk/api/swagger/ui/index) 15-minute counts, M271 (sites 19974, 19796, 20313, 20605, 7588) and M3 J14 (20025) | Observed traffic for the everyday forecast and its backtest (`data/observed.py`, `flow_forecast.py`), cached in `data/raw/webtris/`, not committed | 16–17 Oct 2026; counts 2024-01-01 to 2026-06-30 (about 3.5 months publication lag) | Open Government Licence v3.0 (contains National Highways information) |
+| Southampton City Council [school term dates](https://www.southampton.gov.uk/schools-learning/school-information/school-term-dates/), 2024-25 to 2026-27 live pages, 2023-24 from the [Wayback Machine copy](https://web.archive.org/web/20240303065857/https://www.southampton.gov.uk/schools-learning/school-information/school-term-dates/school-year-calendar-2023-24/) | `SCHOOL_HOLIDAYS` feature in `flow_forecast.py` | 17 Oct 2026 | Facts (dates) with the source cited in the code |
+| GOV.UK [bank holidays](https://www.gov.uk/bank-holidays), England and Wales 2024–2026 | `BANK_HOLIDAYS` in `uplift.py` | 16 Oct 2026 | Open Government Licence v3.0 |
 
 ## Provenance
 
 - **AI-generated:** the project scaffold (`pyproject.toml` backend extras, `src/`, `tests/`,
   `scripts/`, `cluster/`, `configs/`, this README) was generated with Claude Code on
   Fri 16 Oct 2026.
+- **AI-generated:** the learning and evaluation code (`src/sotonship26/data/observed.py`,
+  `data/cruise_history.py`, `uplift.py`, `uplift_model.py`, `backtest.py`, `run_backtest.py`,
+  `flow_forecast.py`, `scripts/plot_flow_forecast.py`, their tests and everything in `notes/`)
+  was written with Claude Code in Keanu's session on Fri 16 and Sat 17 Oct 2026. Keanu reviewed
+  the method and the honest-baseline corrections (`notes/ml-walkthrough.md`).
 - **Existed before the event:** TODO, confirm with the organisers.
 - **Who helped:** TODO.
