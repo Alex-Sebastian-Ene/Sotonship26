@@ -41,7 +41,7 @@ from PIL import Image, ImageDraw  # noqa: E402
 from ultralytics import YOLO  # noqa: E402
 
 model = YOLO(str(WEIGHTS) if WEIGHTS.exists() else "yolo11n-obb.pt")
-T, O = 640, 64  # tile and overlap, pixels; a car is about 18 x 7 px at 25 cm
+T, OV = 640, 64  # tile and overlap, pixels; a car is about 18 x 7 px at 25 cm
 
 for gsd in GSDS:
     tif = clip_to_geotiff(URL, aoi, OUT / f"{NAME}_{int(gsd * 1000)}mm.tif", target_gsd=gsd)
@@ -49,32 +49,49 @@ for gsd in GSDS:
         rgb = np.moveaxis(src.read([1, 2, 3]), 0, -1)
         print(f"{gsd} m: {src.width} x {src.height} px, {src.crs}")
     polys, confs, cls = [], [], []
-    for y0 in range(0, max(rgb.shape[0] - O, 1), T - O):
-        for x0 in range(0, max(rgb.shape[1] - O, 1), T - O):
-            tile = rgb[y0:y0 + T, x0:x0 + T]
+    for y0 in range(0, max(rgb.shape[0] - OV, 1), T - OV):
+        for x0 in range(0, max(rgb.shape[1] - OV, 1), T - OV):
+            tile = rgb[y0 : y0 + T, x0 : x0 + T]
             if tile.size == 0:
                 continue
-            big = np.array(Image.fromarray(tile).resize((tile.shape[1] * UP, tile.shape[0] * UP), Image.BICUBIC))
+            big = np.array(
+                Image.fromarray(tile).resize(
+                    (tile.shape[1] * UP, tile.shape[0] * UP), Image.BICUBIC
+                )
+            )
             r = model.predict(big, imgsz=T * UP, conf=CONF, verbose=False)[0]
             if r.obb is None or len(r.obb) == 0:
                 continue
-            for p, c, k in zip(r.obb.xyxyxyxy.cpu().numpy(), r.obb.conf.cpu().numpy(), r.obb.cls.cpu().numpy()):
+            for p, c, k in zip(
+                r.obb.xyxyxyxy.cpu().numpy(),
+                r.obb.conf.cpu().numpy(),
+                r.obb.cls.cpu().numpy(),
+                strict=True,
+            ):
                 cx, cy = p[:, 0].mean() / UP + x0, p[:, 1].mean() / UP + y0
                 # count a detection once: each tile owns its overlap only up to the midline
-                if (x0 + T < rgb.shape[1] and cx >= x0 + T - O / 2) or (y0 + T < rgb.shape[0] and cy >= y0 + T - O / 2):
+                if (x0 + T < rgb.shape[1] and cx >= x0 + T - OV / 2) or (
+                    y0 + T < rgb.shape[0] and cy >= y0 + T - OV / 2
+                ):
                     continue
-                if (x0 > 0 and cx < x0 + O / 2) or (y0 > 0 and cy < y0 + O / 2):
+                if (x0 > 0 and cx < x0 + OV / 2) or (y0 > 0 and cy < y0 + OV / 2):
                     continue
                 polys.append(p / UP + [x0, y0])
                 confs.append(float(c))
                 cls.append(model.names[int(k)])
-    cars = [c for c, k in zip(confs, cls) if k == "small vehicle"]
-    print(f"  detections: {dict(Counter(cls))}; small vehicles {len(cars)}, mean confidence "
-          f"{np.mean(cars) if cars else 0:.2f}")
+    cars = [c for c, k in zip(confs, cls, strict=True) if k == "small vehicle"]
+    print(
+        f"  detections: {dict(Counter(cls))}; small vehicles {len(cars)}, mean confidence "
+        f"{np.mean(cars) if cars else 0:.2f}"
+    )
     img = Image.fromarray(rgb)
     draw = ImageDraw.Draw(img)
-    for p, k in zip(polys, cls):
-        draw.polygon([tuple(q) for q in p], outline=(255, 0, 0) if k == "small vehicle" else (0, 160, 255), width=2)
+    for p, k in zip(polys, cls, strict=True):
+        draw.polygon(
+            [tuple(q) for q in p],
+            outline=(255, 0, 0) if k == "small vehicle" else (0, 160, 255),
+            width=2,
+        )
     prev = OUT / f"{NAME}_{int(gsd * 1000)}mm_up{UP}_detections.png"
     img.save(prev)
     print("  overlay:", prev)

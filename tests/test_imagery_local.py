@@ -16,8 +16,17 @@ from sotonship26.imagery.providers import LocalGeoTiffProvider, order_tiles  # n
 
 def tile(path, e0, n0, value, size=40, gsd=25.0):
     # synthetic 1 km tile at 25 m per pixel (real tiles are 25 cm; only the georeferencing matters)
-    with rasterio.open(path, "w", driver="GTiff", height=size, width=size, count=3, dtype="uint8",
-                       crs="EPSG:27700", transform=from_origin(e0, n0 + size * gsd, gsd, gsd)) as dst:
+    with rasterio.open(
+        path,
+        "w",
+        driver="GTiff",
+        height=size,
+        width=size,
+        count=3,
+        dtype="uint8",
+        crs="EPSG:27700",
+        transform=from_origin(e0, n0 + size * gsd, gsd, gsd),
+    ) as dst:
         dst.write(np.full((3, size, size), value, dtype="uint8"))
 
 
@@ -27,9 +36,22 @@ def test_lonlat_jpeg_source_is_clipped_to_metric_pixels(tmp_path):
 
     src = tmp_path / "drone.tif"
     deg = 0.05 / 111_320  # about 5 cm
-    with rasterio.open(src, "w", driver="GTiff", height=400, width=400, count=3, dtype="uint8",
-                       crs="EPSG:4326", transform=from_origin(-1.40, 50.90, deg, deg),
-                       compress="jpeg", photometric="ycbcr", tiled=True, blockxsize=256, blockysize=256) as dst:
+    with rasterio.open(
+        src,
+        "w",
+        driver="GTiff",
+        height=400,
+        width=400,
+        count=3,
+        dtype="uint8",
+        crs="EPSG:4326",
+        transform=from_origin(-1.40, 50.90, deg, deg),
+        compress="jpeg",
+        photometric="ycbcr",
+        tiled=True,
+        blockxsize=256,
+        blockysize=256,
+    ) as dst:
         dst.write(np.full((3, 400, 400), 120, dtype="uint8"))
     w, s, e, n = -1.40 + 50 * deg, 50.90 - 350 * deg, -1.40 + 350 * deg, 50.90 - 50 * deg
     aoi = {"type": "Polygon", "coordinates": [[[w, s], [e, s], [e, n], [w, n], [w, s]]]}
@@ -51,7 +73,9 @@ def test_tiles_grouped_by_capture_date_and_mosaicked(tmp_path):
     tile(tmp_path / "su4111.tif", 441000, 111000, 20)
     tile(tmp_path / "su4211_2023-06-04.tif", 442000, 111000, 30)
     (tmp_path / "capture_dates.csv").write_text(
-        "file,date,time\nsu4011.tif,2022-01-14,10:40\nsu4111.tif,2022-01-14,10:40\n", encoding="utf-8")
+        "file,date,time\nsu4011.tif,2022-01-14,10:40\nsu4111.tif,2022-01-14,10:40\n",
+        encoding="utf-8",
+    )
     prov = LocalGeoTiffProvider(tmp_path)
     scenes = prov.search()
     assert [s.extra["tiles"] for s in scenes] == [2, 1]
@@ -62,8 +86,16 @@ def test_tiles_grouped_by_capture_date_and_mosaicked(tmp_path):
     from pyproj import Transformer
 
     to_ll = Transformer.from_crs("EPSG:27700", "EPSG:4326", always_xy=True)
-    ring = [to_ll.transform(e, n) for e, n in
-            ((440500, 111200), (441500, 111200), (441500, 111800), (440500, 111800), (440500, 111200))]
+    ring = [
+        to_ll.transform(e, n)
+        for e, n in (
+            (440500, 111200),
+            (441500, 111200),
+            (441500, 111800),
+            (440500, 111800),
+            (440500, 111200),
+        )
+    ]
     out = prov.fetch(scenes[0], {"type": "Polygon", "coordinates": [ring]}, tmp_path / "clip.tif")
     with rasterio.open(out) as src:
         data = src.read(1)

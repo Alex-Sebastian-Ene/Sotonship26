@@ -56,8 +56,10 @@ class CarPark:
 def overpass_query(bbox=DOCKS_BBOX) -> str:
     s, w, n, e = bbox
     box = f"({s},{w},{n},{e})"
-    return (f"[out:json][timeout:90];(nwr[\"amenity\"=\"parking\"]{box};"
-            f"nwr[\"name\"~\"Cruise Terminal\"]{box};);out tags geom;")
+    return (
+        f'[out:json][timeout:90];(nwr["amenity"="parking"]{box};'
+        f'nwr["name"~"Cruise Terminal"]{box};);out tags geom;'
+    )
 
 
 def fetch_overpass(cache: Path, bbox=DOCKS_BBOX, urls=OVERPASS_URLS) -> dict:
@@ -68,8 +70,13 @@ def fetch_overpass(cache: Path, bbox=DOCKS_BBOX, urls=OVERPASS_URLS) -> dict:
     last = None
     for url in urls:
         try:
-            req = urllib.request.Request(url, data=data, headers={
-                "User-Agent": "Sotonship26/0.1 (github.com/Alex-Sebastian-Ene/Sotonship26)"})
+            req = urllib.request.Request(
+                url,
+                data=data,
+                headers={
+                    "User-Agent": "Sotonship26/0.1 (github.com/Alex-Sebastian-Ene/Sotonship26)"
+                },
+            )
             with urllib.request.urlopen(req, timeout=120) as r:
                 out = json.loads(r.read())
             cache.parent.mkdir(parents=True, exist_ok=True)
@@ -114,7 +121,9 @@ def classify(osm: dict) -> list[CarPark]:
             continue
         name = tags.get("name", "")
         operator = tags.get("operator", "").strip().lower()
-        term, dist = min(((t, poly.distance(p)) for t, poly in terminals.items()), key=lambda x: x[1])
+        term, dist = min(
+            ((t, poly.distance(p)) for t, poly in terminals.items()), key=lambda x: x[1]
+        )
         if COMPOUND_NAME.search(name) or tags.get("access") == "no":
             kind = "vehicle_compound"
         elif operator in CRUISE_OPERATOR or CRUISE_NAME.search(name):
@@ -125,13 +134,21 @@ def classify(osm: dict) -> list[CarPark]:
             kind = "control"
         cap_tag = re.match(r"\d+", tags.get("capacity", ""))
         multi = tags.get("parking") == "multi-storey"
-        out.append(CarPark(
-            osm_id=f"{e['type']}/{e['id']}", name=name or "(unnamed)", kind=kind, terminal=term,
-            terminal_m=round(dist, 1),
-            capacity=int(cap_tag.group()) if cap_tag else int(p.area / M2_PER_SPACE),
-            capacity_source="tag" if cap_tag else "area", multi_storey=multi,
-            area_m2=round(p.area, 1), polygon_bng=[tuple(map(float, c)) for c in p.exterior.coords],
-            polygon_wgs84=ll))
+        out.append(
+            CarPark(
+                osm_id=f"{e['type']}/{e['id']}",
+                name=name or "(unnamed)",
+                kind=kind,
+                terminal=term,
+                terminal_m=round(dist, 1),
+                capacity=int(cap_tag.group()) if cap_tag else int(p.area / M2_PER_SPACE),
+                capacity_source="tag" if cap_tag else "area",
+                multi_storey=multi,
+                area_m2=round(p.area, 1),
+                polygon_bng=[tuple(map(float, c)) for c in p.exterior.coords],
+                polygon_wgs84=ll,
+            )
+        )
     return out
 
 
@@ -143,7 +160,15 @@ def to_geojson(parks: list[CarPark]) -> dict:
     feats = []
     for p in parks:
         props = {k: v for k, v in asdict(p).items() if not k.startswith("polygon")}
-        feats.append({"type": "Feature", "properties": props,
-                      "geometry": {"type": "Polygon", "coordinates": [p.polygon_wgs84]}})
-    return {"type": "FeatureCollection", "features": feats,
-            "attribution": "© OpenStreetMap contributors (ODbL)"}
+        feats.append(
+            {
+                "type": "Feature",
+                "properties": props,
+                "geometry": {"type": "Polygon", "coordinates": [p.polygon_wgs84]},
+            }
+        )
+    return {
+        "type": "FeatureCollection",
+        "features": feats,
+        "attribution": "© OpenStreetMap contributors (ODbL)",
+    }

@@ -24,8 +24,14 @@ from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
 
-DOCK_OF_TERMINAL = {"Ocean": "east", "QEII": "east", "Queen Elizabeth": "east",
-                    "Mayflower": "west", "City": "west", "Horizon": "west"}
+DOCK_OF_TERMINAL = {
+    "Ocean": "east",
+    "QEII": "east",
+    "Queen Elizabeth": "east",
+    "Mayflower": "west",
+    "City": "west",
+    "Horizon": "west",
+}
 PEOPLE_PER_CAR = 2.4
 MAX_VOYAGE_DAYS = 21  # a gap longer than this is not one voyage (ship left the region)
 DEFAULT_VOYAGE_DAYS = 7
@@ -85,8 +91,13 @@ def parked_fraction(v: Voyage, when: datetime) -> float:
 
 def passengers_away(vs: list[Voyage], when: datetime, dock: str) -> float:
     """Passengers on ``dock``'s voyages whose cars would be parked at ``when``."""
-    return float(sum(v.passengers * parked_fraction(v, when) for v in vs
-                     if v.dock == dock and not np.isnan(v.passengers)))
+    return float(
+        sum(
+            v.passengers * parked_fraction(v, when)
+            for v in vs
+            if v.dock == dock and not np.isnan(v.passengers)
+        )
+    )
 
 
 @dataclass
@@ -103,7 +114,9 @@ class ShareFit:
         return {k: (round(v, 4) if isinstance(v, float) else v) for k, v in self.__dict__.items()}
 
 
-def fit_share(counts: pd.DataFrame, vs: list[Voyage], boot: int = 2000, seed: int = 26) -> list[ShareFit]:
+def fit_share(
+    counts: pd.DataFrame, vs: list[Voyage], boot: int = 2000, seed: int = 26
+) -> list[ShareFit]:
     """Fit cars = base + share x passengers_away / PEOPLE_PER_CAR per dock.
 
     ``counts`` has columns ``when`` (image time, local), ``dock`` and ``cars`` (cars counted in that
@@ -112,11 +125,17 @@ def fit_share(counts: pd.DataFrame, vs: list[Voyage], boot: int = 2000, seed: in
     rng = np.random.default_rng(seed)
     out = []
     for dock, g in counts.groupby("dock"):
-        x = np.array([passengers_away(vs, pd.Timestamp(w).to_pydatetime(), dock)
-                      for w in g["when"]]) / PEOPLE_PER_CAR
+        x = (
+            np.array(
+                [passengers_away(vs, pd.Timestamp(w).to_pydatetime(), dock) for w in g["when"]]
+            )
+            / PEOPLE_PER_CAR
+        )
         y = g["cars"].to_numpy(float)
         if len(y) < 3 or np.ptp(x) == 0:
-            raise ValueError(f"{dock}: need at least 3 images with different numbers of passengers away")
+            raise ValueError(
+                f"{dock}: need at least 3 images with different numbers of passengers away"
+            )
 
         def solve(xx, yy):
             a = np.column_stack([np.ones_like(xx), xx])
@@ -130,14 +149,28 @@ def fit_share(counts: pd.DataFrame, vs: list[Voyage], boot: int = 2000, seed: in
             if np.ptp(x[idx]) > 0:
                 draws.append(solve(x[idx], y[idx])[1])
         resid = y - (base + share * x)
-        out.append(ShareFit(dock, share, float(np.percentile(draws, 10)),
-                            float(np.percentile(draws, 90)), base, len(y),
-                            float(resid.std(ddof=2)) if len(y) > 2 else float("nan")))
+        out.append(
+            ShareFit(
+                dock,
+                share,
+                float(np.percentile(draws, 10)),
+                float(np.percentile(draws, 90)),
+                base,
+                len(y),
+                float(resid.std(ddof=2)) if len(y) > 2 else float("nan"),
+            )
+        )
     return out
 
 
-def simulate_counts(vs: list[Voyage], times: list[datetime], share: dict[str, float],
-                    base: dict[str, float], noise_sd: float = 15.0, seed: int = 1) -> pd.DataFrame:
+def simulate_counts(
+    vs: list[Voyage],
+    times: list[datetime],
+    share: dict[str, float],
+    base: dict[str, float],
+    noise_sd: float = 15.0,
+    seed: int = 1,
+) -> pd.DataFrame:
     """Synthetic counts for testing the fit (never shown as observed)."""
     rng = np.random.default_rng(seed)
     rows = []

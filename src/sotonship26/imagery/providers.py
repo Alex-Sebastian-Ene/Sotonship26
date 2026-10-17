@@ -94,9 +94,13 @@ def clip_to_geotiff(src_path, aoi_lonlat, out: Path, target_gsd: float | None = 
                 to_src = Transformer.from_crs("EPSG:4326", srcs[0].crs, always_xy=True).transform
                 geom = shape(aoi_lonlat) if isinstance(aoi_lonlat, dict) else aoi_lonlat
                 data, tr = merge(srcs, bounds=shp_transform(to_src, geom).bounds)
-                profile = srcs[0].profile | {"driver": "GTiff", "height": data.shape[1],
-                                             "width": data.shape[2], "transform": tr,
-                                             "compress": "deflate"}
+                profile = srcs[0].profile | {
+                    "driver": "GTiff",
+                    "height": data.shape[1],
+                    "width": data.shape[2],
+                    "transform": tr,
+                    "compress": "deflate",
+                }
             finally:
                 for x in srcs:
                     x.close()
@@ -122,10 +126,22 @@ def clip_to_geotiff(src_path, aoi_lonlat, out: Path, target_gsd: float | None = 
             scale = max(abs(src.transform.a) / target_gsd, 1e-6)
         h, w = max(1, int(win.height * scale)), max(1, int(win.width * scale))
         data = src.read(window=win, out_shape=(src.count, h, w))
-        tr = src.window_transform(win) * src.window_transform(win).scale(win.width / w, win.height / h)
-        profile = src.profile | {"driver": "GTiff", "height": h, "width": w, "transform": tr,
-                                 "compress": "deflate"}
-        for k in ("blockxsize", "blockysize", "tiled", "photometric"):  # JPEG/YCbCr sources: re-encode as RGB
+        tr = src.window_transform(win) * src.window_transform(win).scale(
+            win.width / w, win.height / h
+        )
+        profile = src.profile | {
+            "driver": "GTiff",
+            "height": h,
+            "width": w,
+            "transform": tr,
+            "compress": "deflate",
+        }
+        for k in (
+            "blockxsize",
+            "blockysize",
+            "tiled",
+            "photometric",
+        ):  # JPEG/YCbCr sources: re-encode as RGB
             profile.pop(k, None)
     out.parent.mkdir(parents=True, exist_ok=True)
     with rasterio.open(out, "w", **profile) as dst:
@@ -148,14 +164,24 @@ def _warp_metric(src, geom, out: Path, gsd: float) -> Path:
     lon, lat = geom.centroid.x, geom.centroid.y
     epsg = (32600 if lat >= 0 else 32700) + int(math.floor((lon + 180) / 6)) + 1
     minx, miny, maxx, maxy = shp_transform(
-        Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True).transform, geom).bounds
+        Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True).transform, geom
+    ).bounds
     w, h = max(1, int((maxx - minx) / gsd)), max(1, int((maxy - miny) / gsd))
     tr = from_origin(minx, maxy, gsd, gsd)
-    with WarpedVRT(src, crs=f"EPSG:{epsg}", transform=tr, width=w, height=h,
-                   resampling=Resampling.bilinear) as vrt:
+    with WarpedVRT(
+        src, crs=f"EPSG:{epsg}", transform=tr, width=w, height=h, resampling=Resampling.bilinear
+    ) as vrt:
         data = vrt.read()
-        profile = {"driver": "GTiff", "height": h, "width": w, "count": vrt.count, "dtype": vrt.dtypes[0],
-                   "crs": f"EPSG:{epsg}", "transform": tr, "compress": "deflate"}
+        profile = {
+            "driver": "GTiff",
+            "height": h,
+            "width": w,
+            "count": vrt.count,
+            "dtype": vrt.dtypes[0],
+            "crs": f"EPSG:{epsg}",
+            "transform": tr,
+            "compress": "deflate",
+        }
     out.parent.mkdir(parents=True, exist_ok=True)
     with rasterio.open(out, "w", **profile) as dst:
         dst.write(data)
@@ -165,27 +191,51 @@ def _warp_metric(src, geom, out: Path, gsd: float) -> Path:
 class StacProvider:
     name = "stac"
 
-    def __init__(self, url: str, collections: list[str], headers: dict | None = None,
-                 asset: str = "visual"):
-        self.url, self.collections, self.headers, self.asset = url, collections, headers or {}, asset
+    def __init__(
+        self, url: str, collections: list[str], headers: dict | None = None, asset: str = "visual"
+    ):
+        self.url, self.collections, self.headers, self.asset = (
+            url,
+            collections,
+            headers or {},
+            asset,
+        )
 
     def search(self, aoi, start: str, end: str, limit: int = 50) -> list[Scene]:
         from pystac_client import Client
 
         client = Client.open(self.url, headers=self.headers)
-        items = client.search(collections=self.collections, intersects=aoi,
-                              datetime=f"{start}/{end}", max_items=limit).items()
+        items = client.search(
+            collections=self.collections, intersects=aoi, datetime=f"{start}/{end}", max_items=limit
+        ).items()
         out = []
         for it in items:
             p = it.properties
-            gsd = p.get("gsd") or next((b.get("gsd") for b in p.get("eo:bands", []) if b.get("gsd")), None)
+            gsd = p.get("gsd") or next(
+                (b.get("gsd") for b in p.get("eo:bands", []) if b.get("gsd")), None
+            )
             if gsd is None and self.asset in it.assets:  # STAC 1.0 puts it on the asset
                 ex = it.assets[self.asset].extra_fields
-                gsd = ex.get("gsd") or next((b.get("spatial_resolution") for b in ex.get("raster:bands", [])
-                                             if b.get("spatial_resolution")), None)
-            out.append(Scene(it.id, self.name, it.datetime, gsd, p.get("eo:cloud_cover"),
-                             it.geometry, {k: a.href for k, a in it.assets.items()},
-                             p.get("license", "")))
+                gsd = ex.get("gsd") or next(
+                    (
+                        b.get("spatial_resolution")
+                        for b in ex.get("raster:bands", [])
+                        if b.get("spatial_resolution")
+                    ),
+                    None,
+                )
+            out.append(
+                Scene(
+                    it.id,
+                    self.name,
+                    it.datetime,
+                    gsd,
+                    p.get("eo:cloud_cover"),
+                    it.geometry,
+                    {k: a.href for k, a in it.assets.items()},
+                    p.get("license", ""),
+                )
+            )
         return out
 
     def fetch(self, scene: Scene, aoi, out: Path, target_gsd: float | None = None) -> Path:
@@ -194,7 +244,7 @@ class StacProvider:
 
 
 class PlanetProvider:
-    """Planet Data API search + Orders API clip. Untested without a key; follows Planet's v1/v2 APIs."""
+    """Planet Data API search + Orders API clip. Untested without a key (Planet v1/v2 APIs)."""
 
     name = "planet"
     DATA = "https://api.planet.com/data/v1/quick-search"
@@ -209,32 +259,70 @@ class PlanetProvider:
     def _req(self, url, body=None, method=None):
         import base64
 
-        req = urllib.request.Request(url, data=json.dumps(body).encode() if body else None,
-                                     method=method or ("POST" if body else "GET"))
-        req.add_header("Authorization", "Basic " + base64.b64encode(f"{self.key}:".encode()).decode())
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(body).encode() if body else None,
+            method=method or ("POST" if body else "GET"),
+        )
+        req.add_header(
+            "Authorization", "Basic " + base64.b64encode(f"{self.key}:".encode()).decode()
+        )
         req.add_header("Content-Type", "application/json")
         with urllib.request.urlopen(req, timeout=60) as r:
             return json.loads(r.read() or b"{}")
 
     def search(self, aoi, start: str, end: str, max_cloud: float = 0.2) -> list[Scene]:
-        flt = {"type": "AndFilter", "config": [
-            {"type": "GeometryFilter", "field_name": "geometry", "config": aoi},
-            {"type": "DateRangeFilter", "field_name": "acquired",
-             "config": {"gte": f"{start}T00:00:00Z", "lte": f"{end}T23:59:59Z"}},
-            {"type": "RangeFilter", "field_name": "cloud_cover", "config": {"lte": max_cloud}}]}
+        flt = {
+            "type": "AndFilter",
+            "config": [
+                {"type": "GeometryFilter", "field_name": "geometry", "config": aoi},
+                {
+                    "type": "DateRangeFilter",
+                    "field_name": "acquired",
+                    "config": {"gte": f"{start}T00:00:00Z", "lte": f"{end}T23:59:59Z"},
+                },
+                {"type": "RangeFilter", "field_name": "cloud_cover", "config": {"lte": max_cloud}},
+            ],
+        }
         res = self._req(self.DATA, {"item_types": self.item_types, "filter": flt})
-        return [Scene(f["id"], self.name, datetime.fromisoformat(f["properties"]["acquired"].replace("Z", "+00:00")),
-                      f["properties"].get("gsd"), f["properties"].get("cloud_cover"), f["geometry"],
-                      {}, "Planet licence (see your agreement)", {"item_type": f["properties"].get("item_type")})
-                for f in res.get("features", [])]
+        return [
+            Scene(
+                f["id"],
+                self.name,
+                datetime.fromisoformat(f["properties"]["acquired"].replace("Z", "+00:00")),
+                f["properties"].get("gsd"),
+                f["properties"].get("cloud_cover"),
+                f["geometry"],
+                {},
+                "Planet licence (see your agreement)",
+                {"item_type": f["properties"].get("item_type")},
+            )
+            for f in res.get("features", [])
+        ]
 
-    def fetch(self, scene: Scene, aoi, out: Path, target_gsd: float | None = None,
-              poll_s: int = 30, timeout_s: int = 3600) -> Path:
-        order = self._req(self.ORDERS, {
-            "name": f"sotonship26-{scene.id}",
-            "products": [{"item_ids": [scene.id], "item_type": scene.extra.get("item_type", self.item_types[0]),
-                          "product_bundle": "pansharpened"}],
-            "tools": [{"clip": {"aoi": aoi}}]})
+    def fetch(
+        self,
+        scene: Scene,
+        aoi,
+        out: Path,
+        target_gsd: float | None = None,
+        poll_s: int = 30,
+        timeout_s: int = 3600,
+    ) -> Path:
+        order = self._req(
+            self.ORDERS,
+            {
+                "name": f"sotonship26-{scene.id}",
+                "products": [
+                    {
+                        "item_ids": [scene.id],
+                        "item_type": scene.extra.get("item_type", self.item_types[0]),
+                        "product_bundle": "pansharpened",
+                    }
+                ],
+                "tools": [{"clip": {"aoi": aoi}}],
+            },
+        )
         url, t0 = order["_links"]["_self"], time.time()
         while time.time() - t0 < timeout_s:
             state = self._req(url)
@@ -261,7 +349,9 @@ class LocalGeoTiffProvider:
     name = "local"
     STAMP = re.compile(r"(\d{4}-\d{2}-\d{2})(?:[T_](\d{2})(\d{2}))?")
 
-    def __init__(self, folder: Path, licence: str = DIGIMAP_CREDIT + " (analysis only, not for display)"):
+    def __init__(
+        self, folder: Path, licence: str = DIGIMAP_CREDIT + " (analysis only, not for display)"
+    ):
         self.folder, self.licence = Path(folder), licence
 
     def dates(self) -> dict[str, datetime]:
@@ -278,7 +368,8 @@ class LocalGeoTiffProvider:
             m = self.STAMP.search(p.name)
             if p.name not in out and m:
                 out[p.name] = datetime.fromisoformat(
-                    m.group(1) + (f"T{m.group(2)}:{m.group(3)}" if m.group(2) else "T11:00"))
+                    m.group(1) + (f"T{m.group(2)}:{m.group(3)}" if m.group(2) else "T11:00")
+                )
         return out
 
     def search(self, aoi=None, start: str = "0000", end: str = "9999") -> list[Scene]:
@@ -293,9 +384,19 @@ class LocalGeoTiffProvider:
         for when, files in sorted(by_date.items()):
             with rasterio.open(files[0]) as src:
                 gsd = abs(src.transform.a) if src.crs and src.crs.is_projected else None
-            out.append(Scene(f"{when:%Y-%m-%dT%H%M}", self.name, when, gsd, None, None,
-                             {"files": [str(f) for f in sorted(files)]}, self.licence,
-                             {"tiles": len(files)}))
+            out.append(
+                Scene(
+                    f"{when:%Y-%m-%dT%H%M}",
+                    self.name,
+                    when,
+                    gsd,
+                    None,
+                    None,
+                    {"files": [str(f) for f in sorted(files)]},
+                    self.licence,
+                    {"tiles": len(files)},
+                )
+            )
         return out
 
     def fetch(self, scene: Scene, aoi, out: Path, target_gsd: float | None = None) -> Path:
@@ -311,6 +412,10 @@ def provider_from_env():
         headers = {}
         if os.environ.get("STAC_TOKEN"):
             headers["Authorization"] = f"Bearer {os.environ['STAC_TOKEN']}"
-        return StacProvider(os.environ["STAC_URL"], os.environ["STAC_COLLECTIONS"].split(","), headers,
-                            os.environ.get("STAC_ASSET", "visual"))
+        return StacProvider(
+            os.environ["STAC_URL"],
+            os.environ["STAC_COLLECTIONS"].split(","),
+            headers,
+            os.environ.get("STAC_ASSET", "visual"),
+        )
     return LocalGeoTiffProvider(Path(os.environ.get("IMAGERY_DIR", "data/raw/imagery")))
