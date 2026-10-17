@@ -136,10 +136,16 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 :root[data-theme="steam"] .brand-mark { background: none; width: 40px; height: 32px; }
 :root[data-theme="steam"] .brand-mark svg { display: none; }
 :root[data-theme="steam"] .brand-mark::after { content: ''; width: 40px; height: 32px; background: var(--ico-ship) center / contain no-repeat; }
-.deco-gull { position: fixed; z-index: 1; top: 130px; left: -80px; width: 56px; pointer-events: none; display: none; animation: fly 26s linear infinite; }
+.deco-gull { position: fixed; z-index: 1; top: 150px; left: -80px; width: 56px; pointer-events: none; display: none; animation: fly 26s linear infinite; }
 .deco-gull .spr { display: block; width: 100%; }
 :root[data-theme="steam"] .deco-gull { display: block; }
-@keyframes fly { from { transform: translate(0, 0); } 50% { transform: translate(60vw, 40px); } to { transform: translate(calc(100vw + 160px), -10px); } }
+@keyframes fly { from { transform: translateX(0); } to { transform: translateX(calc(100vw + 160px)); } }
+/* gulls fly curves: a steady glide across, an eased swoop up and down on a separate wrapper, and a tilt into each turn */
+.gl { display: block; animation: swoop 4.6s ease-in-out infinite alternate; }
+.gl.b { animation-duration: 3.7s; animation-delay: -1.9s; }
+@keyframes swoop { 0% { transform: translateY(-34px) rotate(6deg); } 50% { transform: translateY(6px) rotate(-7deg); } 100% { transform: translateY(40px) rotate(4deg); } }
+.gl > .gl2 { display: block; animation: drift-y 9.5s ease-in-out infinite alternate; }
+@keyframes drift-y { from { transform: translateY(-18px); } to { transform: translateY(22px); } }
 /* landing page */
 .landing { position: fixed; inset: 0; z-index: 100; overflow: hidden; display: grid; place-items: center; color: #1D2B45; font-family: "Fredoka", "Trebuchet MS", sans-serif;
   background: linear-gradient(#FFE9C7 0%, #FFD7B0 46%, #FFC9A8 62%, #A9D9D3 62.2%, #7CC3BE 100%); transition: transform .8s cubic-bezier(.6, 0, .3, 1); }
@@ -155,7 +161,7 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 .l-gull.g1 { top: 24%; animation: cross 28s linear infinite; animation-delay: -6s; }
 .l-gull.g2 { top: 11%; width: 50px; animation: cross 36s linear infinite reverse; animation-delay: -20s; }
 .l-gull.g2 .spr { transform: scaleX(-1); --dur: .85s; }
-@keyframes cross { from { transform: translate(-12vw, 0); } 25% { transform: translate(18vw, -24px); } 50% { transform: translate(48vw, 6px); } 75% { transform: translate(78vw, -18px); } to { transform: translate(112vw, 0); } }
+@keyframes cross { from { transform: translateX(-12vw); } to { transform: translateX(112vw); } }
 .l-light { position: absolute; right: 1vw; bottom: 31%; width: 32vmin; z-index: 1; }
 .l-light .spr, .l-anchor .spr, .l-wheel .spr, .l-spray .spr { display: block; width: 100%; }
 .l-anchor { position: absolute; left: 3vw; bottom: 4%; width: 11vmin; z-index: 4; }
@@ -260,7 +266,7 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
   $('.appbar').after(bar);
   const home = document.createElement('button'); home.type = 'button'; home.className = 'home-btn'; home.title = 'Back to the start'; home.setAttribute('aria-label', 'Back to the start');
   home.innerHTML = SHIP_SVG('home'); $('.brand').prepend(home);
-  const gull = document.createElement('span'); gull.className = 'deco-gull'; gull.innerHTML = '<span class="spr spr-gull"></span>'; gull.setAttribute('aria-hidden', 'true'); document.body.append(gull);
+  const gull = document.createElement('span'); gull.className = 'deco-gull'; gull.innerHTML = '<span class="gl"><span class="gl2"><span class="spr spr-gull"></span></span></span>'; gull.setAttribute('aria-hidden', 'true'); document.body.append(gull);
   let step = 0;
   function showStep(i) {
     const prev = step;
@@ -290,7 +296,7 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
   const land = document.createElement('div'); land.className = 'landing'; land.setAttribute('role', 'dialog'); land.setAttribute('aria-modal', 'true'); land.setAttribute('aria-labelledby', 'l-title');
   const wave = (y, a) => `M0 ${y} ` + Array.from({ length: 12 }, () => `q 50 ${-a} 100 0 t 100 0`).join(' ') + ' V300 H0Z';
   land.innerHTML = `<div class="l-sun"></div><div class="l-cloud c1"></div><div class="l-cloud c2"></div><div class="l-cloud c3"></div>
-    <span class="l-gull g1" aria-hidden="true"><span class="spr spr-gull"></span></span><span class="l-gull g2" aria-hidden="true"><span class="spr spr-gull"></span></span>
+    <span class="l-gull g1" aria-hidden="true"><span class="gl"><span class="gl2"><span class="spr spr-gull"></span></span></span></span><span class="l-gull g2" aria-hidden="true"><span class="gl b"><span class="gl2"><span class="spr spr-gull"></span></span></span></span>
     <span class="l-light" aria-hidden="true"><span class="spr spr-lighthouse"></span></span><span class="l-rock-spray" aria-hidden="true"><span class="spr spr-spray"></span></span>
     <div class="l-ship" aria-hidden="true">${SHIP_SVG('land')}<span class="l-spray"><span class="spr spr-spray"></span></span><span class="l-spray s2"><span class="spr spr-spray"></span></span></div>
     <button type="button" class="l-sound hint" id="l-sound" aria-pressed="false" aria-label="Sound"><svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="on" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="off" d="M16 9.5l5 5M21 9.5l-5 5"/></svg><span id="l-sound-t">Sound on</span></button>
@@ -308,7 +314,7 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
      sawtooth), a horn, and "Drunken Sailor" (traditional, public domain) on a two-reed accordion with an
      oom-pah bass. Browsers only allow sound after a click or key press, so it starts on the first one. */
   const Sea = (() => {
-    let ctx = null, out = null, music = null, timers = [], on = false;
+    let ctx = null, out = null, music = null, on = false;
     const N = { D3: 146.83, C3: 130.81, A2: 110, G2: 98, F3: 174.61, A3: 220, C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392, A4: 440, B4: 493.88, C5: 523.25, D5: 587.33, E5: 659.25 };
     const TUNE = 'A4 A4 A4 A4 A4 D4 F4 A4 G4 G4 G4 G4 G4 C4 E4 G4 A4 A4 A4 A4 A4 B4 C5 D5 C5 A4 G4 E4 D4 - D4 -'.split(' ');
     const BASS = ['D3', 'D3', 'C3', 'C3', 'D3', 'D3', 'C3', 'D3'], CHORD = { D3: ['D4', 'F4', 'A4'], C3: ['C4', 'E4', 'G4'] };
@@ -356,24 +362,31 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
         o.connect(lp).connect(g).connect(out); o.start(t + dt); o.stop(t + dt + 0.75);
       });
     }
+    // one track only: the music is scheduled once into a single context; sound off fades it and pauses
+    // the context, sound on resumes the same track where it stopped, so toggling never stacks copies
+    let next = 0, ticker = null, cryT = null, lastGull = -9, offT = null;
+    const tick = () => { if (!on) return; if (next < ctx.currentTime) next = ctx.currentTime + 0.1; while (next < ctx.currentTime + 1) next += playLoop(next); };
     function start() {
       if (on) return; on = true;
+      clearTimeout(offT);
       if (!ctx) {
         ctx = new (window.AudioContext || window.webkitAudioContext)(); out = ctx.createGain(); out.gain.value = 0.0001; out.connect(ctx.destination);
-        music = ctx.createGain(); music.gain.value = 0.9; music.connect(out); waves();
+        music = ctx.createGain(); music.gain.value = 0.9; music.connect(out); waves(); next = ctx.currentTime + 0.6;
       }
-      ctx.resume(); out.gain.cancelScheduledValues(ctx.currentTime); out.gain.setTargetAtTime(0.8, ctx.currentTime, 0.4);
-      gull(1);
-      let next = ctx.currentTime + 0.6;
-      const tick = () => { if (!on) return; while (next < ctx.currentTime + 1) next += playLoop(next); };
-      tick(); timers.push(setInterval(tick, 250));
-      const cry = () => { if (!on) return; gull(0.85 + Math.random() * 0.35); timers.push(setTimeout(cry, 3500 + Math.random() * 5000)); };
-      timers.push(setTimeout(cry, 2600));
+      ctx.resume().then(() => {
+        if (!on) return;
+        out.gain.cancelScheduledValues(ctx.currentTime); out.gain.setTargetAtTime(0.8, ctx.currentTime, 0.3);
+        if (ctx.currentTime - lastGull > 1.5) { gull(1); lastGull = ctx.currentTime; }
+        tick(); if (!ticker) ticker = setInterval(tick, 250);
+        const cry = () => { if (!on) return; gull(0.85 + Math.random() * 0.35); lastGull = ctx.currentTime; cryT = setTimeout(cry, 3500 + Math.random() * 5000); };
+        clearTimeout(cryT); cryT = setTimeout(cry, 2600);
+      });
     }
-    function stop(fade = 0.3) {
-      if (!on || !ctx) return; on = false; timers.forEach(t => { clearInterval(t); clearTimeout(t); }); timers = [];
-      out.gain.setTargetAtTime(0.0001, ctx.currentTime, fade);
-      setTimeout(() => { if (!on) ctx.suspend(); }, fade * 6000);
+    function stop(fade = 0.25) {
+      if (!on || !ctx) return; on = false;
+      clearInterval(ticker); ticker = null; clearTimeout(cryT);
+      out.gain.cancelScheduledValues(ctx.currentTime); out.gain.setTargetAtTime(0.0001, ctx.currentTime, fade);
+      clearTimeout(offT); offT = setTimeout(() => { if (!on) ctx.suspend(); }, fade * 5000);
     }
     return { start, stop, horn: () => { if (on && ctx) horn(); }, get on() { return on; } };
   })();
