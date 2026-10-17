@@ -213,6 +213,13 @@ data improves it by about 4% a day (not significant) and 2% per 15 minutes.
   and everything in `notes/`)
   was written with Claude Code in Keanu's session on Fri 16 and Sat 17 Oct 2026. Keanu reviewed
   the method and the honest-baseline corrections (`notes/ml-walkthrough.md`).
+- **AI-generated (NTIS self-skill + calibration):** the NTIS predicted-vs-actual diagnostics
+  (`src/sotonship26/ntis_score.py`, `tests/test_ntis_score.py`, `notes/ntis-selfskill.md`) and
+  the SOT-8 calibration harness (`src/sotonship26/calibrate.py`, `tests/test_calibrate.py`) were
+  written with Claude Code in Keanu's session on Fri 16 and Sat 17 Oct 2026. The NTIS skill
+  numbers are provisional, units unconfirmed, labelled "do not quote as validated NTIS skill".
+  The calibration `best.json` is synthetic (`source: "synthetic"`) and gitignored; the real
+  cruise calibration is blocked on the parametric simulator (SOT-10).
 - **AI-generated (port freight):** the port lorry trip type, lorry route costs and the fit to DfT
   lorry counts (`freight_totals`, `freight_demand`, `modelled_lorries`, `calibrate_freight` and the
   freight parts of `build`, `cordon_od`, `modelled_aadf` and `count_point_edges` in
