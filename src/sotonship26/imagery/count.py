@@ -1,12 +1,11 @@
 """Cars in each cruise car park on each imagery date, for the park-and-cruise share fit.
 
 Detection is the team's aerial counter (``sotonship26.vision.detect``, YOLO OBB trained on DOTA).
-Each car park is clipped on its own (its outline's bounding box plus ``MARGIN_M``) and enlarged
-``UPSAMPLE`` times before detection, then the detection centres are mapped back through the
-clip's transform and counted inside the car park outline. Why enlarge: at 25 cm (Digimap) a car
-is about 18 x 7 px, smaller than most DOTA training cars. On a CC-BY drone image resampled to
-25 cm (``scripts/detector_sample_check.py``, 17 Oct 2026) the free nano model found 4 of ~17 cars
-enlarged x2 and 10 enlarged x4, with no false alarms; at 12.5 cm it found ~15.
+Each car park is clipped on its own (its outline's bounding box plus ``MARGIN_M``), the counter
+enlarges it before detecting (``upsample_for``: x4 at 25 cm, x2 at 12.5 cm) and maps detection
+centres back to the clip's pixels, and they are counted inside the car park outline. Why enlarge:
+at 25 cm (Digimap) a car is about 18 x 7 px, smaller than most DOTA training cars; see
+``scripts/detector_sample_check.py`` for the trial on a CC-BY image.
 
 Only counts leave this module. Images stay in gitignored ``data/raw/`` (Digimap's licence bars
 showing them); counts are credited to the imagery source. Multi-storey car parks are counted
@@ -28,7 +27,6 @@ from sotonship26.imagery.occupancy import dock_of
 from sotonship26.imagery.providers import Scene, provider_from_env
 
 ROOT = Path(__file__).resolve().parents[3]
-UPSAMPLE = 4
 MARGIN_M = 15.0
 COLUMNS = [
     "when",
@@ -71,42 +69,35 @@ def outline_in(park: CarPark, crs) -> object:
     return Polygon([tr.transform(x, y) for x, y in park.polygon_bng])
 
 
-def enlarge(rgb: np.ndarray, factor: int) -> np.ndarray:
-    if factor <= 1:
-        return rgb
-    from PIL import Image
-
-    h, w = rgb.shape[:2]
-    return np.asarray(Image.fromarray(rgb).resize((w * factor, h * factor), Image.BICUBIC))
+def upsample_for(gsd_m: float | None) -> float:
+    """Enlargement before detection for a pixel size: x4 at 25 cm, x2 at 12.5 cm, else none."""
+    if gsd_m is None or gsd_m < 0.1:
+        return 1.0
+    return 4.0 if gsd_m >= 0.2 else 2.0
 
 
 def count_park(
     tif: Path,
     park: CarPark,
     model,
-    upsample: int = UPSAMPLE,
+    upsample: float | None = None,
     conf: float = 0.25,
     model_name: str = "",
 ) -> dict:
-    """Detect on one car park clip and count inside its outline."""
+    """Detect on one car park clip and count inside its outline (upsample None: by pixel size)."""
     import rasterio
-    from affine import Affine
 
     from sotonship26.vision import detect
 
+    rgb, transform = detect.read_image(tif)
     with rasterio.open(tif) as src:
-        rgb = detect._as_rgb(
-            np.moveaxis(src.read(indexes=list(range(1, min(src.count, 3) + 1))), 0, -1)
-        )
-        transform, crs = src.transform, src.crs
-    det = detect.detect(enlarge(rgb, upsample), model, "aerial", conf=conf)
+        crs, gsd = src.crs, abs(src.transform.a)
+    up = upsample if upsample is not None else upsample_for(gsd)
+    det = detect.detect(rgb, model, "aerial", conf=conf, upsample=up)
     row = detect.count_in_polygons(
-        det,
-        {park.osm_id: outline_in(park, crs)},
-        transform * Affine.scale(1 / upsample),
-        model_name=model_name,
+        det, {park.osm_id: outline_in(park, crs)}, transform, model_name=model_name
     )
-    return row.iloc[0].to_dict()
+    return row.iloc[0].to_dict() | {"upsample": up}
 
 
 def count_scene(
@@ -117,7 +108,7 @@ def count_scene(
     *,
     model=None,
     weights: str | None = None,
-    upsample: int = UPSAMPLE,
+    upsample: float | None = None,
     conf: float = 0.25,
     target_gsd: float | None = None,
 ) -> pd.DataFrame:
@@ -150,7 +141,7 @@ def count_scene(
                 "large_vehicles": c["large_vehicles"],
                 "conf_mean": c["conf_mean"],
                 "model": weights,
-                "upsample": upsample,
+                "upsample": c["upsample"],
                 "licence": scene.licence,
             }
         )
@@ -178,7 +169,7 @@ def main() -> None:
     ap.add_argument("--start", default="0000")
     ap.add_argument("--end", default="9999")
     ap.add_argument("--kinds", default="cruise,control", help="car park kinds to count")
-    ap.add_argument("--upsample", type=int, default=UPSAMPLE)
+    ap.add_argument("--upsample", type=float, default=None, help="default: by pixel size")
     ap.add_argument("--out", type=Path, default=ROOT / "data" / "cache" / "carparks" / "counts.csv")
     a = ap.parse_args()
     provider = provider_from_env()
