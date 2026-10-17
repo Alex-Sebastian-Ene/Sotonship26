@@ -24,8 +24,9 @@ Traffic that cannot get through a route's bottleneck in those 15 minutes waits a
 15 minutes (a point queue), so queues build and clear through the day.
 
 Demand is noisy in correlated ways: a day-wide factor shared by every kind of trip, a factor per
-kind of trip, 15-minute noise that persists (a busy 08:00 is followed by a busy 08:15), and zone
-factors that move together for neighbouring zones.
+kind of trip, 15-minute noise that persists (a busy 08:00 is followed by a busy 08:15), both
+shared by all trips and per kind of trip, and zone factors that move together for neighbouring
+zones.
 """
 
 from __future__ import annotations
@@ -47,7 +48,11 @@ AT_RISK = 0.85
 ROUTES = 3
 CARRY = 0.8  # share of traffic stuck in a queue that is still waiting 15 minutes later
 LOGIT_BETA = 6.0  # route choice: a route 10% slower than the best gets exp(-0.6) of its weight
-NOISE = {"day": 0.04, "purpose": 0.04, "bin": 0.05, "rho": 0.8, "zone": 0.08, "zone_km": 2.0}
+# Log-scale noise. shared_bin/shared_rho: 15-minute swings every kind of trip shares, sized so a
+# main road shows the 15-min sd ~0.065-0.08 and lag-1 rho ~0.75 seen at WebTRIS M3 J14 / M271
+# (the per-purpose "bin" terms are independent, so they partly cancel on a road).
+NOISE = {"day": 0.04, "purpose": 0.04, "bin": 0.05, "rho": 0.8, "zone": 0.08, "zone_km": 2.0,
+         "shared_bin": 0.072, "shared_rho": 0.8}
 LOCAL = {"primary", "primary_link", "secondary", "secondary_link", "tertiary", "tertiary_link",
          "unclassified"}
 # Class weights still split through traffic, cruise passengers and match fans between gateways;
@@ -882,8 +887,10 @@ def background(m: Model, dtype: int, rng: np.random.Generator | None = None, ter
     groups = {}
     od_mult = 1.0
     day = 1.0
+    shared = 1.0
     if rng is not None:
         day = rng.lognormal(0.0, NOISE["day"] * spread)
+        shared = ar1(rng, N_BINS, NOISE["shared_bin"] * spread, NOISE["shared_rho"])
         z = m.zone_kernel @ rng.normal(0.0, NOISE["zone"] * spread, m.zone_kernel.shape[0])
         zf = np.exp(z)
         oz, dz = m.od_zone[:, 0], m.od_zone[:, 1]
@@ -897,7 +904,7 @@ def background(m: Model, dtype: int, rng: np.random.Generator | None = None, ter
             total *= mult.get(group, mult.get("all", 1.0))
         if rng is not None:
             total *= rng.lognormal(0.0, NOISE["purpose"] * spread)
-            prof = prof * ar1(rng, N_BINS, NOISE["bin"] * spread, NOISE["rho"])
+            prof = prof * ar1(rng, N_BINS, NOISE["bin"] * spread, NOISE["rho"]) * shared
         D += np.outer(prof * total, m.purpose_od[key] * od_mult)
         groups[group] = groups.get(group, 0) + prof * total
     return D, groups
