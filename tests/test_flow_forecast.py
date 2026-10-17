@@ -39,6 +39,14 @@ def test_calendar_features_flags():
     assert f.loc[date(2024, 6, 5), "wd2"] == 1.0  # a Wednesday
 
 
+def test_school_holiday_flags_weekdays_inside_council_dates_only():
+    # Mon 19 Feb 2024 is term (spring half-term was 12-16 Feb); Sat 10 Aug 2024 is a weekend
+    days = [date(2024, 2, 12), date(2024, 2, 16), date(2024, 2, 19), date(2024, 8, 7),
+            date(2024, 8, 10), date(2026, 7, 22), date(2026, 7, 23)]
+    f = calendar_features(days)
+    assert f["school_holiday"].tolist() == [1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0]
+
+
 def test_baselines_respect_publication_lag():
     by_date = {date(2024, 1, 1) + timedelta(days=i): np.full(96, float(i)) for i in range(800)}
     target = date(2025, 6, 4)

@@ -22,7 +22,7 @@ A model only counts as AI at the core if it beats something simple a person coul
   same weekday over the newest 4 weeks we can see) and **planner_rule** (year_median if we have
   it, else recent). Always quote skill against the *strongest* baseline: beating a weak one is
   easy. Our first draft compared against last_year only and claimed 17%; against year_median the
-  same model wins by 4%.
+  same model won by 4% (7% once school holidays were added, see section 7).
 - `backtest.py`: **zero** (no cruise effect), **last_day** (the most comparable earlier cruise
   day, which is the brief's own suggestion) and **pax_linear** (uplift proportional to
   passengers).
@@ -51,7 +51,9 @@ neighbouring bins, because traffic at 08:00 and 08:15 should not need unrelated 
 
 Features for everyday traffic (`calendar_features`): a weekday one-hot, an annual cycle
 (sin/cos of day of year), **weekday x season interactions** (Saturdays in August differ from
-Saturdays in January), bank holidays, Christmas week and a linear trend.
+Saturdays in January), bank holidays, Christmas week, **Southampton school-holiday weekdays**
+(council term dates, which move from year to year, so a year-ago lookup gets them wrong) and a
+linear trend.
 
 ## 5. Intervals you can trust: split conformal prediction
 
@@ -72,12 +74,20 @@ honest about uncertainty.
 ## 7. What the numbers say tonight
 
 - **Everyday traffic** (`notes/flow-forecast.md`): at M3 J14 (355 test days) the learned model
-  beats a careful planner (year_median) by **4%** MAE (35.9 vs 37.4 vehicles per 15 min, WAPE
-  9.7% vs 10.1%). It beats the one-day year-ago lookup by 17% and the recent median by 26%. Its
-  80% intervals cover 84%, a little wide; year_median's own intervals are narrower (106 vs 126
-  vehicles) at 80%. At M271 NB it beats the recent median by 12% over 147 days, but the
-  year-ago baselines exist for only 17 test days there, so we cannot say it beats a planner. Sites with under 30 comparable days are noise. Honest headline:
-  the model is a small, real improvement on the best hand rule, not a big one.
+  beats a careful planner (year_median) by **7%** MAE (35.0 vs 37.4 vehicles per 15 min, WAPE
+  9.4% vs 10.1%; week-block bootstrap 90% CI for the skill 0.5% to 12%). It beats the one-day
+  year-ago lookup by 19% and the recent median by 28%. Its 80% intervals cover 84%, a little
+  wide; year_median's own intervals are narrower (106 vs 124 vehicles) at 80%.
+  Where the win comes from: on the 62 school-holiday weekdays year_median is badly off (MAE 55.7
+  against 39.1 for ridge), because holiday dates shift and a year-ago lookup lands on term time
+  or the other way round. On ordinary days year_median is slightly better (33.6 vs 34.1).
+  Adding the school-holiday flag cut ridge's error by 2.7% (90% CI 1.8% to 3.7%). Before the
+  flag the skill was 4% and its interval included zero.
+  At M271 NB it beats the recent median by 11% over 147 days, but the year-ago baselines exist
+  for only 17 test days there, so we cannot say it beats a planner. Sites with under 30
+  comparable days are noise (20313 went from +10% to -8% on 29 days when the flag was added).
+  Honest headline: the model is a small, real improvement on the best hand rule, not a big one,
+  and it wins exactly where calendars shift.
 - **Cruise uplift** (`notes/backtest.md` once labels exist): blocked. No permitted source has
   past cruise calls (`notes/cruise-history.md`, SOT-21). The code is tested on synthetic data
   with a known effect (`tests/test_uplift_backtest.py`) and runs as soon as a call list lands.
