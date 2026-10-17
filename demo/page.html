@@ -1,10 +1,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Turnaround Traffic Forecast</title>
-<meta name="claude:viewport-fit-sides" content="cover">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap">
+<title>Cruise-day traffic forecast</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <style>
 /* Layout: a duty officer's briefing. Pick a day; its verdict and the things to do come first, then the map and the road timetable; how it works is folded away below. */
@@ -12,24 +8,23 @@
   --bg: #F4F6F8; --surface: #FFFFFF; --sunk: #EBEFF3; --ink: #15202B; --muted: #566273; --line: #D5DCE4; --line-strong: #AEB8C4;
   --accent: #1F57A4; --accent-ink: #FFFFFF; --accent-soft: #E2EBF7;
   --warn-bg: #FFF4D6; --warn-ink: #5C4300; --warn-line: #E8C866;
-  --lv0-bg: #E8EDF2; --lv0-ink: #3C4958; --lv1-bg: #FBEDBF; --lv1-ink: #5A4500;
-  --lv2-bg: #F8CFA8; --lv2-ink: #6A2F06; --lv3-bg: #EFA595; --lv3-ink: #5C100B;
-  --lv0-mark: #9AA6B4; --lv1-mark: #D9A90E; --lv2-mark: #E07A24; --lv3-mark: #C2321F;
+  --lv0-bg: #EEF2F5; --lv0-ink: #3C4958; --lv1-bg: #F7E6A6; --lv1-ink: #4A3900;
+  --lv2-bg: #E47F3A; --lv2-ink: #2A1000; --lv3-bg: #C8462D; --lv3-ink: #FFFFFF;
   --h0: #EEF2F5; --h1: #F7E6A6; --h2: #F2BB62; --h3: #E47F3A; --h4: #C8462D; --h5: #861B1B;
   --band: rgba(31, 87, 164, 0.16); --hatch: #DDE3E9;
   --vms-bg: #0B0B0B; --vms-ink: #FFB21F;
   --land: #EDEFEB; --water: #B8D2E3; --water-ink: #2F6584; --mud: #DADFD4; --green: #D3E2C7; --wood: #C0D6B2;
   --resi: #E4E7E3; --comm: #E9E1DE; --ind: #DBDCE3; --port: #D4D8E2; --campus: #E6DFEB; --airport: #DFE2E6;
   --minor: #C9CFD4; --rail: #8E98A0; --boundary: #4F7387; --casing: #FFFFFF; --road-quiet: #AAB4BB;
-  --l0: #3E9C74; --l1: #9CC45A; --l2: #E8C547; --l3: #EE8B3A; --l4: #D8432F; --l5: #7E1C1C;
+  --l0: #D8BD78; --l1: #EBA04E; --l2: #E47F3A; --l3: #C8462D; --l4: #861B1B; --l5: #4A0D0D;
   --cruise: #6A3FC4; --queue: #D8432F;
   --ra: #1F57A4; --rb: #B4458F; --rc: #C77A12;
   --g-through: #8C9BA5; --g-county: #2F7EA6; --g-outbound: #7FB8D8; --g-internal: #8DB86A;
   --g-visitors: #E3B04B; --g-match: #C2553A; --g-cruise: #6A3FC4; --g-freight: #8A6A4F;
-  --font-display: "Archivo", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
-  --font-body: "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-data: "Archivo", system-ui, "Segoe UI", sans-serif;
-  --step--1: 0.8125rem; --step-0: 1rem; --step-1: 1.25rem; --step-2: 1.625rem; --step-3: 2.25rem;
+  --font-display: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  --font-body: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  --font-data: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  --step--1: 0.875rem; --step-0: 1rem; --step-1: 1.1875rem; --step-2: 1.5rem; --step-3: 2rem;
   --radius: 4px;
 }
 @media (prefers-color-scheme: dark) {
@@ -37,15 +32,14 @@
     --bg: #0F151C; --surface: #161E28; --sunk: #1C2632; --ink: #E3E9EF; --muted: #9AA7B5; --line: #283340; --line-strong: #3C4A5A;
     --accent: #86B2EA; --accent-ink: #0F151C; --accent-soft: #1A2B42;
     --warn-bg: #2D2611; --warn-ink: #F1D27C; --warn-line: #5C4A18;
-    --lv0-bg: #1D2731; --lv0-ink: #A9B6C2; --lv1-bg: #3A3113; --lv1-ink: #F0D27B;
-    --lv2-bg: #482A15; --lv2-ink: #F6B07D; --lv3-bg: #551C18; --lv3-ink: #FF9D8D;
-    --lv0-mark: #5E6B79; --lv1-mark: #E2BB3C; --lv2-mark: #F08D45; --lv3-mark: #FF6B57;
+    --lv0-bg: #1B2530; --lv0-ink: #A9B6C2; --lv1-bg: #4A4221; --lv1-ink: #F2E6B8;
+    --lv2-bg: #B3632B; --lv2-ink: #140804; --lv3-bg: #D8483B; --lv3-ink: #140804;
     --h0: #1B2530; --h1: #4A4221; --h2: #7D5A20; --h3: #B3632B; --h4: #D8483B; --h5: #FF7062;
     --band: rgba(134, 178, 234, 0.22); --hatch: #1F2A35;
     --land: #141B22; --water: #10263A; --water-ink: #7FB2CF; --mud: #1A2626; --green: #17261D; --wood: #1A2E21;
     --resi: #19212A; --comm: #241E26; --ind: #1D212C; --port: #1C2230; --campus: #221C2A; --airport: #1B2228;
     --minor: #2B3943; --rail: #4D5B66; --boundary: #6F95AA; --casing: #0F151C; --road-quiet: #3C4A55;
-    --l0: #4FBF8F; --l1: #ADD36A; --l2: #F2D25A; --l3: #FF9C4A; --l4: #FF5A45; --l5: #FF8FA3;
+    --l0: #4A4221; --l1: #7D5A20; --l2: #B3632B; --l3: #D8483B; --l4: #FF7062; --l5: #FFB3A8;
     --cruise: #B894FF; --queue: #FF5A45;
     --ra: #86B2EA; --rb: #E681C9; --rc: #F0B04B;
     --g-through: #6E7F8B; --g-county: #4FA3CF; --g-outbound: #9CCDE8; --g-internal: #9CCB78;
@@ -57,15 +51,14 @@
   --bg: #0F151C; --surface: #161E28; --sunk: #1C2632; --ink: #E3E9EF; --muted: #9AA7B5; --line: #283340; --line-strong: #3C4A5A;
   --accent: #86B2EA; --accent-ink: #0F151C; --accent-soft: #1A2B42;
   --warn-bg: #2D2611; --warn-ink: #F1D27C; --warn-line: #5C4A18;
-  --lv0-bg: #1D2731; --lv0-ink: #A9B6C2; --lv1-bg: #3A3113; --lv1-ink: #F0D27B;
-  --lv2-bg: #482A15; --lv2-ink: #F6B07D; --lv3-bg: #551C18; --lv3-ink: #FF9D8D;
-  --lv0-mark: #5E6B79; --lv1-mark: #E2BB3C; --lv2-mark: #F08D45; --lv3-mark: #FF6B57;
+  --lv0-bg: #1B2530; --lv0-ink: #A9B6C2; --lv1-bg: #4A4221; --lv1-ink: #F2E6B8;
+  --lv2-bg: #B3632B; --lv2-ink: #140804; --lv3-bg: #D8483B; --lv3-ink: #140804;
   --h0: #1B2530; --h1: #4A4221; --h2: #7D5A20; --h3: #B3632B; --h4: #D8483B; --h5: #FF7062;
   --band: rgba(134, 178, 234, 0.22); --hatch: #1F2A35;
   --land: #141B22; --water: #10263A; --water-ink: #7FB2CF; --mud: #1A2626; --green: #17261D; --wood: #1A2E21;
   --resi: #19212A; --comm: #241E26; --ind: #1D212C; --port: #1C2230; --campus: #221C2A; --airport: #1B2228;
   --minor: #2B3943; --rail: #4D5B66; --boundary: #6F95AA; --casing: #0F151C; --road-quiet: #3C4A55;
-  --l0: #4FBF8F; --l1: #ADD36A; --l2: #F2D25A; --l3: #FF9C4A; --l4: #FF5A45; --l5: #FF8FA3;
+  --l0: #4A4221; --l1: #7D5A20; --l2: #B3632B; --l3: #D8483B; --l4: #FF7062; --l5: #FFB3A8;
   --cruise: #B894FF; --queue: #FF5A45;
   --ra: #86B2EA; --rb: #E681C9; --rc: #F0B04B;
   --g-through: #6E7F8B; --g-county: #4FA3CF; --g-outbound: #9CCDE8; --g-internal: #9CCB78;
@@ -81,8 +74,8 @@ body { background: var(--bg); color: var(--ink); font-family: var(--font-body); 
 }
 /* every stacked grid gets one shrinkable track, so wide children (heatmap, tables) scroll in place */
 .wrap, .sec, .block, .card, .fold-body, .day-head, .notices { grid-template-columns: minmax(0, 1fr); }
-h1, h2, h3 { font-family: var(--font-display); font-stretch: 112%; line-height: 1.15; text-wrap: balance; margin: 0; letter-spacing: -0.005em; }
-h1 { font-size: var(--step-3); font-weight: 750; }
+h1, h2, h3 { font-family: var(--font-display); line-height: 1.15; text-wrap: balance; margin: 0; letter-spacing: -0.005em; }
+h1 { font-size: var(--step-3); font-weight: 700; }
 h2 { font-size: var(--step-2); font-weight: 700; }
 h3 { font-size: var(--step-1); font-weight: 650; }
 p { margin: 0; }
@@ -95,13 +88,14 @@ button, select, input { font: inherit; color: inherit; }
 .foot-note { font-size: var(--step--1); color: var(--muted); }
 
 /* Masthead */
-.masthead { display: grid; gap: 20px 40px; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); align-items: end; padding-bottom: 22px; border-bottom: 2px solid var(--ink); }
-.title-block { display: grid; gap: 10px; }
-.lede { max-width: 60ch; font-size: var(--step-1); line-height: 1.45; }
-.meta { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; margin: 0; font-size: var(--step--1); }
+.masthead { display: grid; gap: 8px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.title-block { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; }
+.lede { color: var(--muted); }
+.meta { display: flex; flex-wrap: wrap; gap: 2px 24px; margin: 0; font-size: var(--step--1); }
+.meta div { display: flex; gap: 6px; }
 .meta dt { color: var(--muted); }
 .meta dd { margin: 0; font-family: var(--font-data); font-variant-numeric: tabular-nums; }
-.provenance { margin-top: -24px; font-size: var(--step--1); color: var(--muted); max-width: 90ch; }
+.provenance { font-size: var(--step--1); color: var(--muted); max-width: 90ch; }
 .provenance strong { color: var(--ink); margin-right: 4px; }
 
 .sec { display: grid; gap: 16px; }
@@ -117,15 +111,15 @@ button, select, input { font: inherit; color: inherit; }
 .cal-wrap { display: grid; gap: 4px; }
 .cal, .cal-dow { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
 .cal-dow span { font-family: var(--font-display); font-size: var(--step--1); font-weight: 600; color: var(--muted); padding-left: 2px; }
-.cell { min-height: 82px; border-radius: var(--radius); border: 1px solid transparent; border-left: 4px solid var(--lv0-mark); padding: 7px 8px; display: grid; grid-template-rows: auto auto 1fr auto; gap: 1px; text-align: left; background: var(--lv0-bg); color: var(--lv0-ink); cursor: pointer; min-width: 0; }
-button.cell:hover { border-color: var(--line-strong); border-left-color: inherit; }
+.cell { min-height: 82px; border-radius: var(--radius); border: 1px solid transparent; padding: 7px 8px; display: grid; grid-template-rows: auto auto 1fr auto; gap: 1px; text-align: left; background: var(--lv0-bg); color: var(--lv0-ink); cursor: pointer; min-width: 0; }
+button.cell:hover { border-color: var(--ink); }
 .cell[aria-pressed="true"] { outline: 3px solid var(--accent); outline-offset: 1px; }
 .cell-off { background: transparent; border: 1px dashed var(--line); color: var(--muted); cursor: default; }
 .cell-beyond { background: repeating-linear-gradient(135deg, var(--surface) 0 6px, var(--hatch) 6px 12px); color: var(--muted); border-color: var(--line); }
-.lv-quiet { background: var(--lv0-bg); color: var(--lv0-ink); border-left-color: var(--lv0-mark); }
-.lv-watch { background: var(--lv1-bg); color: var(--lv1-ink); border-left-color: var(--lv1-mark); }
-.lv-high { background: var(--lv2-bg); color: var(--lv2-ink); border-left-color: var(--lv2-mark); }
-.lv-severe { background: var(--lv3-bg); color: var(--lv3-ink); border-left-color: var(--lv3-mark); }
+.lv-quiet { background: var(--lv0-bg); color: var(--lv0-ink); }
+.lv-watch { background: var(--lv1-bg); color: var(--lv1-ink); }
+.lv-high { background: var(--lv2-bg); color: var(--lv2-ink); }
+.lv-severe { background: var(--lv3-bg); color: var(--lv3-ink); }
 .cell-top { display: flex; align-items: baseline; gap: 6px; }
 .dnum { font-family: var(--font-display); font-weight: 750; font-size: var(--step-1); line-height: 1; font-variant-numeric: tabular-nums; }
 .mon { font-family: var(--font-display); font-size: var(--step--1); font-weight: 600; }
@@ -134,18 +128,22 @@ button.cell:hover { border-color: var(--line-strong); border-left-color: inherit
 .cell-lv { font-family: var(--font-display); font-weight: 700; font-size: var(--step--1); }
 .today { font-size: 0.75rem; font-weight: 700; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: var(--step--1); color: var(--muted); align-items: center; }
-.legend .sw { display: inline-block; width: 14px; height: 14px; border-radius: 2px; vertical-align: -2px; margin-right: 6px; border-left: 4px solid; }
+.legend .sw { display: inline-block; width: 14px; height: 14px; border-radius: 2px; vertical-align: -2px; margin-right: 6px; border: 1px solid var(--line-strong); }
 
 /* Day briefing */
 #day { scroll-margin-top: 16px; }
-.day-head { display: grid; gap: 10px; padding: 20px 22px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-top: 4px solid var(--lv0-mark); border-radius: var(--radius); }
-.day-head.lv-watch { border-top-color: var(--lv1-mark); } .day-head.lv-high { border-top-color: var(--lv2-mark); } .day-head.lv-severe { border-top-color: var(--lv3-mark); }
-.day-head .lv-quiet, .day-head .lv-watch, .day-head .lv-high, .day-head .lv-severe { border-left: 0; }
+.day-head { display: grid; gap: 10px; padding: 20px 22px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius); }
 .verdict { font-size: var(--step-1); line-height: 1.45; max-width: 64ch; }
 .verdict b { font-family: var(--font-data); font-weight: 700; }
 .sev { font-family: var(--font-display); font-weight: 700; padding: 1px 8px; border-radius: 2px; margin-right: 6px; font-size: var(--step-0); white-space: nowrap; }
-.facts { display: flex; flex-wrap: wrap; gap: 4px 22px; font-size: var(--step--1); color: var(--muted); }
-.facts b { color: var(--ink); font-family: var(--font-data); font-weight: 600; }
+.facts { display: flex; flex-wrap: wrap; gap: 6px 28px; margin: 0; font-size: var(--step--1); }
+.facts div { display: grid; gap: 0; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; }
+.facts b { font-size: var(--step-1); font-weight: 700; font-variant-numeric: tabular-nums; }
+.src { display: inline-block; font-size: 0.75rem; font-weight: 700; color: var(--muted); border: 1px solid var(--line-strong); border-radius: 2px; padding: 0 5px; line-height: 1.5; vertical-align: 1px; }
+.trust { font-size: var(--step--1); max-width: 80ch; }
+.trust .src { margin-right: 4px; }
 .notices { display: grid; gap: 8px; }
 .notice { display: grid; grid-template-columns: 9.5em minmax(0, 1fr); gap: 4px 14px; align-items: baseline; padding: 10px 14px; border-radius: var(--radius); background: var(--sunk); font-size: var(--step--1); }
 .notice > .tag { font-family: var(--font-display); font-weight: 700; color: var(--ink); font-size: var(--step--1); }
@@ -158,14 +156,14 @@ button.cell:hover { border-color: var(--line-strong); border-left-color: inherit
 .todo { list-style: none; margin: 0; padding: 0; display: grid; border-top: 1px solid var(--line); }
 .todo-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 18px; padding: 14px 2px; border-bottom: 1px solid var(--line); }
 .todo-item[data-state="accepted"] .todo-title { text-decoration: line-through; text-decoration-color: var(--muted); }
-.todo-item[data-state="accepted"] { background: linear-gradient(90deg, var(--accent-soft), transparent 70%); }
 .todo-body { display: grid; gap: 4px; min-width: 0; justify-items: start; }
 .todo-kind { font-family: var(--font-display); font-size: var(--step--1); font-weight: 650; color: var(--accent); }
 .todo-title { font-size: 1.0625rem; }
 .todo-detail { color: var(--ink); max-width: 72ch; font-size: 0.9375rem; }
 .todo-check { display: inline-flex; gap: 6px; align-items: center; font-size: var(--step--1); font-weight: 600; color: var(--muted); cursor: pointer; white-space: nowrap; }
 .todo-check input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
-.vms { margin-top: 6px; background: var(--vms-bg); color: var(--vms-ink); font-family: "Archivo", monospace; font-stretch: 125%; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; text-align: center; padding: 10px 20px; border-radius: 3px; line-height: 1.5; font-size: var(--step--1); max-width: 100%; box-shadow: inset 0 0 0 3px #2A2A2A; }
+.vms { background: var(--vms-bg); color: var(--vms-ink); font-family: var(--font-data); font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; text-align: center; padding: 10px 20px; border-radius: 3px; line-height: 1.5; font-size: var(--step--1); max-width: 100%; }
+.vms-label { margin-top: 6px; font-size: 0.75rem; font-weight: 700; color: var(--muted); }
 
 /* Map */
 .map-card { padding: 0; overflow: hidden; gap: 0; }
@@ -279,8 +277,8 @@ select { background: var(--surface); border: 1px solid var(--line-strong); borde
 .tl-new { fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-dasharray: 4 3; }
 .tl-grid { stroke: var(--line); }
 .timing { display: grid; gap: 10px; }
-.timing-item { display: grid; gap: 4px; padding: 10px 12px; border-left: 3px solid var(--line-strong); background: var(--sunk); }
-.timing-item.better { border-left-color: var(--accent); background: var(--accent-soft); }
+.timing-item { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); }
+.timing-item.better { border-color: var(--accent); }
 .opts { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: var(--step--1); color: var(--muted); }
 .opts b { font-weight: 600; color: var(--ink); font-family: var(--font-data); }
 
@@ -303,24 +301,20 @@ select { background: var(--surface); border: 1px solid var(--line-strong); borde
 /* Folded detail */
 details.fold { border-top: 1px solid var(--line-strong); }
 details.fold:last-of-type { border-bottom: 1px solid var(--line-strong); }
-details.fold > summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 14px 2px; font-family: var(--font-display); font-stretch: 112%; font-weight: 650; font-size: var(--step-1); }
-details.fold > summary::-webkit-details-marker { display: none; }
-details.fold > summary::after { content: "Show"; font-family: var(--font-body); font-stretch: 100%; font-size: var(--step--1); font-weight: 700; color: var(--accent); }
-details.fold[open] > summary::after { content: "Hide"; }
-details.fold > summary .sum-note { font-family: var(--font-body); font-stretch: 100%; font-weight: 400; font-size: var(--step--1); color: var(--muted); margin-right: auto; padding-left: 4px; }
+details.fold > summary { cursor: pointer; display: list-item; gap: 12px; padding: 14px 2px; font-family: var(--font-display); font-weight: 650; font-size: var(--step-1); }
+details.fold > summary .sum-note { font-family: var(--font-body); font-weight: 400; font-size: var(--step--1); color: var(--muted); padding-left: 8px; }
 .fold-body { display: grid; gap: 20px; padding: 2px 2px 24px; }
 .refusal { border-style: dashed; }
 .steps { margin: 0; padding-left: 1.4em; display: grid; gap: 10px; max-width: 74ch; }
 .steps li::marker { font-family: var(--font-display); font-weight: 700; color: var(--accent); }
 .plain { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; }
 .status { color: var(--warn-ink); background: var(--warn-bg); border-color: var(--warn-line); }
-.evidence { border-left: 4px solid var(--accent); }
 .prose { display: grid; gap: 10px; max-width: 74ch; }
-footer { font-size: var(--step--1); color: var(--muted); border-top: 2px solid var(--ink); padding-top: 14px; }
+footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid var(--line); padding-top: 14px; display: grid; gap: 4px; }
 
-@media (max-width: 900px) { .masthead, .grid2, .sure { grid-template-columns: minmax(0, 1fr); } .provenance { margin-top: -12px; } }
+@media (max-width: 900px) { .grid2, .sure { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 640px) {
-  .cell { min-height: 54px; padding: 5px; border-left-width: 3px; }
+  .cell { min-height: 54px; padding: 5px; }
   .cell-ships, .cell-lv, .mon, .today, .cell-tags { display: none; }
   .cal, .cal-dow { gap: 3px; }
   .todo-item { grid-template-columns: minmax(0, 1fr); }
@@ -335,14 +329,12 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 2px solid v
   <header class="masthead">
     <div class="title-block">
       <h1>Cruise-day traffic forecast</h1>
-      <p class="lede">For Southampton City Council's traffic team: which days and hours cruise ships will congest the roads around the docks, and what to do about it.</p>
+      <p class="lede">Southampton docks, for the council traffic team</p>
     </div>
     <dl class="meta">
-      <dt>Issued</dt><dd id="m-issued"></dd>
-      <dt>Ship schedule</dt><dd id="m-horizon"></dd>
-      <dt>Simulated days per date</dt><dd id="m-n"></dd>
-      <dt>Road network</dt><dd id="m-net"></dd>
-      <dt>Model</dt><dd id="m-model"></dd>
+      <div><dt>Issued</dt><dd id="m-issued"></dd></div>
+      <div><dt>Schedule</dt><dd id="m-horizon"></dd></div>
+      <div><dt>Model</dt><dd id="m-model"></dd></div>
     </dl>
   </header>
   <p class="provenance" role="note"><strong id="m-banner-label">Real map, synthetic traffic.</strong> <span id="m-banner">Roads, junctions, lanes, speed limits and land use come from OpenStreetMap.</span></p>
@@ -350,7 +342,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 2px solid v
   <section class="sec" aria-labelledby="cal-h">
     <div class="sec-head">
       <h2 id="cal-h">Next six weeks</h2>
-      <p>Each day is coloured by how much the ships add to congestion on the <span id="m-roads">27</span> main roads around the docks. Pick a day for its briefing.</p>
+      <p>Colour shows how much the ships add to congestion. Pick a day.</p>
     </div>
     <div class="cal-wrap">
       <div class="cal-dow" aria-hidden="true"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
@@ -418,7 +410,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 2px solid v
       <div class="block-head"><h3>Ships today</h3><span class="foot-note" id="m-sched">Synthetic schedule</span></div>
       <div id="ships"></div>
       <div class="timing" id="timing"></div>
-      <p class="foot-note">Arrival times are set by tides, pilots and itineraries. What can move is when disembarkation starts and when check-in opens, so these are requests to the cruise line and the port.</p>
+      <p class="foot-note">Arrivals are fixed by tides and pilots. Disembarkation and check-in can move, so these are requests to the cruise line and port.</p>
     </div>
 
     <div class="folds">
@@ -431,7 +423,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 2px solid v
         <div class="fold-body"><div class="sure"><div class="chart" id="sure-chart"></div><ul class="plain foot-note" id="sure-drivers"></ul></div></div>
       </details>
       <details class="fold" id="row-model">
-        <summary>Routes and traffic mix <span class="sum-note">How cruise traffic spreads over the roads, and who else is driving</span></summary>
+        <summary>Routes and traffic mix</summary>
         <div class="fold-body grid2">
           <div class="block">
             <div class="block-head"><h3>How cruise traffic is routed</h3><span class="foot-note">Shares and times at <span class="mono" id="rt-clock"></span></span></div>
@@ -449,7 +441,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 2px solid v
         </div>
       </details>
       <details class="fold" id="gates-card">
-        <summary>Dock gates <span class="sum-note">Cruise vehicles per hour at each gate; a coach counts as 2</span></summary>
+        <summary>Dock gates <span class="sum-note">Cruise vehicles per hour; a coach counts as 2</span></summary>
         <div class="fold-body"><div class="gates" id="gates"></div></div>
       </details>
     </div>
@@ -458,7 +450,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 2px solid v
   <section class="sec" aria-labelledby="method-h">
     <div class="sec-head">
       <h2 id="method-h">How the forecast works</h2>
-      <p>A model of Southampton's road network, loaded with everyday traffic and each ship's passengers, run many times per date. The cruise effect is learned from past traffic counts and tested on days the model had not seen.</p>
+      <p>A road-network model run many times per date. The cruise effect is learned from past counts and tested on unseen days.</p>
     </div>
     <div class="grid2">
       <div class="card status evidence" id="backtest-card">
@@ -534,7 +526,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 2px solid v
     </div>
   </section>
 
-  <footer>Map data © OpenStreetMap contributors, available under the Open Database Licence. Generated by <span class="mono">demo/synthetic_demo.py</span> (seed <span id="m-seed"></span>). Gate positions and terminal-to-gate assignments are assumptions.</footer>
+  <footer><span>Road network: <span id="m-net"></span>. Each date is simulated <span id="m-n"></span> times.</span><span>Map data © OpenStreetMap contributors, Open Database Licence. Generated by <span class="mono">demo/synthetic_demo.py</span> (seed <span id="m-seed"></span>). Gate positions and terminal-to-gate assignments are assumptions.</span></footer>
 </div>
 
 <script id="demo-data" type="application/json">__DEMO_DATA__</script>
@@ -681,7 +673,6 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 2px solid v
     $('#m-zones').textContent = int(c.zones);
     $('#m-gw').textContent = int(c.gateways);
     $('#m-ods').textContent = int(c.ods);
-    $('#m-roads').textContent = DATA.corridors.length;
     $('#m-scale').textContent = `×${M.scale} for trips within the area, ×${M.scale_ext} for county and through trips` + (M.scale_freight ? ` and ×${M.scale_freight} for port freight` : '');
     const scaleOf = g => g === 'freight' ? (M.scale_freight || 1) : EXTERNAL.has(g) ? M.scale_ext : M.scale;
     const ms = M.assumptions.mode_share;
@@ -946,7 +937,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 2px solid v
     if (!d.routes.length) { $('#od-list').innerHTML = '<p class="muted">No cruise traffic today.</p>'; $('#routes').innerHTML = ''; $('#share-chart').innerHTML = ''; state.showRoutes = false; return; }
     state.od = Math.min(state.od, d.routes.length - 1);
     $('#od-list').innerHTML = d.routes.map((r, i) => `<button class="od" data-od="${i}" aria-pressed="${i === state.od}">
-      <span><strong>${esc(r.from)}</strong> → <strong>${esc(r.to)}</strong></span><span class="mono">${int(r.veh)}</span>
+      <span><strong>${esc(r.from)}</strong> to <strong>${esc(r.to)}</strong></span><span class="mono">${int(r.veh)}</span>
       <small>${r.hint ? esc(r.hint) + ' · ' : ''}cruise vehicles over the day</small></button>`).join('');
     $('#od-list').querySelectorAll('[data-od]').forEach(b => b.addEventListener('click', () => { state.od = +b.dataset.od; state.showRoutes = true; renderRoutesCard(); paintRoads(); }));
     renderRouteDetail();
@@ -956,7 +947,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 2px solid v
     const b = state.bin;
     $('#routes').innerHTML = od.routes.map((r, i) => `<div class="rt">
       <span class="rt-key" style="background: var(--${['ra', 'rb', 'rc'][i]})"></span>
-      <span>Route ${'ABC'[i]}: ${r.via.length ? esc(r.via.join(' → ')) : 'local roads'}</span>
+      <span>Route ${'ABC'[i]}: ${r.via.length ? esc(r.via.join(', then ')) : 'local roads'}</span>
       <span class="mono">${r.share[b]}% · ${(r.min[b] / 10).toFixed(1)} min</span>
       <span class="rt-bar"><i style="width:${r.share[b]}%; background: var(--${['ra', 'rb', 'rc'][i]})"></i></span></div>`).join('') +
       `<p class="foot-note">Shares are for all traffic between these two places at ${binTime(b)}, and shift as roads fill. <button class="linkbtn" id="toggle-routes">${state.showRoutes ? 'Hide routes on the map' : 'Show routes on the map'}</button></p>`;
@@ -1109,12 +1100,12 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 2px solid v
       if (!alt.length) continue;
       const a = alt[0];
       acts.push({ id: 'div-' + od.from + od.to, kind: 'Diversion', title: `Expect traffic from ${od.from} to ${od.to} to divert`,
-        detail: `Up to <span class="mono">${Math.max(...a.ws.map(w => w[2]))}%</span> take route ${'ABC'[a.i]} (${esc(a.r.via.join(' → ') || 'local roads')}) ${windowsText(a.ws)} as the main route fills. Check that route can take it.` });
+        detail: `Up to <span class="mono">${Math.max(...a.ws.map(w => w[2]))}%</span> take route ${'ABC'[a.i]} (${esc(a.r.via.join(', then ') || 'local roads')}) ${windowsText(a.ws)} as the main route fills. Check that route can take it.` });
     }
     if (d.timing && d.timing.best < d.timing.base - 0.15) {
       const moves = d.timing.shifts.map((sh, i) => [sh, d.calls[i]]).filter(([sh]) => sh[0] || sh[1]);
       acts.push({ id: 'timing', kind: 'Ship timing', title: `Ask the port to move ${moves.length === 1 ? 'one ship\'s' : moves.length + ' ships\''} disembarkation or check-in`,
-        detail: `${moves.map(([sh, c]) => esc(c.ship) + (sh[0] ? ` disembarkation ${sh[0] > 0 ? '+' : '−'}${Math.abs(sh[0])} min` : '') + (sh[1] ? ` check-in ${sh[1] > 0 ? '+' : '−'}${Math.abs(sh[1])} min` : '')).join('; ')}. Congested road-hours <span class="mono">${fmt1(d.timing.base)}</span> → <span class="mono">${fmt1(d.timing.best)}</span>.` });
+        detail: `${moves.map(([sh, c]) => esc(c.ship) + (sh[0] ? ` disembarkation ${sh[0] > 0 ? '+' : '−'}${Math.abs(sh[0])} min` : '') + (sh[1] ? ` check-in ${sh[1] > 0 ? '+' : '−'}${Math.abs(sh[1])} min` : '')).join('; ')}. Congested road-hours fall from <span class="mono">${fmt1(d.timing.base)}</span> to <span class="mono">${fmt1(d.timing.best)}</span>.` });
     }
     for (const id of d.permits) {
       const pm = PERMIT[id], moved = d.whatif.move_permit;
@@ -1135,9 +1126,9 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 2px solid v
       return `<li class="todo-item" data-key="${esc(key)}" data-state="${done ? 'accepted' : 'open'}">
         <div class="todo-body"><span class="todo-kind">${esc(a.kind)}</span><strong class="todo-title">${esc(a.title)}</strong><p class="todo-detail">${a.detail}</p>
           ${a.scenario ? `<button class="linkbtn" data-scenario="${a.scenario}">Show the forecast with it moved</button>` : ''}
-          ${a.vms ? `<div class="vms" role="img" aria-label="${esc('Suggested sign text: ' + a.vms.join(', '))}">${a.vms.map(esc).join('<br>')}</div>` : ''}</div>
+          ${a.vms ? `<span class="vms-label">Suggested sign text</span><div class="vms" role="img" aria-label="${esc('Suggested sign text: ' + a.vms.join(', '))}">${a.vms.map(esc).join('<br>')}</div>` : ''}</div>
         <label class="todo-check" for="${cid}"><input type="checkbox" id="${cid}"${done ? ' checked' : ''}> Arranged</label></li>`;
-    }).join('')}</ul><p class="foot-note">Suggestions only; the duty officer decides. In the product each decision is logged with who made it and why.</p>`;
+    }).join('')}</ul><p class="foot-note">Suggestions only. The duty officer decides.</p>`;
     el.querySelectorAll('[data-scenario]').forEach(b => b.addEventListener('click', () => setScenario(b.dataset.scenario)));
     el.querySelectorAll('.todo-check input').forEach(cb => cb.addEventListener('change', () => {
       const li = cb.closest('.todo-item');
@@ -1275,7 +1266,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 2px solid v
         <li><strong>Car and taxi trips from the county</strong> rather than the city: ${Math.round(P.county * 100)}% (was ${Math.round(D.county * 100)}%)</li>
         <li><strong>Disembarkation traffic leaves</strong> ${P.dis_shift ? `${P.dis_shift} minutes later` : 'at the starting time'} (was +${D.dis_shift} min)</li>
       </ul>
-      <p>Error per 15 minutes: <span class="mono">${F.rmse_before}</span> → <span class="mono">${F.rmse}</span> vehicles. Extra vehicles 05:00–20:00: learned <span class="mono">${sum(F.learned)}</span>, simulated <span class="mono">${sum(F.fitted)}</span> (was <span class="mono">${sum(F.before)}</span>). The sensor sees only northbound traffic 4–7 km from the terminals, so roads nearer the docks are still modelled, not measured.</p>`;
+      <p>Error per 15 minutes fell from <span class="mono">${F.rmse_before}</span> to <span class="mono">${F.rmse}</span> vehicles. Extra vehicles 05:00–20:00: learned <span class="mono">${sum(F.learned)}</span>, simulated <span class="mono">${sum(F.fitted)}</span> (was <span class="mono">${sum(F.before)}</span>). The sensor sees only northbound traffic 4–7 km from the terminals, so roads nearer the docks are still modelled, not measured.</p>`;
   }
 
   /* ---------- uncertainty ---------- */
@@ -1310,6 +1301,21 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 2px solid v
   }
 
   /* ---------- day ---------- */
+  function schedSrc() {
+    const sc = (M.sources || {}).schedule;
+    return sc && !sc.synthetic ? 'Published' : 'Invented';
+  }
+  function trustLine() {
+    const B = DATA.backtest, R = B && B.results && B.results.per_day;
+    let t = 'Traffic here is modelled, not measured. ';
+    if (R && R.model && R.last_comparable) {
+      const days = R.all && R.all.days ? R.all.days : (B.split && B.split.test ? B.split.test.days : null);
+      t += `On ${days ? days + ' ' : ''}past days on the M271, 4 to 7 km away, the cruise effect was out by ${int(R.model.mae)} vehicles a day on average, against ${int(R.last_comparable.mae)} for copying the last similar cruise day. `;
+    } else {
+      t += 'The cruise effect has not yet been tested against past days. ';
+    }
+    return t + 'Roads next to the docks have no public counts to check against.';
+  }
   function selectDay(iso, scroll) {
     stopPlay();
     state.date = iso; state.scenario = 'base'; state.od = 0; state.showRoutes = false;
@@ -1341,12 +1347,18 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 2px solid v
     const add = added(d); let hit = null;
     for (const c of DATA.corridors) for (let b = 0; b < N_BINS; b++) if (!hit || add[c.id][b] > hit.v) hit = { v: add[c.id][b], b, c };
     const head = $('#day-head');
-    head.className = `day-head lv-${lv.key}`;
+    head.className = 'day-head';
     const verdict = !n ? 'No cruise ships today. The map and timetable show everyday traffic only.'
       : `<span class="sev lv-${lv.key}">${lv.label}</span>${n} ${n === 1 ? 'ship' : 'ships'} turning around. The ships add about <b>${fmt1(uplift(d))}</b> hours of congested road${d.range ? ` (likely ${upRange(d)})` : ''}.${hit && hit.v >= 20 ? ` They hit hardest around <b>${binTime(hit.b)}</b> on ${esc(hit.c.name)}, where they raise the chance of congestion by ${hit.v} points.` : ''}`;
     head.innerHTML = `<h2>${esc(longDate(d.date))}</h2><p class="verdict">${verdict}</p>
-      <p class="facts"><span>All traffic: <b>${fmt1(d.range ? d.range.score[1] : d.score)}</b> hours of congested road</span><span>Without the ships: <b>${fmt1(d.range ? d.range.bg[1] : d.bg_score)}</b></span><span>${M.n} simulated days${d.lead != null ? `, ${d.lead} days ahead` : ''}</span></p>
-      <p class="foot-note">A road counts as congested when it is over 85% of its capacity. Hours are added up over the ${DATA.corridors.length} main roads on a typical simulated day; the likely range covers 8 days in 10.</p>`;
+      <p class="trust"><span class="src">Limits</span> ${trustLine()}</p>
+      <dl class="facts">
+        <div><dt>Ships</dt><dd><b>${n}</b> <span class="src">${schedSrc()}</span></dd></div>
+        <div><dt>Added by ships</dt><dd><b>${fmt1(uplift(d))}</b> h <span class="src">Modelled</span></dd></div>
+        <div><dt>All traffic</dt><dd><b>${fmt1(d.range ? d.range.score[1] : d.score)}</b> h <span class="src">Modelled</span></dd></div>
+        <div><dt>Without ships</dt><dd><b>${fmt1(d.range ? d.range.bg[1] : d.bg_score)}</b> h <span class="src">Modelled</span></dd></div>
+      </dl>
+      <p class="foot-note">Congested means over 85% of capacity, summed over ${DATA.corridors.length} main roads. The likely range covers 8 days in 10.</p>`;
     const notes = [];
     d.permits.forEach(id => { const p = PERMIT[id]; notes.push(`<div class="notice"><span class="tag">Roadworks</span><span><strong>Permit ${id}:</strong> ${esc(p.what)} on ${esc(CORR[p.corridor] ? CORR[p.corridor].name : p.corridor)}, ${esc(shortDate(p.from))} to ${esc(shortDate(p.to))}${p.source ? ` (${esc(p.source)})` : ''}. Already in the forecast: traffic reroutes around it.${d.whatif.move_permit ? ' <button class="linkbtn" data-scenario="move_permit">See it moved</button>' : ''}</span></div>`); });
     const fixture = (DATA.matches || []).find(x => x.date === d.date);
@@ -1371,7 +1383,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 2px solid v
     if (state.scenario !== 'base') {
       const base = d.score, now = scenScore(d, state.scenario), diff = now - base;
       delta = state.scenario === 'cruise' ? `The ships add <span class="mono">${fmt1(now)}</span> of the <span class="mono">${fmt1(base)}</span> congested road-hours.`
-        : `Congested road-hours: <span class="mono">${fmt1(base)}</span> as planned → <span class="mono">${fmt1(now)}</span> (<span class="mono">${diff >= 0 ? '+' : '−'}${fmt1(Math.abs(diff))}</span>)`;
+        : `Congested road-hours: <span class="mono">${fmt1(base)}</span> as planned, <span class="mono">${fmt1(now)}</span> with this change (<span class="mono">${diff >= 0 ? '+' : '−'}${fmt1(Math.abs(diff))}</span>)`;
     } else if (!Object.keys(d.whatif).length && d.calls.length) {
       delta = '<span class="foot-note">Road closure what-ifs are precomputed for the busiest days and permit days in this demo.</span>';
     }
