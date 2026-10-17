@@ -10,7 +10,8 @@ The simulator is dependency-injected as a ``Simulator`` callable, not imported, 
 runs today against any model that maps knobs to per-site/bin uplift and swaps straight onto
 Seb's SOT-10 ``forecast_day(day, params: SimParams)`` the moment it lands. Until then the only
 real target -- a parametric ``simulate_uplift`` over the WebTRIS sites -- does not exist in
-``src/`` (SOT-10 is Backlog), so the committed ``best.json`` is produced from the synthetic
+``src/`` (SOT-10 is Backlog), so the generated ``best.json`` (gitignored, not committed) is
+produced from the synthetic
 stand-in in this module and is labelled ``"source": "synthetic"``.
 
 Observed uplift comes from ``sotonship26.data.observed.observed_uplift(flows, days)``:
@@ -106,6 +107,9 @@ def _aligned_errors(target: pd.DataFrame, simulated: pd.DataFrame) -> np.ndarray
     """Absolute per-bin errors on the bins present in both frames."""
     sim = _norm(simulated)[[*KEY_COLS, "uplift_veh"]]
     merged = target.merge(sim, on=KEY_COLS, suffixes=("_obs", "_sim"))
+    # A real simulator may leave gap bins NaN; obs is already non-NaN (observed_target drops it).
+    # Keep only bins scored on both sides so the objective is a real number, not NaN.
+    merged = merged.dropna(subset=["uplift_veh_sim"])
     if merged.empty:
         return np.array([])
     return np.abs(merged["uplift_veh_obs"].to_numpy() - merged["uplift_veh_sim"].to_numpy())
@@ -197,7 +201,9 @@ def backtest_table(
     knobs = dict(params) if params is not None else fitted_params(path)
     target = observed_target(observed, days)
     sim = _norm(simulate(knobs, days))[[*KEY_COLS, "uplift_veh"]]
-    merged = target.merge(sim, on=KEY_COLS, suffixes=("_obs", "_sim"))
+    # Drop bins the simulator left NaN so n_bins and both MAEs are computed over the same bins.
+    merged = target.merge(sim, on=KEY_COLS, suffixes=("_obs", "_sim")).dropna(
+        subset=["uplift_veh_sim"])
 
     def row(site_id: int, g: pd.DataFrame) -> dict[str, float]:
         err = np.abs(g["uplift_veh_obs"] - g["uplift_veh_sim"])
