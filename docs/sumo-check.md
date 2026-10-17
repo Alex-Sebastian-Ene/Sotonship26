@@ -14,6 +14,11 @@ signal plans, no junction tuning, no fit to counts). Where the two models disagr
 known to be right; the observed data that exist (WebTRIS on the M271, the council's Portswood bus
 times) are shown next to both. Nothing in this document feeds the forecast page.
 
+**Which macro model.** Every macro figure here is the model on main at 322fa2e (17 Oct, before
+SOT-27's west-side refit and SOT-30's queues held at their bottleneck were merged). Both change
+the macro side of this comparison (the M271 demand and the point queues in particular), so the
+numbers describe that version; `cluster/iridis/sumo.slurm` reruns the check on the current one.
+
 ## Findings (Sat 17 Oct 2026, Iridis)
 
 1. **At the forecast's own demand, SUMO's network gridlocks.** On the sampled Monday 16 Nov
