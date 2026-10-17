@@ -536,6 +536,11 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
 .ab-ico { fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .ab-open { fill: var(--surface); stroke: var(--accent); stroke-width: 2; stroke-dasharray: 3 3; opacity: .85; }
 .ab-label { font-family: var(--font-body); font-size: 11.5px; font-weight: 750; fill: var(--ink); paint-order: stroke; stroke: var(--surface); stroke-width: 3.5px; stroke-linejoin: round; pointer-events: none; }
+.veh-days { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 3; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 10px;
+  max-width: calc(100% - 24px); padding: 8px 12px; border-radius: 12px; font-size: .85rem; font-weight: 650; background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border: 1px solid var(--accent); box-shadow: 0 8px 24px rgba(0, 0, 0, .25); }
+.veh-days[hidden] { display: none; }
+.veh-days .chip { font-weight: 700; }
 .act-key { position: absolute; left: 12px; bottom: 30px; display: none; gap: 12px; padding: 6px 10px; border-radius: 8px; font-size: .78rem; font-weight: 650;
   background: color-mix(in srgb, var(--surface) 86%, transparent); border: 1px solid var(--line); }
 .map-box.has-acts .act-key { display: flex; }
@@ -766,6 +771,7 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
             <button id="z-all">All</button>
           </div>
           <p class="map-attr">© OpenStreetMap contributors</p>
+          <div class="veh-days" id="veh-days" hidden></div>
           <div class="act-key" aria-hidden="true"><span><i class="ak-on"></i>Arranged</span><span><i class="ak-off"></i>Suggested</span></div>
         </div>
         <div class="map-legend" id="map-legend"></div>
@@ -2125,7 +2131,10 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
     }
     $('#row-vehicles').hidden = false;
     $('#veh-row').hidden = state.layer !== 'agents';
-    const days = Object.keys(AG.days);
+    const days = Object.keys(AG.days).sort();
+    const vd = $('#veh-days');
+    vd.hidden = !!A || BY_DATE[state.date].beyond;
+    if (!A) { vd.innerHTML = `<span>Live cars and buses are simulated for</span>${chips(days)}`; wireChips(vd); }
     if (!A) {
       $('#veh-note').textContent = '';
       $('#veh-body').innerHTML = `<p>Individual vehicles and buses are simulated for ${days.length} days: ${chips(days)}</p>`;
@@ -2303,12 +2312,12 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
   }
 
   const hhmm = m => { const r = Math.round(m); return `${pad(Math.floor(r / 60))}:${pad(r % 60)}`; };
-  function stopVehicles() { if (vehAnim) cancelAnimationFrame(vehAnim); vehAnim = null; $('#veh-play').textContent = 'Play vehicles'; }
+  function stopVehicles() { if (vehAnim) cancelAnimationFrame(vehAnim); vehAnim = null; $('#veh-play').textContent = 'Play vehicles'; if (!state.playing) $('#play').textContent = 'Play the day'; }
   $('#veh-play').addEventListener('click', () => {
     if (vehAnim) return stopVehicles();
     stopPlay();
     if (state.minute >= 1199) state.minute = 300;
-    $('#veh-play').textContent = 'Pause';
+    $('#veh-play').textContent = 'Pause'; $('#play').textContent = 'Pause';
     let last = performance.now();
     const tick = now => {
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
@@ -2472,6 +2481,10 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
   $('#slider').addEventListener('input', e => setBin(+e.target.value));
   $('#play').addEventListener('click', () => {
     if (state.playing) return stopPlay();
+    if (agentDay() && !REDUCED) {
+      if (state.layer !== 'agents') $('#layer-agents').click(); else $('#veh-play').click();
+      return;
+    }
     stopVehicles();
     if (state.bin >= N_BINS - 1) state.bin = 0;
     $('#play').textContent = 'Pause';
@@ -2786,7 +2799,8 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
   renderBacktest();
   renderFit();
   buildMap();
-  selectDay(BY_DATE['2026-10-24'] ? '2026-10-24' : DATA.days[0].date, false);
+  const agDays = AG ? Object.keys(AG.days).filter(x => BY_DATE[x]).sort() : [];
+  selectDay(agDays.includes('2026-10-24') ? '2026-10-24' : agDays[0] || (BY_DATE['2026-10-24'] ? '2026-10-24' : DATA.days[0].date), false);
   requestAnimationFrame(() => { layout(); zoomTo('docks', false); });
   renderChip(); showView(location.hash.slice(1), true);
 })();
