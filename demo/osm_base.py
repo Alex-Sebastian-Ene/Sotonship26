@@ -14,8 +14,8 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import math
+import os
 import pickle
 import re
 from pathlib import Path
@@ -25,7 +25,7 @@ import numpy as np
 import osmnx as ox
 from shapely import STRtree
 from shapely.geometry import LineString, MultiLineString, MultiPolygon, Point, Polygon, box
-from shapely.ops import linemerge, polygonize, unary_union
+from shapely.ops import polygonize, unary_union
 
 BBOX = (-1.53, 50.855, -1.29, 50.975)  # west, south, east, north (WGS84)
 CRS = "EPSG:27700"
