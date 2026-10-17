@@ -482,6 +482,9 @@ def write_configs(run_dir: Path, net_path: Path, threads: int, seed: int,
             "<additional>\n"
             f'  <edgeData id="ed15" period="900" begin="{DAY_START_S}" end="{END_S}" '
             f'file="{mode}.edgedata.xml.gz" excludeEmpty="true"/>\n'
+            # minute by minute per road, for watching queues form and clear
+            f'  <edgeData id="ed1" period="60" begin="{DAY_START_S}" end="{END_S}" '
+            f'file="{mode}.edgedata_1min.xml.gz" excludeEmpty="true"/>\n'
             "</additional>\n", encoding="utf-8", newline="\n")
         meso = ("    <mesosim value=\"true\"/>\n    <meso-junction-control value=\"true\"/>\n"
                 if mode == "meso" else
