@@ -170,6 +170,26 @@ def show(s: dict, log=print) -> None:
     log(f"vehicles held over a bin, summed over the day: {s['held']:.0f}")
 
 
+def served(ctx) -> list[dict]:
+    """Two-way flows a counter would see on the counted roads (at most capacity), weekday 07-10
+    and 16-19 on a deterministic day, against the counts times UNI_TERM: the 80th-percentile link,
+    as calibrate_to_counts reads them."""
+    m = ctx.m
+    v = np.minimum(tm.flows(m, tm.background(m, 0)[0], m.cap, pre=m.pre.get(0)), m.cap)
+    rows = []
+    for s_ in sd.COUNT_SITES:
+        edges = tm.road_edges(m, s_["names"])
+        if not edges:
+            continue
+        tw = tm.two_way(m, v, edges, q=80) / 4.0
+        for per in ("am", "pm"):
+            a, b = tm.PERIODS[per]
+            rows.append({"road": s_["label"], "period": per,
+                         "target": round(float(sum(s_["weekday"][per])) * tm.UNI_TERM),
+                         "modelled": round(float(tw[a:b].sum()))})
+    return rows
+
+
 def main(argv=None) -> None:
     global CTX
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
@@ -198,6 +218,10 @@ def main(argv=None) -> None:
         results = pool.map(one, jobs)
     s = summarise(results)
     show(s)
+    s["served"] = served(CTX)
+    for r in s["served"]:
+        print(f"served {r['road']:36s} {r['period']} counts x UNI_TERM {r['target']:6d}  "
+              f"modelled {r['modelled']:6d}")
     if args.json:
         args.json.write_text(json.dumps({"date": args.date, "uni_term": tm.UNI_TERM, **s}),
                              encoding="utf-8")

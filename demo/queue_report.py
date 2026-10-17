@@ -68,6 +68,9 @@ def bus(path: Path) -> None:
                  for p in ("am", "pm")]
         print(f"  Bluestar {r['route']:2s} {r['dir']:10s} AM {cells[0]}  PM {cells[1]}  "
               f"5+ {100 * (r['five'] or 0):4.1f}%/{100 * r['council']['five']:4.1f}%")
+    for r in s.get("served", []):
+        print(f"  served {r['road'][:22]:22s} {r['period']}: counts x UNI_TERM {r['target']:5d}, "
+              f"modelled {r['modelled']:5d} ({100 * (r['modelled'] / r['target'] - 1):+.0f}%)")
 
 
 def main(argv=None) -> None:
