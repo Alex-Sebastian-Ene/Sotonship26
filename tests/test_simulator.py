@@ -1,4 +1,6 @@
+import sys
 from datetime import date
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -214,3 +216,15 @@ def test_real_demo_calibration_saturday():
     ]
     out = sim.simulate_uplift(DAY, calls=calls, samples=2)
     assert len(out) == 96 and out["uplift_veh"].iloc[20:80].sum() > 0
+
+
+@needs_ctx
+def test_context_loads_before_the_demo_is_imported(monkeypatch):
+    monkeypatch.setattr(
+        sys, "path", [p for p in sys.path if Path(p).resolve() != sim.DEMO.resolve()]
+    )
+    for mod in ("synthetic_demo", "traffic_model", "external_data", "freight_days"):
+        monkeypatch.delitem(sys.modules, mod, raising=False)
+    sim._CONTEXTS.clear()
+    ctx = sim.load_context()
+    assert hasattr(ctx, "m") and len(ctx.m.t0) > 1000

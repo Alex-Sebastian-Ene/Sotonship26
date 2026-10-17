@@ -155,6 +155,7 @@ def load_context(path: str | Path | None = None, *, build: bool = False):
     key = str(path.resolve())
     if key in _CONTEXTS and not build:
         return _CONTEXTS[key]
+    demo_module()  # puts demo/ on the path, where a cache pickled outside __main__ finds classes
     if build:
         ctx, _ = demo_module().build_ctx(log=lambda *a: None)
     elif path.exists():
