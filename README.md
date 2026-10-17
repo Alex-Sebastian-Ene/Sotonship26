@@ -1,38 +1,74 @@
 # Sotonship26
 
-We help Southampton City Council's events team plan cruise turnaround days by forecasting, with
-probabilities, where passengers will overload the streets around the terminals and where ferries and
-leisure craft will bunch up against the clear channel kept for large ships in Southampton Water. The
-inputs are the cruise schedule, UKHO tide predictions and an autorouting-style congestion model run
-over both the street network and the waterway.
+We help Southampton City Council's traffic management team decide which cruise days and hours need
+traffic marshals, sign messages and a hold on roadworks around the docks. The forecast is
+probabilistic: for each road corridor and 15-minute slot it gives the chance of congestion and the
+extra traffic the ships add, with a 10/50/90% range. The inputs are the VTS cruise schedule, Saints
+home fixtures, school term dates, roadworks permits and port freight, run over the real road
+network and checked against observed traffic. [docs/design.md](docs/design.md) has the full plan.
+
+The product is vehicle traffic, not people on foot (team decision, Sat 17 Oct 2026). The footways
+round the terminals are wide enough that walking passengers don't change any decision the council
+makes. The pedestrian and waterway code from the first design is still in the package but is not
+part of the product.
 
 ## How it fits together
 
-```
-cruise schedule ─┐                        ┌─ street graph (OSM walking network)
-UKHO tides ──────┼─► demand per 15-min bin ┼─► PathFinder negotiated-congestion routing
-ferry timetable ─┘   (sampled per scenario)└─ waterway lattice minus the moving clear channel
-                                   │
-                   Monte Carlo over many sampled days
-                                   ▼
-          P(overload) per street segment / water cell per time bin
-          + where craft are held waiting to cross the channel
-                                   │
-              RL agent (PPO) learns metering and steering levers
+```mermaid
+flowchart TD
+    subgraph inputs["Inputs, real, dated, cited"]
+        vts["VTS cruise schedule<br/>ships · berths · passengers"]
+        cal["Saints fixtures · school terms<br/>bank holidays"]
+        permits["Street Manager<br/>roadworks permits"]
+        freight["Port freight calls<br/>container + RoRo"]
+        census["Census + DfT gateway<br/>commuter / through traffic"]
+    end
+
+    subgraph model["Traffic model on the real road network"]
+        trips["Vehicle trips per 15-min bin<br/>cars · taxis · coaches · lorries · buses"]
+        net["OSM directed road graph<br/>lanes · dock gates"]
+        route["Route choice + queues<br/>carried between bins"]
+        mc["Monte Carlo over sampled days<br/>paired with / without ships"]
+    end
+
+    subgraph calib["Fitted + checked against observed traffic"]
+        webtris["WebTRIS 15-min<br/>M271 · M3 J14"]
+        dft["DfT AADF + hourly counts"]
+        imagery["Aerial car-park occupancy<br/>+ camera vehicle counts"]
+    end
+
+    out(["P(congestion) per corridor per 15 min<br/>+ cruise uplift, 10 / 50 / 90% range"])
+
+    subgraph product["demo/page.html, what the council sees"]
+        calendar["Calendar<br/>days coloured by risk"]
+        dayview["Day view<br/>corridor × 15-min heatmap + map"]
+        whatif["What-if<br/>close a road, rerun before/after"]
+    end
+
+    vts --> trips
+    cal --> trips
+    permits --> trips
+    freight --> trips
+    census --> trips
+    trips --> net --> route --> mc --> out
+    calib -. "calibrate / backtest" .-> model
+    out --> calendar
+    out --> dayview
+    out --> whatif
 ```
 
 | Module | What it does |
 | --- | --- |
-| `data/cruise.py` | Loads the cruise schedule CSV (`ship, terminal, arrival, departure, passengers`) |
-| `data/tides.py` | ADMIRALTY UK Tidal API client (`UKHO_API_KEY`) and tide height interpolation |
-| `data/streets.py` | OSM walking network around the terminals with per-edge capacity |
-| `data/waterway.py` | Southampton Water as a lattice, gated by depth at the predicted tide |
-| `demand/` | Passenger turnaround flows, ferry runs, leisure-craft trips per time bin |
-| `routing/pathfinder.py` | PathFinder (McMurchie & Ebeling) rip-up-and-reroute congestion negotiation |
-| `routing/clear_channel.py` | The moving exclusion box ahead of large ships |
-| `forecast/` | Monte Carlo over sampled days → overload probabilities |
-| `rl/env.py` | Gymnasium env: steer edges and meter demand to cut overload |
-| `synthetic.py` | Small street and waterway scenarios so everything runs before real data |
+| `data/vts.py` | Real cruise schedule from the VTS feed, with lower-berth capacity per ship |
+| `data/vts_freight.py` | Container and RoRo calls per day, for port lorry demand |
+| `data/dft.py` | DfT road traffic counts (yearly averages and hourly counts) near the docks |
+| `data/observed.py` | WebTRIS 15-minute observed flows on the M271 and M3 |
+| `data/roads.py`, `corridors.py` | Directed road graph, corridors, terminal-to-gate table, candidate paths |
+| `flow_forecast.py` | Ridge forecast of everyday traffic, scored against planner baselines |
+| `uplift.py`, `uplift_model.py`, `backtest.py` | Cruise-day uplift target, baselines and backtest |
+| `imagery/`, `vision/` | Car-park occupancy from aerial tiles; vehicle counts from camera stills |
+| `demo/` | The forecast page: traffic model on the real network, real inputs, `page.html` |
+| `data/streets.py`, `data/waterway.py`, `data/tides.py`, `demand/`, `rl/` | First design (pedestrians and waterway), parked |
 
 Settings, with the guesses that still need calibrating marked as such, live in
 [configs/default.yaml](configs/default.yaml).
@@ -192,5 +228,8 @@ data improves it by about 4% a day (not significant) and 2% per 15 minutes.
   `tests/test_bus_lateness.py` and the "Buses observed on the day" fold of `demo/page.html` were
   written by Claude Code (Edward's session) on Sat 17 Oct 2026, porting the bustimes.org pipeline
   from the parked Gangway branch (`claude/wizardly-thompson-ybdvds`, b8a77c4) onto main.
+- **AI-assisted research:** `notes/local-evidence.md` (local evidence, scale and business numbers)
+  was compiled by Claude Code (Edward's session, with a research subagent) on Sat 17 Oct 2026 from
+  the public sources cited on each line.
 - **Existed before the event:** TODO, confirm with the organisers.
 - **Who helped:** TODO.
