@@ -128,6 +128,7 @@ actual berthings. Days no capture covers (Jul 2024, Jan to Aug 2025) are left ou
 counted as non-cruise days. The traffic is one motorway sensor (M271 northbound), 4 to 7 km from
 the terminals. Most of the model's gain over the baselines comes from the calendar: adding ship
 data improves it by about 4% a day (not significant) and 2% per 15 minutes.
+| DfT road traffic statistics, AADF by direction and hourly raw manual counts (API, Southampton LA 137) | Background traffic and hourly profile on counted roads, fetched by `data/dft.py`, cached in `data/raw/dft/`, not committed | At run time (first pull 16 Oct 2026) | Open Government Licence v3.0 |
 
 ## Provenance
 
@@ -156,5 +157,7 @@ data improves it by about 4% a day (not significant) and 2% per 15 minutes.
 - **AI-generated:** the VTS schedule loader (`src/sotonship26/data/vts.py`, `tests/test_vts.py`)
   was written by Claude Code (Edward's session) on Fri 16 Oct 2026. Keanu's Claude Code research
   desk compiled `ship_capacity.csv` from the public sources cited on each row.
+- **AI-generated:** `src/sotonship26/data/dft.py` and `tests/test_dft.py` were written by Claude
+  Code (Edward's session) on Fri 16 Oct 2026.
 - **Existed before the event:** TODO, confirm with the organisers.
 - **Who helped:** TODO.
