@@ -10,7 +10,8 @@ Models, all scored on days after ``cutoff`` with the same lag rule:
   recent_median median of the same weekday over the 4 newest weeks that are published by then
   planner_rule  year_median when available, else recent_median
   ridge         learned: per-bin ridge regression on calendar features (weekday x season,
-                bank holidays, Christmas week, trend), refit at each test month on published data
+                bank holidays, Christmas week, school-holiday weekdays, trend), refit at each
+                test month on published data
 Intervals: split conformal on the newest published 20% of days before each refit, with the
 model for those errors fitted ``lag_days`` earlier so the interval matches the forecast horizon.
 """
@@ -30,6 +31,26 @@ from sotonship26.uplift import BANK_HOLIDAYS, day_matrix
 ROOT = Path(__file__).resolve().parents[2]
 LAG_DAYS = 105
 
+# Southampton City Council school holidays (maintained schools; academies and INSET days vary),
+# inclusive. Sources, checked 2026-10-17: southampton.gov.uk/schools-learning/school-information/
+# school-term-dates/school-year-calendar-YYYY-YY/ for 2024-25 to 2026-27, and the 2023-24 page as
+# archived at web.archive.org/web/20240303065857/ (no longer on the live site).
+SCHOOL_HOLIDAYS = tuple((date.fromisoformat(a), date.fromisoformat(b)) for a, b in (
+    ("2023-10-23", "2023-10-27"), ("2023-12-18", "2023-12-29"), ("2024-02-12", "2024-02-16"),
+    ("2024-04-01", "2024-04-12"), ("2024-05-27", "2024-05-31"), ("2024-07-25", "2024-08-30"),
+    ("2024-10-28", "2024-11-01"), ("2024-12-23", "2025-01-03"), ("2025-02-17", "2025-02-21"),
+    ("2025-04-07", "2025-04-21"), ("2025-05-26", "2025-05-30"), ("2025-07-23", "2025-08-29"),
+    ("2025-10-27", "2025-10-31"), ("2025-12-22", "2026-01-02"), ("2026-02-16", "2026-02-20"),
+    ("2026-03-30", "2026-04-10"), ("2026-05-25", "2026-05-29"), ("2026-07-23", "2026-08-31"),
+    ("2026-10-26", "2026-10-30"), ("2026-12-21", "2027-01-03"), ("2027-02-15", "2027-02-19"),
+    ("2027-03-26", "2027-04-09"), ("2027-05-31", "2027-06-04"), ("2027-07-22", "2027-08-31"),
+))
+
+
+def school_holiday(d: date) -> bool:
+    """True on a Southampton school-holiday weekday. Weekends are left out: no school run anyway."""
+    return d.weekday() < 5 and any(a <= d <= b for a, b in SCHOOL_HOLIDAYS)
+
 
 def calendar_features(dates) -> pd.DataFrame:
     """Calendar features per date. Weekday dummies are interacted with an annual cycle so the
@@ -46,6 +67,7 @@ def calendar_features(dates) -> pd.DataFrame:
         out[f"wd{wd}_sin"] = is_wd * np.sin(doy)
         out[f"wd{wd}_cos"] = is_wd * np.cos(doy)
     out["bank_holiday"] = [float(d in BANK_HOLIDAYS) for d in dates]
+    out["school_holiday"] = [float(school_holiday(d)) for d in dates]
     out["christmas"] = [float((d.month == 12 and d.day >= 24) or (d.month == 1 and d.day <= 2))
                         for d in dates]
     out["trend"] = (idx - pd.Timestamp("2024-01-01")).days.to_numpy() / 365.25
