@@ -29,21 +29,26 @@ def thin(agents: dict, keep: float, seed: int = 0) -> None:
     vehicles, and the agents-added-up check is recounted from the agents kept."""
     rng = np.random.default_rng(seed)
     nb = [len(dec(p["b"])) for p in agents["paths"]]
+    nl = [len(dec(p["b"])) for p in agents.get("legs", [])]
     P = agents["purposes"]
-    used = set()
+    used, used_legs = set(), set()
     for day in agents["days"].values():
         A = day["agents"]
+        legs_a, legs_e = A.get("a", [-1] * A["n"]), A.get("e", [-1] * A["n"])
         ints, pos, per = dec(A["t"]), 0, []
-        for p in A["p"]:
-            per.append(ints[pos:pos + nb[p]])
-            pos += nb[p]
+        for p, la, le in zip(A["p"], legs_a, legs_e, strict=True):
+            n = nb[p] + (nl[la] if la >= 0 else 0) + (nl[le] if le >= 0 else 0)
+            per.append(ints[pos:pos + n])
+            pos += n
         k = rng.random(A["n"]) < keep
-        for col in ("k", "o", "d", "p", "q", "c"):
-            A[col] = [v for v, s in zip(A[col], k, strict=True) if s]
+        for col in ("k", "o", "d", "p", "q", "c", "a", "e", "s"):
+            if col in A:
+                A[col] = [v for v, s in zip(A[col], k, strict=True) if s]
         per = [t for t, s in zip(per, k, strict=True) if s]
         A["t"] = "".join(enc(t) for t in per)
         A["n"] = int(k.sum())
         used |= set(A["p"])
+        used_legs |= {x for x in A.get("a", []) + A.get("e", []) if x >= 0}
         day["rates"] = {w: r * keep for w, r in day["rates"].items()}
         day["weights"] = {w: round(1 / r, 1) for w, r in day["rates"].items()}
         counts = {g: [0.0] * len(c["agents"]) for g, c in day["check"].items()}
@@ -59,8 +64,16 @@ def thin(agents: dict, keep: float, seed: int = 0) -> None:
     order = sorted(used)
     new = {old: i for i, old in enumerate(order)}
     agents["paths"] = [agents["paths"][i] for i in order]
+    lorder = sorted(used_legs)
+    lnew = {old: i for i, old in enumerate(lorder)}
+    if "legs" in agents:
+        agents["legs"] = [agents["legs"][i] for i in lorder]
     for day in agents["days"].values():
-        day["agents"]["p"] = [new[p] for p in day["agents"]["p"]]
+        A = day["agents"]
+        A["p"] = [new[p] for p in A["p"]]
+        for col in ("a", "e"):
+            if col in A:
+                A[col] = [lnew[x] if x >= 0 else -1 for x in A[col]]
 
 
 def main(argv=None) -> None:
