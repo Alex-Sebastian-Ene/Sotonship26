@@ -25,14 +25,17 @@ def load(name):
     for _ in range(2):
         clear = a[..., 3] < 40
         edge = np.zeros_like(clear)
-        edge[1:] |= clear[:-1]; edge[:-1] |= clear[1:]; edge[:, 1:] |= clear[:, :-1]; edge[:, :-1] |= clear[:, 1:]
+        edge[1:] |= clear[:-1]
+        edge[:-1] |= clear[1:]
+        edge[:, 1:] |= clear[:, :-1]
+        edge[:, :-1] |= clear[:, 1:]
         a[edge & (a[..., :3].min(axis=2) > 205), 3] = 0
     return Image.fromarray(a)
 
 
-def pad(im, l=0, t=0, r=0, b=0):
-    out = Image.new("RGBA", (im.width + l + r, im.height + t + b))
-    out.alpha_composite(im, (l, t))
+def pad(im, left=0, top=0, right=0, bottom=0):
+    out = Image.new("RGBA", (im.width + left + right, im.height + top + bottom))
+    out.alpha_composite(im, (left, top))
     return out
 
 
@@ -53,7 +56,7 @@ def sample(a, sx, sy):
 
 def gull(n=8):
     """Wings fold towards the shoulders and open again; head, body and tail stay put."""
-    im = pad(load("gull"), t=4, b=4)
+    im = pad(load("gull"), top=4, bottom=4)
     a = np.array(im).astype(float)
     h, w = a.shape[:2]
     yy, xx = np.mgrid[0:h, 0:w].astype(float)
@@ -166,9 +169,12 @@ def sheet(name, frames, dur):
     return {"n": len(frames), "w": w, "h": h, "dur": dur}
 
 
+def wob(n, amp):
+    return [amp * math.sin(2 * math.pi * i / n) for i in range(n)]
+
+
 def main():
     OUT.mkdir(exist_ok=True)
-    wob = lambda n, amp: [amp * math.sin(2 * math.pi * i / n) for i in range(n)]
     meta = {
         "gull": sheet("gull", *gull()),
         "lighthouse": sheet("lighthouse", *lighthouse()),
