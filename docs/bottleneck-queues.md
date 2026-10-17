@@ -1,9 +1,10 @@
 # Queued traffic waits at its bottleneck (SOT-30)
 
 Written Sat 17 Oct 2026 by [seb-claude] (Claude Code), branch `seb/SOT-30-queue-at-bottleneck`,
-stacked on SOT-27 (`docs/west-side-counts.md`). Counts: DfT road traffic statistics, annual
-average daily flow 2025 (published June 2026, OGL v3), and the SCC/WSP Portswood counts (July
-2024). The learned M271 cruise uplift comes from WebTRIS site 19974 (National Highways, OGL v3)
+stacked on SOT-27 (036b27a + 666475d on main 1542e43, `docs/west-side-counts.md`). Counts: DfT
+road traffic statistics, annual average daily flow 2025 (published June 2026, OGL v3), and the
+SCC/WSP Portswood counts and Bluestar run times (July 2024; Portswood Project Baseline Data
+Report, Jan 2025, Table 3-5). The learned M271 cruise uplift comes from WebTRIS site 19974 (National Highways, OGL v3)
 through `demo/webtris_backtest.py`. Every other number here is the city simulator
 (`demo/traffic_model.py`), not an observation.
 
@@ -50,34 +51,39 @@ weekday (3 iterations, laptop) `x` alone took 0.67 s against 0.80 s, and `x` wit
 
 ## Results
 
-Calibration only (`synthetic_demo.build_ctx()`, deterministic), the same on a laptop and on
-Iridis. "Queues only" is steps 1 and 3 (Iridis job 1890524); "this branch" is all four.
+Calibration only (`synthetic_demo.build_ctx()`) is deterministic and the same on a laptop and on
+Iridis. "SOT-27" is Iridis job 1890804 (`/scratch/ase1g23/sotonship26-sot27b`). "Queues only" is
+steps 1, 3 and 4 without step 2 (laptop). "This branch" is all four, Iridis job 1891168
+(`/scratch/ase1g23/sotonship26-sot30b`, `cluster/iridis/bus_check.slurm`, which builds the page
+and then runs the bus check).
 
-| DfT count point (AADF 2025) | Observed | SOT-27 (job 1890271) | Queues only | This branch |
+| DfT count point (AADF 2025) | Observed | SOT-27 | Queues only | This branch |
 |---|---:|---:|---:|---:|
-| 26062 M271, A35 to junction 1 | 53,320 | +11% | +16% | +21% |
-| 90217 A33 Redbridge Road | 69,132 | -9% | -7% | -11% |
-| 36375 A35 Redbridge Causeway | 61,994 | +34% | +36% | +35% |
-| 56347 A33 Millbrook Road West | 49,004 | -38% | -36% | -39% |
-| 57434 A33 The Avenue | 27,474 | -25% | -25% | -29% |
-| 18312 A335 Thomas Lewis Way | 31,027 | +31% | +33% | +29% |
-| 17793 M27 junctions 3-4 | 136,437 | -11% | -10% | -12% |
-| 48091 M27 junctions 4-5 | 112,272 | +11% | +9% | +5% |
-| 38083 M27 junctions 7-8 | 114,831 | +4% | +3% | 0% |
-| 16321 M3 junctions 13-14 | 140,751 | -7% | -8% | -13% |
-| Mean absolute error, 10 fitted points | | 18.1% | 18.4% | 19.5% |
-| Same without the M271 | | 18.9% | 18.7% | 19.4% |
-| Checks: Itchen Bridge / Northam Bridge | 18,300 / 24,312 | +51% / -35% | +55% / -37% | +47% / -40% |
+| 26062 M271, A35 to junction 1 | 53,320 | +10% | +15% | +24% |
+| 90217 A33 Redbridge Road | 69,132 | -10% | -9% | -8% |
+| 36375 A35 Redbridge Causeway | 61,994 | +34% | +37% | +40% |
+| 56347 A33 Millbrook Road West | 49,004 | -38% | -37% | -37% |
+| 57434 A33 The Avenue | 27,474 | -26% | -26% | -27% |
+| 18312 A335 Thomas Lewis Way | 31,027 | +31% | +32% | +34% |
+| 17793 M27 junctions 3-4 | 136,437 | -12% | -11% | -7% |
+| 48091 M27 junctions 4-5 | 112,272 | +11% | +9% | +13% |
+| 38083 M27 junctions 7-8 | 114,831 | +4% | +3% | +7% |
+| 16321 M3 junctions 13-14 | 140,751 | -7% | -9% | -7% |
+| Mean absolute error, 10 fitted points | | 18.3% | 18.6% | 20.4% |
+| Same without the M271 | | | 19.1% | 20.0% |
+| Checks: Itchen Bridge / Northam Bridge | 18,300 / 24,312 | +51% / -35% | +55% / -37% | +53% / -38% |
 
 | | SOT-27 | Queues only | This branch |
 |---|---:|---:|---:|
 | Portswood count sites, weekday AM sum (5,534 counted) | +16% | +16% | +16% |
 | Portswood count sites, weekday PM sum (6,549 counted) | -11% | -13% | -13% |
-| Scales: county / city / port lorries | 1.00 / 1.42 / 1.75 | 1.00 / 1.43 / 1.75 | 0.92 / 1.36 / 1.75 |
-| M271 cruise fit, counted, RMSE per 15 min | 19.6 | 19.3 | **13.6** |
-| M271 cruise fit on link load (what the page used), RMSE | 13.8 | | |
+| Scales: county / city / port lorries | 1.00 / 1.42 / 1.30 | 1.00 / 1.43 / 1.30 | 1.00 / 1.36 / 1.30 |
+| M271 cruise fit, counted, RMSE per 15 min | 19.6 | 18.4 | **13.7** |
+| M271 cruise fit on link load (what the page used), RMSE | 13.7 | | |
 | Cruise assumptions the fit picks (car and taxi share, from the county, shift) | x1.0, 80%, 0 | x1.0, 95%, 0 | x1.15, 95%, 0 |
-| Corridor-hours at risk per day, 44 days, mean (max) | 110.0 (158.5) | 67.6 (99.4) | 57.9 (83.0) |
+| Corridor-hours at risk per day, 44 days, with ships (without) | 102.8 (99.4) | | **56.8 (54.3)** |
+| Cruise uplift on ship days, corridor-hours (29 days) | 5.16 | | 3.81 |
+| Portswood bus run times, July-like weekday, RMSE against Table 3-5 | 3.5 min | | **2.8 min** |
 
 The cruise fit compares the paired with-and-without-ships difference on the two M271 northbound
 links at WebTRIS 19974 with the learned uplift for a Saturday with 5,000 berths at each dock
@@ -87,24 +93,34 @@ starts later (none before 07:00; WebTRIS sees 20-25 per 15 minutes from 06:30), 
 (about 48 per 15 minutes from 08:30 to 10:00 against 69-72) and shows 7-15 per 15 minutes from
 13:00 to 15:00 during check-in, when WebTRIS sees about 1.
 
-**The Redbridge Causeway (36375) is at +35%** (SOT-27: +34%). Eastbound, its traffic waits at
-the one-lane A35 slip to Redbridge roundabout beyond the count point (on all 921 routes that use
-both), so it is counted as it sets off whichever way its queue is handled: the over-supply is
-demand (see `docs/west-side-counts.md`), not queues. The M271 rises from +11% to +21% because
-it is past those jams: traffic held at the A35 slip and at the A33 slip to Redbridge roundabout
-now gets onto it instead of being loaded again upstream (step 1) or disappearing (step 2).
+**Step 2 is a trade.** It is what brings the counted cruise fit under 14 (18.4 without it), and
+it costs about 2 points of DfT error: the 20% of each queue it counts as getting through lands on
+the west side, which is already over. **The Redbridge Causeway (36375) is at +40%** (SOT-27:
++34%). Eastbound its traffic waits at the one-lane A35 slip to Redbridge roundabout beyond the
+count point (on all 921 routes that use both), so it is counted as it sets off and the queue
+change does not touch it. Westbound the count point is past Redbridge roundabout, so traffic
+that used to be loaded again upstream (step 1) or to disappear (step 2) now reaches it. The
+M271 (+24%) is past the same jams.
 
-**Corridor-hours at risk fall by about half** (full rebuild, Iridis job 1890911 against 1890271,
-same 44 days and schedule). Demand over capacity no longer counts waiting traffic on the links
-before its bottleneck; those links were shown at risk only because the same cars were loaded on
-them again every 15 minutes. Steps 1 and 3 alone take the mean to 67.6 (job 1890524); the lower
-county and city scales after step 2 take it to 57.9. Each day falls to 0.41-0.63 of its old
-value, and the order of days barely changes (Spearman rank correlation 0.85): Fri 27 Nov is
-still the worst day (158.5 to 83.0). The page's risk numbers change with it.
+**Portswood bus run times** (`demo/bus_check.py`, 16 sampled days of Mon 16 Nov without the
+university-term uplift, like the council's July survey; RMSE over the AM and PM figures of
+Bluestar 2 and 20 in both directions) improve from 3.5 to 2.8 minutes (main before SOT-27: 1.7).
+Bluestar 2 northbound and 20 northbound are now within 1-3 minutes of the council's figures;
+Bluestar 2 southbound is still 3-5 minutes too slow and 20 southbound 2.5-4 minutes too fast.
+Main's `COUNT_HEADROOM` (1.15) was fitted with the old queues and has not been refitted.
+
+**Corridor-hours at risk fall by about half** because demand over capacity no longer counts
+waiting traffic on the links before its bottleneck; those links were shown at risk only because
+the same cars were loaded on them again every 15 minutes. On the previous SOT-27 tip (c3817fc,
+before the lorry limit) the same change took the mean from 110.0 to 57.9 (Iridis jobs 1890271 and
+1890911): each day fell to 0.41-0.63 of its old value, the order of days barely changed
+(Spearman rank correlation 0.85), and Fri 27 Nov stayed the worst day. The page's risk numbers
+change with it.
 
 ## Where the cruise cars were lost (before step 2)
 
-On the calibration Saturday (deterministic, averaged over 8 cruise samples, county 95%) the
+On the calibration Saturday (deterministic, averaged over 8 cruise samples, county 95%, on the
+previous SOT-27 tip c3817fc) the
 ships put 938 cars on routes over the M271 probe; 655 were counted there and the paired
 difference was 465. They were held at Central Road inside the Western Docks (800 veh/h, demand
 over capacity 2.2 with ships, 0.8 without) and at the one-lane A33 slip down to Redbridge
@@ -120,8 +136,8 @@ the same assumptions and 14.1 at the best grid point (x1.15, 95%, no shift).
   `daysim.DaySim` and `ppo_gpu.py` now use the new ones (their tests pass), so the policy should
   be retrained before its numbers are quoted.
 - **`COUNT_HEADROOM`** (main, d62d7e7) was fitted to the Portswood bus run times with the old
-  queues; `demo/bus_check.py` should be rerun after this merges.
-- The west side is still over (M271 +21%, Causeway +35%, A335 +29%) and the A33 Millbrook Road
+  queues; refitting it on the new ones may bring the bus RMSE below 2.8 minutes.
+- The west side is still over (M271 +24%, Causeway +40%, A335 +34%) and the A33 Millbrook Road
   West and The Avenue under; see `docs/west-side-counts.md`.
 - The Portswood AM sum stays at +16%, just outside 15%: the AM and PM sums cannot both be inside
   15% while the fit minimises the log error over both.
