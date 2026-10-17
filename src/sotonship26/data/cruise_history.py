@@ -23,10 +23,9 @@ Sources, checked 2026-10-16 (details in ``notes/cruise-history.md``):
   ``manual_coverage.csv``. Both are gitignored and both formats are documented on
   ``load_manual``.
 
-Feed parsing is ``vts.parse_feed``. ``vts.py`` and ``ship_capacity.csv`` are copied unchanged
-from Ed's PR #5 (branch ``edward/SOT-11-vts-schedule``) so this branch runs on its own; drop the
-copies once that PR merges. Historic ships missing from ``ship_capacity.csv`` can be added to
-``ship_capacity_history.csv`` (same columns), which is read on top of it.
+Feed parsing is ``vts.parse_feed`` (Edward's loader, SOT-11). Historic ships missing from
+``ship_capacity.csv`` can be added to ``ship_capacity_history.csv`` (same columns), which is read
+on top of it.
 """
 
 from __future__ import annotations

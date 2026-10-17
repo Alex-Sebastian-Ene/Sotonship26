@@ -58,6 +58,6 @@ but that only helps from now on and not this weekend's backtest.
 
 ## Passenger capacity
 
-The VTS rows match on IMO against `ship_capacity.csv` (SOT-17, copied from PR #5). With no
+The VTS rows match on IMO against `ship_capacity.csv` (SOT-17, Edward's loader on main). With no
 historic calls, there are no extra historic ships to look up yet, so `ship_capacity_history.csv`
 has not been created. `load_capacities()` reads it when it exists.
