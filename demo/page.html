@@ -1,7 +1,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Cruise-day traffic forecast</title>
+<script>try { document.documentElement.dataset.theme = localStorage.getItem('forecast-theme') || 'harbour'; } catch (e) { document.documentElement.dataset.theme = 'harbour'; }</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,750&family=Fredoka:wght@500;600;700&family=IBM+Plex+Mono:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap">
 <style>
 /* Layout: a duty officer's briefing. Pick a day; its verdict and the things to do come first, then the map and the road timetable; how it works is folded away below. */
 :root {
@@ -23,6 +26,7 @@
   --area-docks: #2A78D6; --area-centre: #EB6834; --area-portswood: #1BAF7A;
   --g-through: #8C9BA5; --g-county: #2F7EA6; --g-outbound: #7FB8D8; --g-internal: #8DB86A;
   --g-visitors: #E3B04B; --g-match: #C2553A; --g-cruise: #6A3FC4; --g-freight: #8A6A4F; --g-school: #C77A12; --g-bus: #11202A;
+  --bus-hi: #0B8577; --glow: rgba(31, 87, 164, 0.18);
   --font-display: Arial, "Helvetica Neue", Helvetica, sans-serif;
   --font-body: Arial, "Helvetica Neue", Helvetica, sans-serif;
   --font-data: Arial, "Helvetica Neue", Helvetica, sans-serif;
@@ -30,7 +34,7 @@
   --radius: 4px;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:not([data-theme="light"]):not([data-theme="chart"]):not([data-theme="steam"]) {
     --bg: #0F151C; --surface: #161E28; --sunk: #1C2632; --ink: #E3E9EF; --muted: #9AA7B5; --line: #283340; --line-strong: #3C4A5A;
     --accent: #86B2EA; --accent-ink: #0F151C; --accent-soft: #1A2B42;
     --warn-bg: #2D2611; --warn-ink: #F1D27C; --warn-line: #5C4A18;
@@ -48,10 +52,11 @@
     --area-docks: #3987E5; --area-centre: #D95926; --area-portswood: #199E70;
     --g-through: #6E7F8B; --g-county: #4FA3CF; --g-outbound: #9CCDE8; --g-internal: #9CCB78;
     --g-visitors: #F0C25E; --g-match: #E07058; --g-cruise: #B894FF; --g-freight: #B89878; --g-school: #F0B04B; --g-bus: #E2E9EE;
+    --bus-hi: #3FD6C6; --glow: rgba(134, 178, 234, 0.25);
     color-scheme: dark;
   }
 }
-:root[data-theme="dark"] {
+:root[data-theme="dark"], :root[data-theme="harbour"], :root[data-theme="signal"] {
   --bg: #0F151C; --surface: #161E28; --sunk: #1C2632; --ink: #E3E9EF; --muted: #9AA7B5; --line: #283340; --line-strong: #3C4A5A;
   --accent: #86B2EA; --accent-ink: #0F151C; --accent-soft: #1A2B42;
   --warn-bg: #2D2611; --warn-ink: #F1D27C; --warn-line: #5C4A18;
@@ -69,7 +74,45 @@
   --area-docks: #3987E5; --area-centre: #D95926; --area-portswood: #199E70;
   --g-through: #6E7F8B; --g-county: #4FA3CF; --g-outbound: #9CCDE8; --g-internal: #9CCB78;
   --g-visitors: #F0C25E; --g-match: #E07058; --g-cruise: #B894FF; --g-freight: #B89878; --g-school: #F0B04B; --g-bus: #E2E9EE;
+  --bus-hi: #3FD6C6; --glow: rgba(134, 178, 234, 0.25);
   color-scheme: dark;
+}
+/* Extra themes: same data colours, different ground, type and accent */
+:root[data-theme="harbour"] {
+  --bg: #06111D; --surface: #0B1A2B; --sunk: #0F2238; --ink: #E4F0FA; --muted: #8DA6BE; --line: #183049; --line-strong: #29486A;
+  --accent: #4CC9F0; --accent-ink: #04121F; --accent-soft: #0E2C44;
+  --land: #08182A; --water: #05223D; --water-ink: #5FB3E6; --mud: #0D1F2C; --green: #0D2422; --wood: #0F2A24;
+  --resi: #0D1D2E; --comm: #12192C; --ind: #0F1A2E; --port: #10203A; --campus: #131A30; --airport: #0E1C2C;
+  --minor: #163049; --casing: #06111D; --road-quiet: #2C4A68;
+  --bus-hi: #5CF2C8; --glow: rgba(76, 201, 240, 0.28);
+  --font-display: "Space Grotesk", "Segoe UI", sans-serif;
+}
+:root[data-theme="signal"] {
+  --bg: #050505; --surface: #0D0D0C; --sunk: #151513; --ink: #FFE6AE; --muted: #B59C6C; --line: #2A2417; --line-strong: #4C3F22;
+  --accent: #FFB21F; --accent-ink: #0B0B0B; --accent-soft: #2B2109;
+  --land: #090909; --water: #0E171C; --water-ink: #8FB4C8; --mud: #121210; --green: #0F140E; --wood: #11170F;
+  --resi: #0E0E0D; --comm: #12100E; --ind: #0F0F11; --port: #111214; --campus: #121011; --airport: #0F1011;
+  --minor: #1E1B15; --casing: #050505; --road-quiet: #3B3427;
+  --bus-hi: #7CF3FF; --glow: rgba(255, 178, 31, 0.25);
+  --font-display: "IBM Plex Mono", Consolas, monospace; --font-data: "IBM Plex Mono", Consolas, monospace;
+}
+:root[data-theme="chart"] {
+  --bg: #F2ECDD; --surface: #FBF7EC; --sunk: #EAE2CF; --ink: #1A2A3A; --muted: #5B6873; --line: #D8CDB3; --line-strong: #B6A887;
+  --accent: #A13131; --accent-ink: #FFFFFF; --accent-soft: #F2DBD3;
+  --land: #F1E8CF; --water: #B9D7DE; --water-ink: #2B6676; --mud: #E3DCC3; --green: #DCE3C2; --wood: #CBD8B2;
+  --resi: #ECE3CB; --comm: #EEDFD0; --ind: #E2DCCB; --port: #DCD9CB; --campus: #EADFD8; --airport: #E5E0D0;
+  --minor: #D4C9AE; --casing: #FBF7EC; --road-quiet: #B3A98F;
+  --bus-hi: #00838F; --glow: rgba(161, 49, 49, 0.16);
+  --font-display: "Fraunces", Georgia, serif;
+}
+:root[data-theme="steam"] {
+  --bg: #F5EEDC; --surface: #FFFBF1; --sunk: #EFE5CD; --ink: #1D2B45; --muted: #5B6476; --line: #E0D2B2; --line-strong: #1D2B45;
+  --accent: #D8473A; --accent-ink: #FFFFFF; --accent-soft: #FADFD7;
+  --land: #F2EAD3; --water: #A9D9D3; --water-ink: #1E6E73; --mud: #E5DCC2; --green: #DCE6C3; --wood: #C9D9AF;
+  --resi: #EDE4CB; --comm: #F0E0CF; --ind: #E4DDCA; --port: #DED9C8; --campus: #ECDFD6; --airport: #E6E0CF;
+  --minor: #D6CAAB; --casing: #FFFBF1; --road-quiet: #B5AA8C;
+  --bus-hi: #127C80; --glow: rgba(29, 43, 69, 0.16);
+  --font-display: "Fredoka", "Trebuchet MS", sans-serif; --radius: 14px;
 }
 
 body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: var(--step-0); line-height: 1.55; }
@@ -324,6 +367,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
    browser shows it at that larger size on scaled displays and the vehicles drift off the roads */
 .agent-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 #ppo-test .fold-body, #bus-card .fold-body, #ppo-card, #row-vehicles > .block { grid-template-columns: minmax(0, 1fr); }
+#ppo-body { display: grid; gap: 14px; }
 .veh-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 16px; border-top: 1px solid var(--line); }
 .veh-row[hidden] { display: none; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -380,6 +424,169 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
 .bl-hit { fill: transparent; }
 .bl-zero { stroke: var(--line-strong); stroke-width: 1.5; stroke-dasharray: 4 3; }
 
+/* Themes, motion and the live map */
+.masthead { grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+.masthead > .meta { grid-column: 1; }
+.theme-pick { grid-column: 2; grid-row: 1 / span 2; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: var(--step--1); color: var(--muted); }
+.theme-pick button { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line-strong); padding: 0; cursor: pointer; background: linear-gradient(135deg, var(--a) 0 50%, var(--b) 50% 100%); transition: transform .15s; }
+.theme-pick button:hover { transform: scale(1.12); }
+.theme-pick button[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 2px; }
+h1, h2 { transition: color .3s; }
+body { transition: background-color .35s, color .35s; }
+@keyframes rise { from { transform: translateY(10px); } to { transform: none; } }
+@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 var(--glow); } 50% { box-shadow: 0 0 0 7px var(--glow); } }
+.cal-intro .cell { animation: rise .5s cubic-bezier(.2, .7, .2, 1) both; animation-delay: calc(var(--i, 0) * 14ms); }
+button.cell { transition: transform .15s, box-shadow .15s, border-color .15s; }
+button.cell:hover { transform: translateY(-3px); box-shadow: 0 8px 18px var(--glow); }
+.day-head.enter, .notices.enter > * { animation: rise .45s cubic-bezier(.2, .7, .2, 1) both; }
+.notices.enter > *:nth-child(2) { animation-delay: 60ms; } .notices.enter > *:nth-child(3) { animation-delay: 120ms; } .notices.enter > *:nth-child(n+4) { animation-delay: 180ms; }
+.sev.lv-severe, .sev.lv-high { animation: pulse 1.8s ease-in-out infinite; }
+.map-card { transition: box-shadow .3s; }
+.map-card:hover { box-shadow: 0 10px 30px var(--glow); }
+.map-hud { position: absolute; left: 12px; top: 12px; pointer-events: none; display: grid; gap: 2px; padding: 8px 12px; border-radius: 6px;
+  background: color-mix(in srgb, var(--surface) 84%, transparent); border: 1px solid var(--line); backdrop-filter: blur(6px); }
+.map-hud[hidden] { display: none; }
+.hud-clock { font-family: var(--font-data); font-variant-numeric: tabular-nums; font-size: 1.7rem; font-weight: 700; line-height: 1; letter-spacing: .02em; }
+.hud-sub { font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.hud-sub b { color: var(--ink); }
+.hud-bus { display: inline-block; width: 9px; height: 9px; border-radius: 2px; background: var(--bus-hi); margin-right: 4px; }
+.veh-row label.check { display: inline-flex; align-items: center; gap: 6px; font-size: var(--step--1); cursor: pointer; }
+@media (max-width: 640px) { .masthead { grid-template-columns: minmax(0, 1fr); } .theme-pick { grid-column: 1; grid-row: auto; } }
+@media (prefers-reduced-motion: reduce) { .cal-intro .cell, .day-head.enter, .notices.enter > *, .sev.lv-severe, .sev.lv-high { animation: none !important; } button.cell:hover { transform: none; } }
+
+/* App shell: one top bar, four views over the same blocks */
+.appbar { position: sticky; top: 0; z-index: 40; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px;
+  padding: 10px max(16px, env(safe-area-inset-left, 0px)); background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; white-space: nowrap; }
+.brand-mark { width: 26px; height: 26px; border-radius: 7px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; }
+.brand small { font-weight: 500; color: var(--muted); font-size: .8rem; }
+.views { display: flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--sunk); border: 1px solid var(--line); }
+.views button { border: 0; background: transparent; padding: 7px 16px; min-height: 36px; border-radius: 999px; cursor: pointer; font-weight: 650; font-size: var(--step--1); color: var(--muted); transition: background .2s, color .2s; }
+.views button:hover { color: var(--ink); }
+.views button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); box-shadow: 0 2px 10px var(--glow); }
+.stepper { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.stepper button { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line-strong); background: var(--surface); cursor: pointer; font-size: 1.1rem; line-height: 1; }
+.stepper button:disabled { opacity: .35; cursor: default; }
+.day-chip { min-width: 9.5em; text-align: center; font-family: var(--font-data); font-variant-numeric: tabular-nums; font-weight: 700; font-size: var(--step--1); padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); }
+.day-chip i { font-style: normal; display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+.appbar .theme-pick { grid-column: auto; grid-row: auto; }
+.appbar .theme-pick > span { display: none; }
+.appbar .theme-pick button { width: 24px; height: 24px; }
+[data-views].off-view { display: none !important; }
+.view-enter { animation: rise .35s cubic-bezier(.2, .7, .2, 1) both; }
+body[data-view="map"] .wrap { max-width: 1560px; }
+body[data-view="map"] #day { grid-template-columns: minmax(0, 1fr) 360px; align-items: start; }
+body[data-view="map"] #day > #day-head { grid-column: 1 / -1; padding: 12px 18px; }
+body[data-view="map"] #day > #day-head .dayline { display: none; }
+body[data-view="map"] .tile { padding: 8px 12px; } body[data-view="map"] .tile .v { font-size: 1.5rem; }
+body[data-view="map"] #day > #day-body { grid-column: 1; grid-row: 2 / span 3; }
+body[data-view="map"] #day > #ships-block, body[data-view="map"] #day > #row-vehicles, body[data-view="map"] #day > #ppo-card { grid-column: 2; }
+body[data-view="map"] #row-vehicles { grid-template-columns: minmax(0, 1fr); }
+body[data-view="map"] .map-box { height: max(420px, calc(100vh - 330px)); }
+body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates-card > summary { font-size: var(--step-1); }
+@media (max-width: 1100px) { body[data-view="map"] #day { grid-template-columns: minmax(0, 1fr); } body[data-view="map"] #day > * { grid-column: 1 !important; grid-row: auto !important; } }
+@media (max-width: 760px) { .views { order: 3; width: 100%; justify-content: space-between; } .views button { padding: 7px 10px; } .brand small { display: none; } }
+@media (prefers-reduced-motion: reduce) { .view-enter { animation: none; } }
+
+/* Demo pass: figures over sentences, explanations behind ? */
+#journey > p.muted { display: none; }  /* the block header already says: click a dot or bus */
+.sec-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+/* action cards: icon, what and where, when (with its ? beside the time), then tick or cross */
+.acts { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); gap: 14px; }
+.act { --ok: #1A9E6E; --no: #C8462D; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 1fr auto; gap: 14px; padding: 16px;
+  border: 1px solid var(--line); border-radius: 16px; background: var(--surface); transition: transform .15s, box-shadow .15s, border-color .2s, opacity .2s; }
+.act:hover { transform: translateY(-2px); box-shadow: 0 10px 24px var(--glow); }
+.act-ico { width: 52px; height: 52px; border-radius: 15px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+.act-ico svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.act-body { display: grid; gap: 3px; align-content: start; justify-items: start; min-width: 0; }
+.act-kind { font-size: .72rem; font-weight: 750; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.act-title { font-family: var(--font-display); font-size: 1.2rem; line-height: 1.2; }
+.act-title::first-letter { text-transform: uppercase; }
+.acts.clamped > .act:nth-child(n+5) { display: none; }
+.v-more { justify-self: start; border: 1px solid var(--line-strong); background: var(--surface); border-radius: 999px; padding: 8px 18px; font-weight: 700; cursor: pointer; }
+:root[data-theme="steam"] .v-more { border: 2px solid #1D2B45; box-shadow: 3px 3px 0 #1D2B45; }
+.act-meta { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.act-meta .todo-time { min-width: 0; }
+.act-meta .qwrap { flex: none; }
+.act-owner { font-size: .78rem; font-weight: 650; color: var(--muted); }
+.act .vms { margin-top: 8px; padding: 6px 14px; font-size: .75rem; }
+.act .linkbtn { margin-top: 4px; }
+.decide { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.dec { height: 46px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--sunk); color: var(--muted); display: grid; place-items: center; padding: 0; cursor: pointer; transition: background .15s, color .15s, border-color .15s, transform .15s; }
+.dec svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; }
+.dec:hover { transform: translateY(-1px); }
+.dec-yes:hover { color: var(--ok); border-color: var(--ok); }
+.dec-no:hover { color: var(--no); border-color: var(--no); }
+.dec-yes[aria-pressed="true"] { background: var(--ok); border-color: var(--ok); color: #fff; }
+.dec-no[aria-pressed="true"] { background: var(--no); border-color: var(--no); color: #fff; }
+.act[data-state="accepted"], .act[data-state="approved"] { border-color: var(--ok); box-shadow: inset 0 0 0 1px var(--ok); }
+.act[data-state="declined"] { opacity: .5; }
+.act[data-state="declined"] .act-title { text-decoration: line-through; }
+.fx-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.fx { display: grid; gap: 1px; padding: 8px 14px; border-radius: 12px; background: var(--sunk); }
+.fx .k { font-size: .7rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.fx .v { font-family: var(--font-data); font-variant-numeric: tabular-nums; font-weight: 700; font-size: 1.05rem; }
+.fx .v i { font-style: normal; color: var(--muted); margin: 0 4px; }
+/* steamship theme: navy bar, sticker cards, life-ring ? buttons */
+:root[data-theme="steam"] .appbar { background: #1D2B45; color: #FFF8EA; border-bottom: 4px solid #D8473A; }
+:root[data-theme="steam"] .appbar .brand small { color: #C9D3E3; }
+:root[data-theme="steam"] .stepper button, :root[data-theme="steam"] .day-chip { color: #1D2B45; border-color: #FFF8EA; }
+:root[data-theme="steam"] .views { background: #2B3C5C; border-color: #2B3C5C; }
+:root[data-theme="steam"] .views button { color: #C9D3E3; }
+:root[data-theme="steam"] .views button[aria-selected="true"] { background: #D8473A; color: #fff; }
+:root[data-theme="steam"] .act, :root[data-theme="steam"] .card, :root[data-theme="steam"] .tile, :root[data-theme="steam"] button.cell, :root[data-theme="steam"] .fold, :root[data-theme="steam"] .day-head {
+  border: 2px solid #1D2B45; box-shadow: 3px 3px 0 #1D2B45; }
+:root[data-theme="steam"] .act:hover, :root[data-theme="steam"] button.cell:hover { box-shadow: 5px 5px 0 #1D2B45; }
+:root[data-theme="steam"] .act-ico { background: #A9D9D3; color: #1D2B45; border: 2px solid #1D2B45; }
+:root[data-theme="steam"] .dec { border: 2px solid #1D2B45; }
+:root[data-theme="steam"] h2, :root[data-theme="steam"] h3, :root[data-theme="steam"] .act-title { font-weight: 600; letter-spacing: 0; }
+:root[data-theme="steam"] .qmark { border: 4px solid transparent; color: #1D2B45; width: 28px; height: 28px;
+  background: linear-gradient(#FFFBF1, #FFFBF1) padding-box, conic-gradient(#D8473A 0 25%, #FFFBF1 0 50%, #D8473A 0 75%, #FFFBF1 0) border-box; box-shadow: 0 0 0 1.5px #1D2B45, inset 0 0 0 1.5px #1D2B45; }
+:root[data-theme="steam"] .qmark:hover, :root[data-theme="steam"] .qwrap.open > .qmark { color: #fff; background: linear-gradient(#D8473A, #D8473A) padding-box, conic-gradient(#1D2B45 0 25%, #FFFBF1 0 50%, #1D2B45 0 75%, #FFFBF1 0) border-box; }
+:root[data-theme="steam"] #qlayer > .qpop { border: 2px solid #1D2B45; box-shadow: 4px 4px 0 #1D2B45; }
+.todo-time { font-family: var(--font-data); font-variant-numeric: tabular-nums; font-weight: 700; font-size: var(--step--1); padding: 2px 9px; border-radius: 999px; background: var(--sunk); }
+#actions .vms-label { flex-basis: 100%; }
+.veh-legend { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important; }
+.qwrap { position: relative; display: inline-block; vertical-align: middle; }
+.qmark { width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--line-strong); background: var(--surface); color: var(--muted);
+  font-weight: 800; font-size: .8rem; line-height: 1; padding: 0; cursor: pointer; transition: background .15s, color .15s, transform .15s; }
+.qmark:hover { transform: scale(1.1); }
+.qmark:hover, .qwrap.open > .qmark { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.qwrap > .qpop { display: none !important; }
+/* an open explanation moves to a fixed layer above everything, so no card, map or sticky bar can cover or clip it */
+#qlayer { position: fixed; inset: 0; z-index: 2147483000; pointer-events: none; }
+#qlayer > .qpop { display: block !important; position: fixed; pointer-events: auto; width: max-content; max-width: min(360px, calc(100vw - 16px));
+  margin: 0; background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); border-radius: 12px; padding: 10px 14px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, .3); font-size: var(--step--1); line-height: 1.5; text-align: left; animation: rise .2s both; }
+#qlayer > .qpop * { color: inherit; }
+.q-more { border: 0; background: none; padding: 0; margin-left: 2px; color: var(--accent) !important; font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.block-head > .qwrap, .sec-head > .qwrap { margin-right: auto; }
+.masthead .title-block { display: none; }
+.head-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.head-row .sev { font-size: var(--step-1); padding: 2px 12px; border-radius: 999px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.tile { display: grid; gap: 2px; align-content: start; padding: 12px 14px; border-radius: 12px; background: var(--sunk); transition: transform .15s; }
+.tile:hover { transform: translateY(-2px); }
+.tile .k { font-size: .72rem; font-weight: 750; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.tile .v { font-family: var(--font-data); font-size: 2rem; font-weight: 750; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.tile .v small { font-size: .55em; font-weight: 650; margin-left: 2px; }
+.tile .s { font-size: .78rem; color: var(--muted); }
+.tile.hot { background: var(--lv3-bg); color: var(--lv3-ink); } .tile.hot .k, .tile.hot .s { color: inherit; opacity: .85; }
+.tile.warm { background: var(--lv2-bg); color: var(--lv2-ink); } .tile.warm .k, .tile.warm .s { color: inherit; opacity: .85; }
+.dayline { display: grid; gap: 2px; }
+.dayline svg { display: block; width: 100%; height: 64px; cursor: pointer; }
+.dl-area { fill: var(--lv2-bg); opacity: .55; } .dl-line { fill: none; stroke: var(--lv3-bg); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.dl-ph { fill: var(--accent); }
+.dl-axis { display: flex; justify-content: space-between; font-size: .7rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.notices { display: flex; flex-wrap: wrap; gap: 8px; }
+.notices .notice { display: inline-flex; align-items: center; gap: 8px; padding: 5px 6px 5px 14px; border-radius: 999px; }
+.notices .notice > .tag { white-space: nowrap; }
+.ico { width: 15px; height: 12px; vertical-align: -1px; margin-right: 1px; }
+.cell-ships .ico { width: 17px; height: 13px; }
+.cell-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.cell-tags span { display: inline-flex; align-items: center; gap: 3px; }
+
 @media (max-width: 900px) { .grid2, .sure { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 640px) {
   .cell { min-height: 54px; padding: 5px; }
@@ -393,6 +600,21 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
 </style>
 
+<nav class="appbar" aria-label="App">
+  <div class="brand"><span class="brand-mark" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 11h12M3.5 11l1.5-5h6l1.5 5M8 6V2.5M8 2.5l3 1.5"/></svg></span>Cruise-day traffic <small>Southampton docks</small></div>
+  <div class="views" role="tablist" aria-label="Views">
+    <button role="tab" data-go="briefing" aria-selected="true">Briefing</button>
+    <button role="tab" data-go="map" aria-selected="false">Live map</button>
+    <button role="tab" data-go="timeline" aria-selected="false">Timeline</button>
+    <button role="tab" data-go="insights" aria-selected="false">Insights</button>
+  </div>
+  <div class="stepper">
+    <button type="button" id="day-prev" aria-label="Previous day">‹</button>
+    <span class="day-chip" id="day-chip" aria-live="polite"></span>
+    <button type="button" id="day-next" aria-label="Next day">›</button>
+  </div>
+  <div id="appbar-themes"></div>
+</nav>
 <div class="wrap">
   <header class="masthead">
     <div class="title-block">
@@ -404,6 +626,15 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       <div><dt>Schedule</dt><dd id="m-horizon"></dd></div>
       <div><dt>Model</dt><dd id="m-model"></dd></div>
     </dl>
+    <div class="theme-pick" role="group" aria-label="Theme">
+      <span>Theme</span>
+      <button type="button" data-theme-pick="light" title="Light" aria-label="Light theme" style="--a:#F4F6F8;--b:#1F57A4"></button>
+      <button type="button" data-theme-pick="dark" title="Dark" aria-label="Dark theme" style="--a:#0F151C;--b:#86B2EA"></button>
+      <button type="button" data-theme-pick="harbour" title="Harbour night" aria-label="Harbour night theme" style="--a:#06111D;--b:#4CC9F0"></button>
+      <button type="button" data-theme-pick="signal" title="Signal" aria-label="Signal theme" style="--a:#050505;--b:#FFB21F"></button>
+      <button type="button" data-theme-pick="chart" title="Chart paper" aria-label="Chart paper theme" style="--a:#F2ECDD;--b:#A13131"></button>
+      <button type="button" data-theme-pick="steam" title="Steamship" aria-label="Steamship theme" style="--a:#F5EEDC;--b:#D8473A"></button>
+    </div>
   </header>
   <p class="provenance" role="note"><strong id="m-banner-label">Real map, synthetic traffic.</strong> <span id="m-banner">Roads, junctions, lanes, speed limits and land use come from OpenStreetMap.</span></p>
 
@@ -424,7 +655,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     <div class="notices" id="notices"></div>
 
     <div class="block" id="row-actions">
-      <div class="block-head"><h3>What to do</h3><span class="foot-note">Tick an item once it is arranged.</span></div>
+      <div class="block-head"><h3>What to do</h3><p class="foot-note">Suggestions only: the duty officer decides. Tick when arranged, cross when not needed.</p></div>
       <div id="actions"></div>
     </div>
 
@@ -444,6 +675,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
         <div class="map-box" id="map-box">
           <svg id="map-svg" role="img" aria-label="Map of Southampton with main roads coloured by how full they are"><g id="zoom"><g id="world"></g></g><g id="ui"></g></svg>
           <canvas class="agent-canvas" id="agent-canvas" aria-hidden="true"></canvas>
+          <div class="map-hud" id="map-hud" hidden><span class="hud-clock" id="hud-clock"></span><span class="hud-sub" id="hud-sub"></span></div>
           <div class="map-tip" id="map-tip" hidden></div>
           <div class="map-ctl">
             <button id="z-in" aria-label="Zoom in">+</button>
@@ -463,6 +695,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
           <button class="btn" id="veh-play">Play vehicles</button>
           <label class="foot-note" for="veh-speed">Speed</label>
           <select id="veh-speed"><option value="2">2 min a second</option><option value="5" selected>5 min a second</option><option value="15">15 min a second</option></select>
+          <label class="check"><input type="checkbox" id="veh-trails" checked> Flow trails</label>
           <span class="clock" id="veh-clock"></span>
           <span class="foot-note" id="veh-count"></span>
         </div>
@@ -498,11 +731,11 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       <div class="block-head"><h3>Ships today</h3><span class="foot-note" id="m-sched">Synthetic schedule</span></div>
       <div id="ships"></div>
       <div class="timing" id="timing"></div>
-      <p class="foot-note">Arrivals are fixed by tides and pilots. Disembarkation and check-in can move, so these are requests to the cruise line and port.</p>
+      <p class="foot-note">Arrivals are fixed by tides and pilots; disembarkation and check-in can move, so these are requests to the line and port.</p>
     </div>
 
     <div class="block" id="ppo-card" hidden>
-      <div class="block-head"><h3>Plan from the learned policy</h3><span class="foot-note">Each step needs approval from whoever owns it.</span></div>
+      <div class="block-head"><h3>Plan from the learned policy</h3><p class="foot-note" id="ppo-why">Each step needs approval from whoever owns it.</p></div>
       <div id="ppo-body"></div>
     </div>
 
@@ -575,7 +808,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
             <li><strong>Counted roads use the counts.</strong> On Portswood Road and Bevois Hill, where the model's own traffic falls short of the July 2024 counts, capacity is the counted peak-hour flow plus <span id="m-headroom"></span>: peak speeds there were close to the all-day average and buses ran 0–4 minutes behind timetable, so the roads were busy but not full. Highfield Lane and St Denys Road, where the model already carries the counted traffic, keep their road-class capacity. That margin makes modelled bus run times on Portswood Road match the council's on a July-like weekday. Local traffic the zones miss is added so each link's flow matches the counts, plus <span id="m-uni"></span> for university term, because the counts were taken in July.</li>
             <li><strong>Cruise traffic is added ship by ship.</strong> Car drop-offs, park and cruise, taxis and coaches, timed by disembarkation and boarding and sent to the terminal's nearest dock gate.</li>
             <li><strong>Drivers choose routes as roads fill.</strong> Every 15 minutes each of the <span id="m-ods"></span> origin–destination flows splits over up to three real routes and shifts towards the quickest. Traffic that cannot get through a full road waits for the next 15 minutes, so queues build and clear.</li>
-            <li><strong>Days vary.</strong> Drivers misjudge speeds, and everyone on a road shares the error. Everyday traffic swings by day, by kind of trip, by area and through the day. Passengers on one ship share its delay and travel mix. Wet days and incidents happen at their usual rates, and dates further ahead get wider ranges.</li>
+            <li><strong>Days vary.</strong> Drivers misjudge speeds together; everyday traffic swings by day, trip type, area and hour; each ship's passengers share its delay and travel mix. Wet days and incidents occur at their usual rates, and dates further ahead get wider ranges.</li>
             <li><strong>Many simulated days.</strong> Each date is simulated <span id="m-n2"></span> times. A road's chance of congestion is the share of those days on which it goes over 85% of its capacity. Each simulated day is also run without the ships, so the ships' effect is measured on the same day.</li>
           </ol>
         </div>
@@ -701,7 +934,8 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       groups: Object.fromEntries(GROUP_ORDER.map(g => [g, cs.getPropertyValue(`--g-${g}`).trim()])),
       school: cs.getPropertyValue('--g-school').trim(), bus: cs.getPropertyValue('--g-bus').trim(),
       casing: cs.getPropertyValue('--casing').trim(), accent: cs.getPropertyValue('--accent').trim(),
-      ink: cs.getPropertyValue('--ink').trim(),
+      ink: cs.getPropertyValue('--ink').trim(), busHi: cs.getPropertyValue('--bus-hi').trim(),
+      font: cs.getPropertyValue('--font-data').trim() || 'sans-serif',
     };
   }
   function ramp(stops, x) {
@@ -836,7 +1070,13 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     }).join('');
   }
 
+  const ICON = {
+    ship: '<svg class="ico" viewBox="0 0 17 13" aria-hidden="true"><path fill="currentColor" d="M1 8h15l-2.4 4H3.2zM3.5 7.2V4.5h9v2.7zM6 3.7V1h4v2.7z"/></svg>',
+    cone: '<svg class="ico" viewBox="0 0 12 12" aria-hidden="true"><path fill="currentColor" d="M4.9 1h2.2l3 8.6H1.9zM.8 10.2h10.4V12H.8z"/></svg>',
+    ball: '<svg class="ico" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.8" fill="none" stroke="currentColor" stroke-width="1.6"/><path fill="currentColor" d="M6 3.6 8.2 5.2 7.4 7.8H4.6L3.8 5.2z"/></svg>',
+  };
   function renderCalendar() {
+    requestAnimationFrame(() => $('#cal').querySelectorAll('.cell').forEach((c, i) => c.style.setProperty('--i', i)));
     const first = dateOf('2026-10-12');
     const last = dateOf(DATA.days[DATA.days.length - 1].date);
     const cells = [];
@@ -853,8 +1093,8 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       const said = `${longDate(iso)}: ${n ? `${n} ${n === 1 ? 'ship' : 'ships'}, ${lv.label.toLowerCase()} impact, the ships add ${fmt1(uplift(dd))} hours of congested road` : 'no ships'}${tags.length ? '. ' + tags.join(', ') : ''}`;
       cells.push(`<button class="cell lv-${lv.key}" data-date="${iso}" aria-pressed="${pressed}" aria-label="${esc(said)}">
         <span class="cell-top"><span class="dnum">${d.getDate()}</span>${mon}</span>
-        <span class="cell-ships">${n ? `${n} ${n === 1 ? 'ship' : 'ships'}` : 'No ships'}</span>
-        <span class="cell-tags">${esc(tags.join(' · '))}</span><span class="cell-lv">${n ? lv.label : ''}</span></button>`);
+        <span class="cell-ships">${n ? ICON.ship.repeat(Math.min(n, 5)) : ''}</span>
+        <span class="cell-tags">${dd.permits.length ? `<span>${ICON.cone}${dd.permits.length > 1 ? dd.permits.length : ''}</span>` : ''}${dd.match ? `<span>${ICON.ball}${dd.match}</span>` : ''}${dd.calls.some(c => c.pax == null) ? '<span>?pax</span>' : ''}</span><span class="cell-lv">${n ? lv.label : ''}</span></button>`);
     }
     $('#cal').innerHTML = cells.join('');
   }
@@ -1025,7 +1265,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     if (L === 'cruise') html = `<span><svg width="44" height="10" aria-hidden="true"><line x1="2" y1="5" x2="42" y2="5" stroke="var(--cruise)" stroke-width="2"/></svg> 50</span><span><svg width="44" height="12" aria-hidden="true"><line x1="3" y1="6" x2="41" y2="6" stroke="var(--cruise)" stroke-width="6" stroke-linecap="round"/></svg> 200 cruise vehicles per hour</span>`;
     else html = `<span class="ramp">${[0.3, 0.6, 0.78, 0.92, 1.1, 1.3].map(x => `<i style="background:${loadColor(x)}"></i>`).join('')}</span><span>How full: under 50%, 70%, 85%, full, over capacity</span>`;
     if (L === 'queue') html += '<span><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="5" class="q-dot"/></svg> vehicles waiting at a bottleneck</span>';
-    if (L === 'agents') html += `<span><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="3.5" fill="${PAL.groups.internal}"/></svg> one vehicle agent, coloured by kind of trip (below the map)</span><span><svg width="14" height="14" aria-hidden="true"><rect x="2" y="2" width="10" height="10" fill="${PAL.bus}"/></svg> bus</span><span>Roads: this one simulated day</span>`;
+    if (L === 'agents') html += `<span><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="3.5" fill="${PAL.groups.internal}"/></svg> one vehicle agent, coloured by kind of trip (below the map)</span><span><svg width="14" height="14" aria-hidden="true"><rect x="1" y="2" width="12" height="10" rx="3" fill="${PAL.busHi}"/></svg> bus, labelled with its route; a ring marks one leaving its first stop</span><span>Roads: this one simulated day</span>`;
     html += '<span><svg width="12" height="12" aria-hidden="true"><rect x="1" y="1" width="10" height="10" rx="2" class="mk-gate"/></svg> dock gate</span><span><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="5" class="mk-gw"/></svg> county gateway, vehicles per hour coming in</span>';
     html += '<span class="muted">Drag to move. Pinch, Ctrl + scroll or the buttons to zoom.</span>';
     $('#map-legend').innerHTML = html;
@@ -1197,11 +1437,28 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
   }
 
   /* ---------- actions ---------- */
+  const ACT_ICON = {
+    Marshals: '<circle cx="12" cy="5" r="2.4"/><path d="M8 21v-6.5L5.5 11 9 8h6l3.5 3-2.5 3.5V21M9 12.5h6"/>',
+    'Sign message': '<rect x="3" y="3.5" width="18" height="10.5" rx="1.5"/><path d="M7 8.75h10M12 14v7M8.5 21h7"/>',
+    Diversion: '<path d="M7 21V12a5 5 0 0 1 5-5h7M16 4l3 3-3 3M7 12V3"/>',
+    'Ship timing': '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+    'Check-in time': '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+    Roadworks: '<path d="M10 3h4l4.5 15h-13zM8.2 9h7.6M6.8 13.5h10.4M3 21h18"/>',
+    Event: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.6l4 2.9-1.5 4.6h-5L8 10.5z"/>',
+    'Meter disembarkation': '<path d="M4 21V4h9v17M13 12.5h7M17 9.5l3 3-3 3"/>',
+  };
+  const actIcon = k => `<span class="act-ico" aria-hidden="true"><svg viewBox="0 0 24 24">${ACT_ICON[k] || ACT_ICON.Event}</svg></span>`;
+  const timeChips = ts => ts.length ? `<span class="todo-time">${ts.join(' · ')}</span>` : '';
+  function decideBtns(st, yes, yesLabel, noLabel) {
+    return `<div class="decide" role="group" aria-label="Decision">
+      <button type="button" class="dec dec-yes" data-dec="${yes}" aria-pressed="${st === yes}" aria-label="${yesLabel}" title="${yesLabel}"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+      <button type="button" class="dec dec-no" data-dec="declined" aria-pressed="${st === 'declined'}" aria-label="${noLabel}" title="${noLabel}"><svg viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></button></div>`;
+  }
   function renderActions() {
     const d = day(), p = added(d), acts = [];
     for (const c of DATA.corridors.filter(c => c.group === 'Dock gates')) {
       const ws = runs(p[c.id], 40);
-      if (ws.length) acts.push({ id: 'm-' + c.id, kind: 'Marshals', title: `Put marshals at the ${c.name.replace(' access', '')}`, detail: `${windowsText(ws)}. The ships make the gate approach congested on up to <span class="mono">${Math.max(...ws.map(w => w[2]))}%</span> more of the simulated days.` });
+      if (ws.length) acts.push({ id: 'm-' + c.id, kind: 'Marshals', title: c.name.replace(' access', ''), times: windowsText(ws).split(', '), detail: `Ships make this gate approach congested on up to <span class="mono">${Math.max(...ws.map(w => w[2]))}%</span> more simulated days.` });
     }
     const groups = [...new Set(DATA.corridors.map(c => c.group))].filter(g => SIGNS[g]);
     for (const g of groups) {
@@ -1209,49 +1466,50 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       const series = Array.from({ length: N_BINS }, (_, b) => Math.max(...cs.map(c => p[c.id][b])));
       const ws = runs(series, 50); if (!ws.length) continue;
       const roads = cs.filter(c => runs(p[c.id], 50).length).map(c => c.name);
-      acts.push({ id: 'sign-' + g, kind: 'Sign message', title: `Set signs on the ${SIGNS[g].where}`,
-        detail: `${windowsText(ws.map(([a, b, pk]) => [Math.max(0, a - 2), b, pk]))}, starting 30 minutes before congestion is likely. The ships raise the chance of congestion on ${esc(roads.join(', '))} by up to <span class="mono">${Math.max(...ws.map(w => w[2]))}</span> points.`, vms: SIGNS[g].lines });
+      acts.push({ id: 'sign-' + g, kind: 'Sign message', title: SIGNS[g].where, times: windowsText(ws.map(([a, b, pk]) => [Math.max(0, a - 2), b, pk])).split(', '),
+        detail: `Starts 30 minutes early; ships add up to <span class="mono">${Math.max(...ws.map(w => w[2]))}</span> points of congestion risk on ${esc(roads.join(', '))}.`, vms: SIGNS[g].lines });
     }
     for (const od of d.routes) {
       if (od.routes.length < 2) continue;
       const alt = od.routes.slice(1).map((r, i) => ({ r, i: i + 1, ws: runs(r.share, 35, 2) })).filter(x => x.ws.length);
       if (!alt.length) continue;
       const a = alt[0];
-      acts.push({ id: 'div-' + od.from + od.to, kind: 'Diversion', title: `Expect traffic from ${od.from} to ${od.to} to divert`,
-        detail: `Up to <span class="mono">${Math.max(...a.ws.map(w => w[2]))}%</span> take route ${'ABC'[a.i]} (${esc(a.r.via.join(', then ') || 'local roads')}) ${windowsText(a.ws)} as the main route fills. Check that route can take it.` });
+      acts.push({ id: 'div-' + od.from + od.to, kind: 'Diversion', title: `${od.from} → ${od.to}`, times: windowsText(a.ws).split(', '),
+        detail: `Up to <span class="mono">${Math.max(...a.ws.map(w => w[2]))}%</span> switch to route ${'ABC'[a.i]} (${esc(a.r.via.join(', then ') || 'local roads')}) as the main route fills.` });
     }
     if (d.timing && d.timing.best < d.timing.base - 0.15) {
       const moves = d.timing.shifts.map((sh, i) => [sh, d.calls[i]]).filter(([sh]) => sh[0] || sh[1]);
-      acts.push({ id: 'timing', kind: 'Ship timing', title: `Ask the port to move ${moves.length === 1 ? 'one ship\'s' : moves.length + ' ships\''} disembarkation or check-in`,
-        detail: `${moves.map(([sh, c]) => esc(c.ship) + (sh[0] ? ` disembarkation ${sh[0] > 0 ? '+' : '−'}${Math.abs(sh[0])} min` : '') + (sh[1] ? ` check-in ${sh[1] > 0 ? '+' : '−'}${Math.abs(sh[1])} min` : '')).join('; ')}. Congested road-hours fall from <span class="mono">${fmt1(d.timing.base)}</span> to <span class="mono">${fmt1(d.timing.best)}</span>.` });
+      acts.push({ id: 'timing', kind: 'Ship timing', title: `Retime ${moves.length === 1 ? 'one ship' : moves.length + ' ships'}`, times: [],
+        detail: `${moves.map(([sh, c]) => esc(c.ship) + (sh[0] ? ` off ${sh[0] > 0 ? '+' : '−'}${Math.abs(sh[0])} min` : '') + (sh[1] ? ` check-in ${sh[1] > 0 ? '+' : '−'}${Math.abs(sh[1])} min` : '')).join(', ')}: congested road-hours <span class="mono">${fmt1(d.timing.base)}</span> → <span class="mono">${fmt1(d.timing.best)}</span>.` });
     }
     for (const id of d.permits) {
       const pm = PERMIT[id], moved = d.whatif.move_permit;
       const ws = CORR[pm.corridor] ? runs(d.p85[pm.corridor], 30, 1) : [];
-      let detail = `${esc(pm.what)} on ${esc(CORR[pm.corridor] ? CORR[pm.corridor].name : pm.corridor)} overlaps today's turnarounds${ws.length ? `, with that road at risk ${windowsText(ws)}` : ''}.`;
-      if (moved) detail += ` Moving it cuts congested road-hours from <span class="mono">${fmt1(d.score)}</span> to <span class="mono">${fmt1(moved.score)}</span>.`;
-      acts.push({ id: 'p-' + id, kind: 'Roadworks', title: `Ask the works promoter to move permit ${id}`, detail, scenario: moved ? 'move_permit' : null });
+      const road = CORR[pm.corridor] ? CORR[pm.corridor].name : pm.corridor;
+      const detail = `${esc(pm.what)} (permit ${esc(id)})${moved ? `; moving it takes congested road-hours from <span class="mono">${fmt1(d.score)}</span> to <span class="mono">${fmt1(moved.score)}</span>` : ''}.`;
+      acts.push({ id: 'p-' + id, kind: 'Roadworks', title: `Move works on ${road}`, times: ws.length ? windowsText(ws).split(', ') : [], detail, scenario: moved ? 'move_permit' : null });
     }
     if (d.match) {
       const hits = DATA.corridors.filter(c => c.group === 'North and east' && runs(p[c.id], 40).length);
-      if (hits.length) acts.push({ id: 'match', kind: 'Event', title: "Agree a joint plan with the club's match-day traffic team", detail: `Kick-off ${d.match}. At risk: ${esc(hits.map(h => h.name).join(', '))}.` });
+      if (hits.length) acts.push({ id: 'match', kind: 'Event', title: 'Match-day plan with the club', times: [`Kick-off ${d.match}`], detail: `Roads at risk: ${esc(hits.map(h => h.name).join(', '))}.` });
     }
     const el = $('#actions');
     if (!acts.length) { el.innerHTML = '<p class="muted">Nothing to arrange. The ships do not make any main road congested for 30 minutes or more on most simulated days.</p>'; return; }
-    el.innerHTML = `<ul class="todo">${acts.map(a => {
-      const key = `${state.date}:${a.id}`, done = decisions[key] === 'accepted';
-      const cid = 'todo-' + a.id.replace(/[^A-Za-z0-9_-]/g, '');
-      return `<li class="todo-item" data-key="${esc(key)}" data-state="${done ? 'accepted' : 'open'}">
-        <div class="todo-body"><span class="todo-kind">${esc(a.kind)}</span><strong class="todo-title">${esc(a.title)}</strong><p class="todo-detail">${a.detail}</p>
-          ${a.scenario ? `<button class="linkbtn" data-scenario="${a.scenario}">Show the forecast with it moved</button>` : ''}
-          ${a.vms ? `<span class="vms-label">Suggested sign text</span><div class="vms" role="img" aria-label="${esc('Suggested sign text: ' + a.vms.join(', '))}">${a.vms.map(esc).join('<br>')}</div>` : ''}</div>
-        <label class="todo-check" for="${cid}"><input type="checkbox" id="${cid}"${done ? ' checked' : ''}> Arranged</label></li>`;
-    }).join('')}</ul><p class="foot-note">Suggestions only. The duty officer decides.</p>`;
+    el.innerHTML = `<ul class="acts">${acts.map(a => {
+      const key = `${state.date}:${a.id}`, st = decisions[key] || 'open';
+      return `<li class="act" data-key="${esc(key)}" data-state="${st}">${actIcon(a.kind)}
+        <div class="act-body"><span class="act-kind">${esc(a.kind)}</span><strong class="act-title">${esc(a.title)}</strong>
+          <div class="act-meta">${timeChips(a.times)}<p class="todo-detail">${a.detail}</p></div>
+          ${a.scenario ? `<button class="linkbtn" data-scenario="${a.scenario}">See it moved</button>` : ''}
+          ${a.vms ? `<div class="vms" role="img" aria-label="${esc('Suggested sign text: ' + a.vms.join(', '))}">${a.vms.map(esc).join('<br>')}</div>` : ''}</div>
+        ${decideBtns(st, 'accepted', 'Arranged', 'Not needed')}</li>`;
+    }).join('')}</ul>`;
     el.querySelectorAll('[data-scenario]').forEach(b => b.addEventListener('click', () => setScenario(b.dataset.scenario)));
-    el.querySelectorAll('.todo-check input').forEach(cb => cb.addEventListener('change', () => {
-      const li = cb.closest('.todo-item');
-      decisions[li.dataset.key] = cb.checked ? 'accepted' : 'open';
+    el.querySelectorAll('[data-dec]').forEach(b => b.addEventListener('click', () => {
+      const li = b.closest('.act'), want = b.dataset.dec;
+      decisions[li.dataset.key] = decisions[li.dataset.key] === want ? 'open' : want;
       li.dataset.state = decisions[li.dataset.key];
+      li.querySelectorAll('[data-dec]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.dec === li.dataset.state)));
     }));
   }
 
@@ -1495,6 +1753,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     return [G.xs[s] + g * (G.xs[s + 1] - G.xs[s]), G.ys[s] + g * (G.ys[s + 1] - G.ys[s])];
   }
   function agentPos(a, now) {
+    if (!a.segs) return posAt(geom('a', a.p), a.t, now);  // pages built before agents had segments
     for (const sg of a.segs) if (now <= sg.t[sg.t.length - 1]) return posAt(geom(sg.kind, sg.idx), sg.t, now);
     const last = a.segs[a.segs.length - 1];
     return posAt(geom(last.kind, last.idx), last.t, now);
@@ -1514,10 +1773,22 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     for (let k = 0; k < G.xs.length; k++) { const [x, y] = screen(G.xs[k], G.ys[k]); if (k) cx2.lineTo(x, y); else cx2.moveTo(x, y); }
     cx2.stroke();
   }
-  function drawAgents() {
+  const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const trailsOn = () => !REDUCED && $('#veh-trails').checked;
+  function roundRect(x, y, w, h, r) {
+    cx2.beginPath(); cx2.moveTo(x + r, y); cx2.arcTo(x + w, y, x + w, y + h, r); cx2.arcTo(x + w, y + h, x, y + h, r);
+    cx2.arcTo(x, y + h, x, y, r); cx2.arcTo(x, y, x + w, y, r); cx2.closePath();
+  }
+  // fade = true while vehicles play: the last frames fade instead of clearing, so moving dots leave flow trails
+  function drawAgents(fade) {
     const [w, h] = sizeCanvas();
-    cx2.clearRect(0, 0, w, h); drawn = [];
+    if (fade && trailsOn()) {
+      cx2.globalCompositeOperation = 'destination-out'; cx2.fillStyle = 'rgba(0,0,0,0.2)'; cx2.fillRect(0, 0, w, h);
+      cx2.globalCompositeOperation = 'source-over';
+    } else cx2.clearRect(0, 0, w, h);
+    drawn = [];
     const A = state.layer === 'agents' ? agentDay() : null;
+    $('#map-hud').hidden = !A;
     if (!A) return;
     const now = state.minute, rad = Math.max(1.8, Math.min(4.5, 1.4 + Math.log2(Math.max(1, T.k))));
     if (selected) {
@@ -1526,26 +1797,52 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       cx2.strokeStyle = PAL.casing; cx2.lineWidth = 6; Gs.forEach(tracePath);
       cx2.strokeStyle = PAL.accent; cx2.lineWidth = 3; Gs.forEach(tracePath);
     }
-    let na = 0, nb = 0;
+    const tails = !fade || !trailsOn();
+    let na = 0, nb = 0, cruiseOn = 0;
+    cx2.lineCap = 'round';
     for (const a of A.list) {
       if (a.dep > now || a.arr < now) continue;
       na++;
       const [x, y] = screen(...agentPos(a, now));
       if (x < -6 || y < -6 || x > w + 6 || y > h + 6) continue;
-      const P = AG.purposes[a.k];
-      cx2.fillStyle = agentColor(a.k);
+      const P = AG.purposes[a.k], col = agentColor(a.k);
+      if (P.cruise) cruiseOn++;
+      // fade in after leaving and out before arriving, so trips appear and finish rather than blink
+      cx2.globalAlpha = Math.max(0.25, Math.min(1, (now - a.dep) / 1.5, (a.arr - now) / 1.5));
+      if (tails) {
+        const [px, py] = screen(...agentPos(a, Math.max(a.dep, now - 1.2)));
+        cx2.strokeStyle = col; cx2.lineWidth = rad * 0.9; cx2.globalAlpha *= 0.45;
+        cx2.beginPath(); cx2.moveTo(px, py); cx2.lineTo(x, y); cx2.stroke();
+        cx2.globalAlpha /= 0.45;
+      }
+      cx2.fillStyle = col;
       if (P.key === 'cruise_coach') cx2.fillRect(x - rad - 1, y - rad - 1, 2 * rad + 2, 2 * rad + 2);
       else { cx2.beginPath(); cx2.arc(x, y, P.cruise ? rad + 0.8 : rad, 0, 2 * Math.PI); cx2.fill(); }
       drawn.push([x, y, 'a', a.i]);
     }
+    cx2.globalAlpha = 1;
+    let started = 0;
+    const label = T.k >= 1.6;
     for (const b of A.buses) {
+      if (b.start <= now) started++;
       if (b.start > now || b.end < now) continue;
       nb++;
       const [x, y] = screen(...posAt(geom('b', b.p), b.t, now));
-      if (x < -8 || y < -8 || x > w + 8 || y > h + 8) continue;
-      const s = rad + 2.5;
-      cx2.fillStyle = PAL.casing; cx2.fillRect(x - s - 1, y - s - 1, 2 * s + 2, 2 * s + 2);
-      cx2.fillStyle = PAL.bus; cx2.fillRect(x - s, y - s, 2 * s, 2 * s);
+      if (x < -30 || y < -30 || x > w + 30 || y > h + 30) continue;
+      const age = now - b.start, s = rad + 3.4, pop = REDUCED ? 1 : Math.min(1, 0.35 + age / 1.2);
+      if (age < 5 && !REDUCED) {  // spawn: a ring spreading from the first stop
+        const k = age / 5;
+        cx2.strokeStyle = PAL.busHi; cx2.lineWidth = 2.5 * (1 - k) + 0.5; cx2.globalAlpha = 1 - k;
+        cx2.beginPath(); cx2.arc(x, y, s + 3 + k * 22, 0, 2 * Math.PI); cx2.stroke(); cx2.globalAlpha = 1;
+      }
+      const R = AG.bus.routes[b.r], name = R ? String(R.name) : '';
+      const bw = label && name ? Math.max(2 * s, 7 + name.length * s * 0.95) : 2 * s, bh = 2 * s;
+      cx2.fillStyle = PAL.casing; roundRect(x - bw * pop / 2 - 1.5, y - bh * pop / 2 - 1.5, bw * pop + 3, bh * pop + 3, 4); cx2.fill();
+      cx2.fillStyle = PAL.busHi; roundRect(x - bw * pop / 2, y - bh * pop / 2, bw * pop, bh * pop, 3); cx2.fill();
+      if (label && name && pop === 1) {
+        cx2.fillStyle = PAL.casing; cx2.font = `700 ${Math.round(s * 1.15)}px ${PAL.font}`; cx2.textAlign = 'center'; cx2.textBaseline = 'middle';
+        cx2.fillText(name, x, y + 0.5);
+      }
       drawn.push([x, y, 'b', b.i]);
     }
     if (selected) {
@@ -1557,7 +1854,9 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       }
     }
     $('#veh-clock').textContent = hhmm(now);
-    $('#veh-count').textContent = `${int(na)} agents${A.buses.length ? ` and ${int(nb)} buses` : ''} on the road`;
+    $('#veh-count').textContent = `${int(na)} agents${A.buses.length ? `, ${int(nb)} buses` : ''} on the road`;
+    $('#hud-clock').textContent = hhmm(now);
+    $('#hud-sub').innerHTML = `<b>${int(na)}</b> vehicles · <b>${int(cruiseOn)}</b> cruise${A.buses.length ? ` · <span class="hud-bus"></span><b>${int(nb)}</b> buses (${int(started)} of ${int(A.buses.length)} started)` : ''}`;
   }
   svg.addEventListener('click', e => {
     if (state.layer !== 'agents' || !agentDay()) return;
@@ -1577,7 +1876,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
   const mins = x => `${fmt1(x)} min`;
   function renderJourney() {
     const A = agentDay(), el = $('#journey');
-    if (!A || !selected) { el.innerHTML = '<p class="muted">Turn on the Vehicles layer and click a dot to follow one vehicle: where it came from and is going, its route, when it left and arrived, and how long it queued.</p>'; return; }
+    if (!A || !selected) { el.innerHTML = '<p class="muted">Turn on Vehicles and click a dot or bus to follow it: from, to, route, timings, queueing.</p>'; return; }
     if (selected.type === 'a') {
       const a = A.list[selected.i], P = AG.purposes[a.k], path = AG.paths[a.p];
       const legs = a.segs.filter(sg => sg.kind === 'l').reduce((x, sg) => x + AG.legs[sg.idx].ff / 10, 0);
@@ -1595,7 +1894,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       const b = A.buses[selected.i], R = AG.bus.routes[b.r], pat = AG.bus.patterns[b.p];
       const stops = pat.s.map(i => AG.names[i]);
       const timed = AG.bus.timetable === 'gtfs';
-      el.innerHTML = `<p><span class="sw" style="display:inline-block;width:10px;height:10px;margin-right:6px;background:${PAL.bus}"></span><strong>${esc(R.operator)} ${esc(R.name)}</strong> <span class="muted">${esc(R.long)}</span></p>
+      el.innerHTML = `<p><span class="sw" style="display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;background:${PAL.busHi}"></span><strong>${esc(R.operator)} ${esc(R.name)}</strong> <span class="muted">${esc(R.long)}</span></p>
         <dl><dt>From</dt><dd>${esc(stops[0] || '')}</dd><dt>To</dt><dd>${esc(stops[stops.length - 1] || '')} (${stops.length} stops in the area)</dd>
         <dt>Route</dt><dd>${pat.v.length ? esc(pat.v.map(i => AG.names[i]).join(' → ')) : ''}</dd>
         <dt>${timed ? 'Timetabled' : 'Assumed'} start</dt><dd class="mono">${hhmm(b.dep)}</dd><dt>Modelled end</dt><dd class="mono">${hhmm(b.end)}</dd>
@@ -1636,12 +1935,12 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     const rows = groups.map(g => { const m = D.check[g].model.reduce((s, v) => s + v, 0) / 4, a = D.check[g].agents.reduce((s, v) => s + v, 0) / 4;
       return `<tr><td><span class="sw" style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;background:${PAL.groups[g] || PAL.school}"></span>${esc(M.groups[g] || (g === 'school' ? 'School run' : g))}</td><td class="num">${int(m)}</td><td class="num">${int(a)}</td><td class="num">${m ? Math.round((a / m - 1) * 100) + '%' : ''}</td></tr>`; }).join('');
     $('#veh-note').textContent = `seed ${D.seed.join('-')}`;
-    $('#veh-body').innerHTML = `<p>${int(A.list.length)} agents stand for ${int(vehicles)} vehicle trips on <strong>one sampled day</strong>${D.wet ? ' (wet)' : ''}${D.incident ? ', with an incident on a main road' : ''}. Each everyday agent stands for about ${int(D.weights.everyday)} vehicles and each cruise agent for ${int(D.weights.cruise)}, so cruise traffic is easier to see. In the Vehicles layer the roads are coloured by this same sampled day, so dots and colours are the same traffic; the other layers show the average of ${M.n} sampled days.</p>
-      <div class="veh-legend">${AG.purposes.map((P, k) => counts[k] ? `<span><span class="sw" style="background:${agentColor(k)}"></span>${esc(P.label)} <span class="mono">${int(counts[k])}</span></span>` : '').join('')}${A.buses.length ? `<span><span class="sw" style="border-radius:2px;background:${PAL.bus}"></span>Bus <span class="mono">${int(A.buses.length)}</span></span>` : ''}</div>
-      <h3 style="font-size: var(--step-0)">The agents added up</h3>
+    $('#veh-body').innerHTML = `<p>${int(A.list.length)} agents = ${int(vehicles)} vehicle trips on <strong>one sampled day</strong>${D.wet ? ' (wet)' : ''}${D.incident ? ', with a main-road incident' : ''}. One everyday agent ≈ ${int(D.weights.everyday)} vehicles; one cruise agent ≈ ${int(D.weights.cruise)}, so cruise traffic stands out. Road colours in this layer are the same sampled day; other layers average ${M.n} days.</p>
+      <div class="veh-legend">${(() => { const gc = {}; AG.purposes.forEach((P, k) => { if (counts[k]) gc[P.group] = (gc[P.group] || 0) + counts[k]; }); return Object.entries(gc).map(([g, c]) => `<span><span class="sw" style="background:${PAL.groups[g] || PAL.school}"></span>${esc(M.groups[g] || (g === 'school' ? 'School run' : g))} <span class="mono">${int(c)}</span></span>`).join(''); })()}${A.buses.length ? `<span><span class="sw" style="border-radius:3px;background:${PAL.busHi}"></span>Bus <span class="mono">${int(A.buses.length)}</span></span>` : ''}</div>
+      <span class="eyebrow">Agents add up to the model's flows</span><div class="agents-check">
       <div class="chart"><svg viewBox="0 0 320 106" role="img" aria-label="Trips starting per hour: model flows against agents times their weight">${grid}${bars}${line}${ticks}</svg></div>
-      <p class="foot-note">Line: vehicles per hour the model starts on this sampled day. Bars: the agents times the vehicles each stands for. They differ only by sampling.</p>
-      <div class="table-scroll"><table><thead><tr><th>Kind of trip</th><th>Model</th><th>Agents × weight</th><th>Diff</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      <p class="foot-note">Line: model trips started per hour. Bars: agents × weight. Any gap is sampling.</p>
+      <div class="table-scroll"><table><thead><tr><th>Kind of trip</th><th>Model</th><th>Agents × weight</th><th>Diff</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
     renderJourney();
   }
   function renderBuses() {
@@ -1699,7 +1998,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     const from = D.collected_from.slice(11, 16), to = D.collected_to.slice(11, 16), W = Math.max(280, Math.floor(el.clientWidth || card.clientWidth || 600));
     const lines = D.day_lines.slice().sort((a, b) => b.n - a.n).slice(0, 16);
     const legend = Object.keys(AREA_NAME).filter(k => D.areas.some(p => p.key === k)).map(k => `<span><i class="bl-f-${AREA_CLS[k]}"></i>${esc(AREA_NAME[k])}</span>`).join('');
-    el.innerHTML = `<p><strong>Observed, not modelled.</strong> Every bus in the city box was read from bustimes.org once a minute from ${from} to ${to} on ${esc(shortDate(state.date))}: ${int(D.journeys)} bus journeys in ${int(D.polls)} readings. Lateness is the delay against the timetable that bustimes.org works out from each bus's position. Each journey counts once per hour.</p>
+    el.innerHTML = `<p><strong>Observed, not modelled.</strong> Every bus in the city box, read from bustimes.org once a minute, ${from}–${to} ${esc(shortDate(state.date))}: ${int(D.journeys)} journeys in ${int(D.polls)} readings. Lateness = bustimes.org's delay against the timetable; one count per journey per hour.</p>
       <div class="bl-legend">${legend}</div>
       <div class="bus-live-chart">${busLiveChart(D, W)}<div class="map-tip bl-tip" hidden></div></div>
       <p class="foot-note">Mean minutes late per hour in each area (boxes drawn by hand round each place). Hover a point for the spread.</p>
@@ -1716,11 +2015,12 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     host.addEventListener('mouseleave', () => { tip.hidden = true; });
   }
   const PPO_KIND = { meter: 'Meter disembarkation', checkin: 'Check-in time', signs: 'Sign message', marshals: 'Marshals' };
+  // [title, time chips, one-sentence note]
   function ppoText(a) {
-    if (a.kind === 'meter') return [`Meter disembarkation at ${a.terminal} (${a.ships})`, `${a.from}–${a.to}: let ${Math.round(a.release * 100)}% of the passengers waiting to leave go each 15 minutes; the rest wait in the terminal (never more than ${PPO.levers.max_hold_min} minutes). Their pick-ups, taxis and coaches leave later with them.`];
-    if (a.kind === 'checkin') return [`Open check-in at ${a.terminal} ${Math.abs(a.shift)} minutes ${a.shift < 0 ? 'earlier' : 'later'} (${a.ships})`, `${a.new} instead of ${a.planned}; closing time unchanged, so drop-offs spread over a ${a.shift < 0 ? 'longer' : 'shorter'} window.`];
-    if (a.kind === 'signs') return [`Set signs on the ${SIGNS[a.group] ? SIGNS[a.group].where : a.group}`, `${a.from}–${a.to}, to steer drivers off the ${esc(a.group)} corridors.`];
-    return [`Marshals at ${a.gate}`, `${a.from}–${a.to}, to keep the gate approach moving (assumed +${Math.round((PPO.levers.marshal_cap - 1) * 100)}% capacity, £${int(PPO.costs.marshal_hour)} an hour).`];
+    if (a.kind === 'meter') return [`${a.terminal} terminal`, [`${a.from}–${a.to}`], `${esc(a.ships)}: let ${Math.round(a.release * 100)}% of waiting passengers off each 15 minutes, holding none longer than ${PPO.levers.max_hold_min} minutes`];
+    if (a.kind === 'checkin') return [`${a.terminal}: ${Math.abs(a.shift)} min ${a.shift < 0 ? 'earlier' : 'later'}`, [`Opens ${a.new}`], `${esc(a.ships)} opens at ${a.new}, not ${a.planned}, and closes as planned`];
+    if (a.kind === 'signs') return [SIGNS[a.group] ? SIGNS[a.group].where : a.group, [`${a.from}–${a.to}`], `Steers drivers off the ${esc(a.group)} corridors`];
+    return [a.gate, [`${a.from}–${a.to}`], `Assumed +${Math.round((PPO.levers.marshal_cap - 1) * 100)}% gate capacity at £${int(PPO.costs.marshal_hour)} an hour`];
   }
   function renderPPO() {
     $('#ppo-card').hidden = !PPO;
@@ -1728,11 +2028,12 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     const R = PPO.days[state.date], el = $('#ppo-body');
     if (!R) { el.innerHTML = `<p class="muted">The learned plan is worked out for ${chips(Object.keys(PPO.days))}</p>`; wireChips(el); return; }
     const E = R.effect, acts = R.actions.map((a, i) => {
-      const [title, detail] = ppoText(a), key = `ppo:${state.date}:${i}`, st = decisions[key] || 'open';
-      return `<div class="ppo-act" data-key="${esc(key)}" data-state="${st}"><div class="action-body"><span class="eyebrow action-kind">${esc(PPO_KIND[a.kind])}${st !== 'open' ? ` · ${st === 'approved' ? 'Approved' : 'Declined'}` : ''}</span>
-        <strong>${esc(title)}</strong><span class="foot-note" style="color: var(--ink)">${detail} PPO chose this on ${Math.round(a.share * 100)}% of ${R.k} sampled days.</span>
-        <span class="owner">Needs approval: ${esc(a.owner)}</span>${a.kind === 'signs' && SIGNS[a.group] ? `<div class="vms" aria-label="Suggested sign text">${SIGNS[a.group].lines.map(esc).join('<br>')}</div>` : ''}</div>
-        <div class="action-btns"><button class="btn ${st === 'approved' ? '' : 'btn-primary'}" data-ppo="approved">${st === 'approved' ? 'Undo' : 'Approve'}</button><button class="btn" data-ppo="declined">${st === 'declined' ? 'Undo' : 'Decline'}</button></div></div>`;
+      const [title, times, note] = ppoText(a), key = `ppo:${state.date}:${i}`, st = decisions[key] || 'open';
+      return `<li class="act" data-key="${esc(key)}" data-state="${st}">${actIcon(PPO_KIND[a.kind])}
+        <div class="act-body"><span class="act-kind">${esc(PPO_KIND[a.kind])}</span><strong class="act-title">${esc(title)}</strong>
+          <div class="act-meta">${timeChips(times)}<p class="todo-detail">${note}; PPO chose it on ${Math.round(a.share * 100)}% of ${R.k} sampled days.</p></div>
+          <span class="act-owner">Owner: ${esc(a.owner)}</span></div>
+        ${decideBtns(st, 'approved', 'Approve', 'Decline')}</li>`;
     }).join('');
     const S = PPO.summary.all;
     let verdict = '';
@@ -1743,11 +2044,17 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       verdict += '.';
       if (PPO.ablation) verdict += ' Most of its saving comes from marshals at the dock gates, whose effect is our assumption.';
     }
-    el.innerHTML = `${acts || '<p>On most sampled days the learned policy does nothing on this day.</p>'}
-      <p>On ${R.k} sampled days of this date, following the plan changes congested road-hours from <span class="mono">${fmt1(E.corridor_hours.nothing)}</span> to <span class="mono">${fmt1(E.corridor_hours.ppo)}</span>, delay from <span class="mono">${int(E.vehicle_hours.nothing)}</span> to <span class="mono">${int(E.vehicle_hours.ppo)}</span> vehicle-hours, holds passengers for <span class="mono">${int(E.held_pax_hours.ppo)}</span> passenger-hours and uses marshals for <span class="mono">${fmt1(E.marshal_hours.ppo)}</span> gate-hours.</p>
-      <p class="foot-note">The policy was trained by reinforcement learning (PPO) on simulated days and is shown as a suggestion. The port and cruise lines own disembarkation and check-in; the council owns the signs. ${verdict} See "Learned policy tested against simpler ones" below.</p>`;
-    el.querySelectorAll('[data-ppo]').forEach(b => b.addEventListener('click', () => {
-      const key = b.closest('.ppo-act').dataset.key, want = b.dataset.ppo;
+    const more = R.actions.length > 4 && !renderPPO.all ? `<button type="button" class="v-more" id="ppo-more">Show all ${R.actions.length} steps</button>` : '';
+    el.innerHTML = `${acts ? `<ul class="acts${more ? ' clamped' : ''}">${acts}</ul>${more}` : '<p>On most sampled days the learned policy does nothing on this day.</p>'}
+      <div class="fx-strip"><div class="fx"><span class="k">Congested road-hours</span><span class="v">${fmt1(E.corridor_hours.nothing)}<i>→</i>${fmt1(E.corridor_hours.ppo)}</span></div>
+        <div class="fx"><span class="k">Delay, vehicle-hours</span><span class="v">${int(E.vehicle_hours.nothing)}<i>→</i>${int(E.vehicle_hours.ppo)}</span></div>
+        <div class="fx"><span class="k">Marshals, gate-hours</span><span class="v">${fmt1(E.marshal_hours.ppo)}</span></div>
+        ${E.held_pax_hours.ppo >= 1 ? `<div class="fx"><span class="k">Passengers held, hours</span><span class="v">${int(E.held_pax_hours.ppo)}</span></div>` : ''}
+        <p class="foot-note">Without the plan, then with it, averaged over ${R.k} sampled days of this date.</p></div>`;
+    $('#ppo-why').innerHTML = `Trained by reinforcement learning (PPO) on simulated days; each step needs its owner's approval. ${verdict} The port and cruise lines own disembarkation and check-in, and the council owns the signs.`;
+    if ($('#ppo-more')) $('#ppo-more').addEventListener('click', () => { renderPPO.all = true; renderPPO(); });
+    el.querySelectorAll('[data-dec]').forEach(b => b.addEventListener('click', () => {
+      const key = b.closest('.act').dataset.key, want = b.dataset.dec;
       decisions[key] = decisions[key] === want ? 'open' : want; renderPPO();
     }));
   }
@@ -1772,7 +2079,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       const rows = Object.keys(names).filter(k => AB[k]).map(k => `<tr><td>${esc(names[k])}</td><td class="num">${cell(AB[k], 'corridor_hours')}</td><td class="num">${cell(AB[k], 'vehicle_hours')}</td><td class="num">${cell(AB[k], 'marshal_hours')}</td><td class="num">${cell(AB[k], 'cost')}</td></tr>`).join('');
       return `<h3 style="font-size: var(--step-0)">Where PPO's saving comes from</h3><p class="foot-note">The same test days with one lever switched off at a time; differences from doing nothing per day.</p><div class="table-scroll"><table><thead><tr><th></th><th>Congested road-hours</th><th>Delay (veh-h)</th><th>Marshal hours</th><th>Cost</th></tr></thead><tbody>${rows}</tbody></table></div><p class="foot-note">Most of the saving comes from putting marshals at the dock gates, whose effect (25% more gate capacity) is our assumption, not a measurement. Signs move traffic off the busiest corridors at the price of longer routes.</p>`;
     })() : '';
-    $('#ppo-test-body').innerHTML = `<p class="foot-note">Each policy plays the same ${S.nothing.n} sampled days (${PPO.dates.test.length} dates held out of training and ${PPO.dates.seen.length} training dates, with new random draws), so the differences are paired. Mean per day (10th–90th percentile); below it, the difference from doing nothing [95% bootstrap interval]. The rule sets signs where a road went over 85% full in the last 15 minutes and marshals where a gate approach did. The advisor is this page's ship-timing advice, planned from ${PPO.n_advise} of the forecast's own samples per date.</p>
+    $('#ppo-test-body').innerHTML = `<p class="foot-note">Every policy plays the same ${S.nothing.n} sampled days (${PPO.dates.test.length} held-out dates, ${PPO.dates.seen.length} training dates, new draws), so differences are paired. Cell: mean per day (10th–90th percentile), then the change against doing nothing [95% bootstrap interval]. Rule: signs where a road passed 85% in the last 15 minutes, marshals where a gate approach did. Advisor: this page's ship-timing advice, from ${PPO.n_advise} forecast samples per date.</p>
       <div class="table-scroll"><table><thead><tr><th>Policy</th><th>Days</th>${keys.map(k => `<th>${esc(ML[k])}</th>`).join('')}<th>Days cheaper than nothing</th></tr></thead><tbody>${rows}</tbody></table></div>
       <p>Lowest average cost on these days: <strong>${esc(PPO.labels[best])}</strong>.${best !== 'ppo' ? ' PPO does not beat it here.' : ''}</p>
       ${abl}<p class="foot-note">Costs: £${int(C.corridor_hour)} per congested road-hour (one road over 85% full for an hour; a weight for the risk of a road locking up, set by us, not measured), £${int(C.vehicle_hour)} per vehicle-hour of delay (vehicles queuing into the next 15 minutes, plus slow running), £${int(C.held_pax_hour)} per passenger-hour held in a terminal, £${int(C.marshal_hour)} per gate-hour of marshals${C.sign_hour ? `, £${int(C.sign_hour)} per sign location-hour` : ''}. ${C.sign_hour ? 'Check-in moves have' : 'Signs and check-in moves have'} no cost of their own. ${tr.timesteps ? `Trained on ${int(tr.days)} sampled days (${int(tr.timesteps)} steps of 15 minutes) on ${esc(tr.gpu || tr.device)}.` : ''}</p>${curve}`;
@@ -1790,7 +2097,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
       state.minute = Math.min(1200, state.minute + dt * +$('#veh-speed').value);
       const b = Math.min(N_BINS - 1, Math.floor((state.minute - 300) / 15));
-      if (b !== state.bin) setBin(b, true); else drawAgents();
+      if (b !== state.bin) setBin(b, true); else drawAgents(true);
       if (state.minute >= 1200) { stopVehicles(); return; }
       vehAnim = requestAnimationFrame(tick);
     };
@@ -1800,7 +2107,9 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     $('#veh-row').hidden = state.layer !== 'agents';
     if (state.layer !== 'agents') stopVehicles();
     drawAgents();
+    if (state.layer === 'agents' && !vehAnim && !REDUCED && agentDay()) $('#veh-play').click();
   }));
+  $('#veh-trails').addEventListener('change', () => drawAgents());
 
   /* ---------- day ---------- */
   function schedSrc() {
@@ -1831,7 +2140,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       for (const c of DATA.corridors) if (d.p85[c.id][state.bin] > tp) { tp = d.p85[c.id][state.bin]; top = c.id; }
       state.corr = top;
     }
-    renderCalendar(); renderDay();
+    renderCalendar(); renderDay(); if ($('#day-chip')) renderChip();
     if (scroll) $('#day').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
   }
   function renderDay() {
@@ -1842,7 +2151,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     if (d.beyond) {
       $('#day-head').innerHTML = '';
       $('#notices').innerHTML = `<div class="card refusal"><p class="eyebrow">Outside coverage</p><h2>No forecast for ${esc(longDate(d.date))}</h2>
-        <p>The published cruise schedule ends on ${esc(longDate(M.horizon))}. Without a schedule there are no ship calls to forecast from, so the tool shows nothing rather than a guess. Dates fill in when the next schedule is published.</p>
+        <p>The published schedule ends on ${esc(longDate(M.horizon))}. No schedule, no forecast: we show nothing rather than guess.</p>
         <p><button class="btn btn-primary" id="goto-last">Open ${esc(shortDate(M.horizon))}, the last covered day</button></p></div>`;
       $('#goto-last').addEventListener('click', () => selectDay(M.horizon, true));
       return;
@@ -1852,17 +2161,22 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     for (const c of DATA.corridors) for (let b = 0; b < N_BINS; b++) if (!hit || add[c.id][b] > hit.v) hit = { v: add[c.id][b], b, c };
     const head = $('#day-head');
     head.className = 'day-head';
+    void head.offsetWidth; head.classList.add('enter');
     const verdict = !n ? 'No cruise ships today. The map and timetable show everyday traffic only.'
       : `<span class="sev lv-${lv.key}">${lv.label}</span>${n} ${n === 1 ? 'ship' : 'ships'} turning around. The ships add about <b>${fmt1(uplift(d))}</b> hours of congested road${d.range ? ` (likely ${upRange(d)})` : ''}.${hit && hit.v >= 20 ? ` They hit hardest around <b>${binTime(hit.b)}</b> on ${esc(hit.c.name)}, where they raise the chance of congestion by ${hit.v} points.` : ''}`;
-    head.innerHTML = `<h2>${esc(longDate(d.date))}</h2><p class="verdict">${verdict}</p>
-      <p class="trust"><span class="src">Limits</span> ${trustLine()}</p>
-      <dl class="facts">
-        <div><dt>Ships</dt><dd><b>${n}</b> <span class="src">${schedSrc()}</span></dd></div>
-        <div><dt>Added by ships</dt><dd><b>${fmt1(uplift(d))}</b> h <span class="src">Modelled</span></dd></div>
-        <div><dt>All traffic</dt><dd><b>${fmt1(d.range ? d.range.score[1] : d.score)}</b> h <span class="src">Modelled</span></dd></div>
-        <div><dt>Without ships</dt><dd><b>${fmt1(d.range ? d.range.bg[1] : d.bg_score)}</b> h <span class="src">Modelled</span></dd></div>
-      </dl>
-      <p class="foot-note">Congested means over 85% of capacity, summed over ${DATA.corridors.length} main roads. The likely range covers 8 days in 10.</p>`;
+    const tileHeat = lv.key === 'severe' ? ' hot' : lv.key === 'high' ? ' warm' : '';
+    head.innerHTML = `<div class="head-row"><h2>${esc(longDate(d.date))}</h2>${n ? `<span class="sev lv-${lv.key}">${lv.label}</span>` : ''}
+        <div class="head-more"><p class="verdict">${verdict}</p><p class="trust"><span class="src">Limits</span> ${trustLine()}</p>
+        <p>Congested = over 85% of capacity, summed over ${DATA.corridors.length} main roads. Likely range: 8 days in 10.</p></div></div>
+      <div class="tiles">
+        <div class="tile"><span class="k">Ships</span><span class="v"><b>${n}</b></span><span class="s">${schedSrc()} VTS schedule</span></div>
+        <div class="tile${tileHeat}"><span class="k">Ships add</span><span class="v"><b>${fmt1(uplift(d))}</b><small>h</small></span><span class="s">${d.range ? `likely ${upRange(d)} · ` : ''}congested road-hours · modelled</span></div>
+        ${hit && hit.v >= 20 ? `<div class="tile"><span class="k">Worst moment</span><span class="v">${binTime(hit.b).slice(0, 5)}</span><span class="s">${esc(hit.c.name)} · +${hit.v} pts</span></div>` : ''}
+        <div class="tile"><span class="k">All traffic</span><span class="v"><b>${fmt1(d.range ? d.range.score[1] : d.score)}</b><small>h</small></span><span class="s"><b>${fmt1(d.range ? d.range.bg[1] : d.bg_score)}</b>h without ships · modelled</span></div>
+      </div>
+      <div class="dayline">${dayline(d)}<div class="dl-axis"><span>05:00</span><span>08:00</span><span>11:00</span><span>14:00</span><span>17:00</span><span>20:00</span></div></div>`;
+    const dl = head.querySelector('.dayline svg');
+    if (dl) dl.addEventListener('click', e => { const r = dl.getBoundingClientRect(); setBin(Math.floor((e.clientX - r.left) / r.width * N_BINS)); });
     const notes = [];
     d.permits.forEach(id => { const p = PERMIT[id]; notes.push(`<div class="notice"><span class="tag">Roadworks</span><span><strong>Permit ${id}:</strong> ${esc(p.what)} on ${esc(CORR[p.corridor] ? CORR[p.corridor].name : p.corridor)}, ${esc(shortDate(p.from))} to ${esc(shortDate(p.to))}${p.source ? ` (${esc(p.source)})` : ''}. Already in the forecast: traffic reroutes around it.${d.whatif.move_permit ? ' <button class="linkbtn" data-scenario="move_permit">See it moved</button>' : ''}</span></div>`); });
     const fixture = (DATA.matches || []).find(x => x.date === d.date);
@@ -1873,12 +2187,40 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     if (d.freight) notes.push(`<div class="notice${d.freight.unconfirmed ? ' notice-warn' : ''}"><span class="tag">Port freight</span><span>Port lorries ×${d.freight.factor.toFixed(2)}: ${d.freight.moves} container and ro-ro ship arrivals and departures planned today, against ${d.freight.mean_moves} a day over the days the feed covers (Southampton VTS, ABP). Scaling lorries by ship calls is an assumption, not fitted, so the swing is halved.${d.freight.unconfirmed ? ` ${d.freight.unconfirmed} of today's times are not yet confirmed.` : ''}</span></div>`);
     if (!d.calls.length) notes.push('<div class="notice"><span class="tag">No ships</span><span>No turnarounds today. The map shows everyday traffic only.</span></div>');
     $('#notices').innerHTML = notes.join('');
+    $('#notices').classList.remove('enter'); void $('#notices').offsetWidth; $('#notices').classList.add('enter');
+    if (!REDUCED) head.querySelectorAll('.tile b').forEach(countUp);
     $('#notices').querySelectorAll('[data-scenario]').forEach(b => b.addEventListener('click', () => setScenario(b.dataset.scenario)));
     const opts = ['base', 'cruise', 'bg', ...Object.keys(d.whatif)];
     $('#scenario').innerHTML = opts.map(k => `<option value="${k}"${k === state.scenario ? ' selected' : ''}>${esc(scenLabel(d, k))}</option>`).join('');
     $('#slider').value = state.bin;
     segCenters = {};
     renderTiming(); renderActions(); renderRoutesCard(); renderSure(); renderVehicles(); renderBuses(); renderBusLive(); renderPPO(); renderVisuals();
+  }
+  function countUp(el) {
+    const txt = el.textContent, target = parseFloat(txt.replace(/,/g, ''));
+    if (!isFinite(target) || !/^[\d.,]+$/.test(txt)) return;
+    const dp = (txt.split('.')[1] || '').length, t0 = performance.now();
+    let done = false;
+    const finish = () => { done = true; el.textContent = txt; };
+    const step = now => {
+      if (done) return;
+      const k = Math.max(0, Math.min(1, (now - t0) / 650)), v = target * (1 - (1 - k) ** 3);
+      if (k >= 1) return finish();
+      el.textContent = dp ? v.toFixed(dp) : Math.round(v).toLocaleString('en-GB');
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+    setTimeout(finish, 900);  // lands on the real figure even if frames are throttled
+  }
+  // share of the main roads likely over 85% full, per 15 minutes, with a playhead at the map's time
+  function dayline(d) {
+    const ids = DATA.corridors.map(c => c.id), ys = [];
+    for (let b = 0; b < N_BINS; b++) ys.push(ids.reduce((s, id) => s + d.p85[id][b], 0) / ids.length / 100);
+    const top = Math.max(0.15, ...ys), X = b => (b + 0.5) / N_BINS * 600, Y = v => 62 - v / top * 56;
+    const pts = ys.map((v, b) => `${X(b).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+    return `<svg viewBox="0 0 600 64" preserveAspectRatio="none" role="img" aria-label="Share of main roads likely congested through the day; click to move the map to that time">
+      <polygon class="dl-area" points="0,64 ${pts} 600,64"/><polyline class="dl-line" points="${pts}"/>
+      <rect class="dl-ph" id="dl-ph" x="${(state.bin / N_BINS * 600).toFixed(1)}" y="0" width="${(600 / N_BINS).toFixed(1)}" height="64" opacity="0.35"/></svg>`;
   }
   function renderVisuals() {
     const d = day();
@@ -1897,6 +2239,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
   function setScenario(key) { state.scenario = key; $('#scenario').value = key; renderVisuals(); }
   function setBin(b, keepMinute) {
     state.bin = Math.max(0, Math.min(N_BINS - 1, b));
+    const ph = document.getElementById('dl-ph'); if (ph) ph.setAttribute('x', (state.bin / N_BINS * 600).toFixed(1));
     if (!keepMinute) state.minute = 300 + state.bin * 15 + 7.5;
     if (+$('#slider').value !== state.bin) $('#slider').value = state.bin;
     paintRoads(); placeUI(); renderHeat(); renderInfo(); renderGates(); renderMix(); renderRouteDetail(); renderTimeline();
@@ -2082,16 +2425,128 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     host.addEventListener('mouseleave', () => { const tip = host.querySelector('.viz-tip'); if (tip) tip.hidden = true; hideX(); });
   }
 
+  function setTheme(t) {
+    if (t === 'light' || t === 'dark' || t === 'harbour' || t === 'signal' || t === 'chart' || t === 'steam') document.documentElement.dataset.theme = t;
+    else delete document.documentElement.dataset.theme;
+    document.querySelectorAll('[data-theme-pick]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.themePick === t)));
+    try { localStorage.setItem('forecast-theme', t || ''); } catch (err) { /* private mode: theme just isn't remembered */ }
+  }
+  document.querySelectorAll('[data-theme-pick]').forEach(b => b.addEventListener('click', () => setTheme(b.dataset.themePick)));
+  let savedTheme = null;
+  try { savedTheme = localStorage.getItem('forecast-theme'); } catch (err) { /* no storage */ }
+  setTheme(savedTheme || 'harbour');  // Harbour night unless the viewer picked another
   function onTheme() { readPalette(); if (state.date && !day().beyond) renderVisuals(); }
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', onTheme);
   new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
+  /* ---------- app shell: which blocks each view shows ---------- */
+  const VIEWS = ['briefing', 'map', 'timeline', 'insights'];
+  const VIEW_OF = {
+    '.masthead': 'briefing', '.provenance': 'briefing', '#cal-h': 'briefing',
+    '#day-head': 'briefing map', '#notices': 'briefing', '#row-actions': 'briefing', '#ppo-card': 'briefing map',
+    '#day-body': 'map', '#row-vehicles': 'map', '#ships-block': 'briefing map timeline',
+    '#heat-card': 'timeline', '#tl-card': 'timeline', '#sure-card': 'timeline', '#gates-card': 'timeline',
+    '#row-model': 'insights', '#bus-card': 'insights', '#bus-live': 'insights', '#method-h': 'insights',
+  };
+  for (const [sel, v] of Object.entries(VIEW_OF)) {
+    let el = $(sel);
+    if (!el) continue;
+    if (sel === '#cal-h' || sel === '#method-h') el = el.closest('section');
+    el.dataset.views = v;
+  }
+  $('#appbar-themes').replaceWith($('.theme-pick'));
+  function showView(v, fromHash) {
+    if (!VIEWS.includes(v)) v = 'briefing';
+    document.body.dataset.view = v;
+    document.querySelectorAll('[data-views]').forEach(el => el.classList.toggle('off-view', !el.dataset.views.split(' ').includes(v)));
+    document.querySelectorAll('[data-go]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.go === v)));
+    const w = $('.wrap'); w.classList.remove('view-enter'); void w.offsetWidth; w.classList.add('view-enter');
+    if (v === 'timeline') { $('#tl-card').open = true; $('#gates-card').open = true; }
+    if (v === 'map') {
+      requestAnimationFrame(() => { layout(); if (!showView.zoomed) { zoomTo('docks', false); showView.zoomed = true; } drawAgents(); });
+      if (state.layer !== 'agents' && agentDay() && !REDUCED) $('#layer-agents').click();
+    } else stopVehicles();
+    if (!fromHash) history.replaceState(null, '', '#' + v);
+    window.scrollTo(0, 0);
+  }
+  document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => showView(b.dataset.go)));
+  addEventListener('hashchange', () => showView(location.hash.slice(1), true));
+  const DATES = DATA.days.map(d => d.date);
+  function renderChip() {
+    const d = day(), i = DATES.indexOf(state.date);
+    const lv = d && !d.beyond ? level(uplift(d)) : null;
+    $('#day-chip').innerHTML = `${lv ? `<i class="lv-${lv.key}"></i>` : ''}${esc(shortDate(state.date))}`;
+    $('#day-prev').disabled = i <= 0; $('#day-next').disabled = i >= DATES.length - 1;
+  }
+  $('#day-prev').addEventListener('click', () => { const i = DATES.indexOf(state.date); if (i > 0) selectDay(DATES[i - 1], false); });
+  $('#day-next').addEventListener('click', () => { const i = DATES.indexOf(state.date); if (i < DATES.length - 1) selectDay(DATES[i + 1], false); });
+
+  /* ---------- explanations behind a ? button ---------- */
+  const TUCK = ['.provenance', '.sec-head > p', 'p.foot-note', 'div.foot-note', '.head-more', '#veh-body > p', '#ppo-body > p',
+    '.ppo-act .foot-note', '#info', '.map-legend > .muted', '.scale > span:last-child', '#bus-body > p', '#bus-live-body > p',
+    '.fold-body > p', '.notice > span:not(.tag)', '.timing > p', '#actions > p.muted', 'p.todo-detail', '.agents-check'].join(', ');
+  const qlayer = document.createElement('div'); qlayer.id = 'qlayer'; document.body.append(qlayer);
+  let qOpen = null;
+  // an explanation opens as its first sentence or two; the rest is behind "More"
+  function condense(el) {
+    const lead = el.querySelector(':scope > .q-lead');
+    if (lead) { lead.hidden = false; el.querySelector(':scope > .q-more').hidden = false; el.querySelector(':scope > .q-full').hidden = true; return; }
+    if (el.querySelector('svg, table, ul, ol, select, input')) return;
+    const words = n => n.nodeType === 3 ? n.textContent : n.nodeType === 1 ? [...n.childNodes].map(words).join('') + ' ' : '';
+    const full = words(el).replace(/\s+/g, ' ').replace(/\s+([.,;:)])/g, '$1').trim(), sents = full.split(/(?<=[.!?])\s+(?=[A-Z0-9£(])/);
+    let short = sents[0];
+    if (sents.length > 1 && short.length + sents[1].length < 170) short += ' ' + sents[1];
+    if (short.length >= full.length - 12) return;
+    const l = document.createElement('span'), m = document.createElement('button'), rest = document.createElement('span');
+    l.className = 'q-lead'; l.textContent = short; m.type = 'button'; m.className = 'q-more'; m.textContent = 'More';
+    rest.className = 'q-full'; rest.hidden = true; rest.append(...el.childNodes);
+    m.addEventListener('click', e => { e.stopPropagation(); l.hidden = true; m.hidden = true; rest.hidden = false; placeTuck(); });
+    el.append(l, ' ', m, rest);
+  }
+  function placeTuck() {
+    if (!qOpen) return;
+    const { b, pop } = qOpen, r = b.getBoundingClientRect(), M = 8;
+    pop.style.left = `${Math.max(M, Math.min(r.left - 4, innerWidth - pop.offsetWidth - M))}px`;
+    const below = r.bottom + 8, above = r.top - pop.offsetHeight - 8;
+    pop.style.top = `${below + pop.offsetHeight > innerHeight - M && above > M ? above : below}px`;
+  }
+  function tuck(el) {
+    if (!el.parentElement || el.classList.contains('qwrap') || el.classList.contains('qpop') || el.parentElement.closest('.qwrap, #qlayer') || el.textContent.trim().length < 20) return;
+    const w = document.createElement('span'), b = document.createElement('button');
+    w.className = 'qwrap'; b.type = 'button'; b.className = 'qmark'; b.textContent = '?';
+    b.setAttribute('aria-label', 'More about this'); b.setAttribute('aria-expanded', 'false');
+    el.replaceWith(w); w.append(b, el); el.classList.add('qpop');
+    if (el.classList.contains('provenance')) $('.masthead .meta').append(w);
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      const same = qOpen && qOpen.w === w;
+      closeTucks();
+      if (same) return;
+      condense(el);
+      qOpen = { w, b, pop: el }; w.classList.add('open'); b.setAttribute('aria-expanded', 'true');
+      qlayer.append(el); placeTuck();
+    });
+  }
+  function closeTucks() {
+    if (!qOpen) return;
+    const { w, b, pop } = qOpen; qOpen = null;
+    w.classList.remove('open'); b.setAttribute('aria-expanded', 'false'); w.append(pop);
+  }
+  let tuckQueued = false;
+  const tuckAll = () => { tuckQueued = false; if (qOpen && !qOpen.w.isConnected) closeTucks(); document.querySelectorAll(TUCK).forEach(tuck); };
+  new MutationObserver(() => { if (!tuckQueued) { tuckQueued = true; queueMicrotask(tuckAll); } }).observe(document.body, { childList: true, subtree: true });
+  document.addEventListener('click', e => { if (!e.target.closest('.qwrap, #qlayer')) closeTucks(); });
+  addEventListener('keyup', e => { if (e.key === 'Escape') closeTucks(); });
+  addEventListener('scroll', placeTuck, true); addEventListener('resize', placeTuck);
+
   readPalette();
+  $('#cal').classList.add('cal-intro'); setTimeout(() => $('#cal').classList.remove('cal-intro'), 1600);
   renderMeta(); renderPPOTest(); wirePPOViz();
   renderBacktest();
   renderFit();
   buildMap();
   selectDay(BY_DATE['2026-10-24'] ? '2026-10-24' : DATA.days[0].date, false);
   requestAnimationFrame(() => { layout(); zoomTo('docks', false); });
+  renderChip(); showView(location.hash.slice(1), true);
 })();
 </script>
