@@ -71,12 +71,19 @@ def day_tasks(cruise: dict | None = None) -> dict[str, dict]:
     synthetic_demo.main() (calls are synthetic_demo.Call objects). ``cruise``: fitted cruise
     assumptions, if any (fitted_cruise)."""
     sched = sd.make_schedule(np.random.default_rng(sd.SEED))
+    freight = None
+    if hasattr(sd, "load_freight_days"):  # port freight per day, where synthetic_demo has it
+        import freight_days as fd
+
+        freight, _ = sd.load_freight_days(lambda *_: None)
     out = {}
     d = sd.FIRST_DAY
     while d <= sd.HORIZON:
         out[d.isoformat()] = {"date": d.isoformat(), "calls": list(sched[d]),
                               "closed": [p["corridor"] for p in sd.permits_on(d)],
                               "match": sd.match_on(d), "term": sd.in_term(d), "cruise": cruise}
+        if freight is not None:
+            out[d.isoformat()]["freight_f"] = fd.factor_on(freight, d)
         d += timedelta(days=1)
     return out
 
@@ -88,8 +95,9 @@ def task_json(task: dict) -> dict:
              for c in task["calls"]]
     out = {"date": task["date"], "key": "base", "calls": calls, "closed": list(task["closed"]),
            "match": task["match"], "term": task["term"], "full": False, "paired": False}
-    if task.get("cruise"):
-        out["cruise"] = task["cruise"]
+    for k in ("cruise", "freight_f"):
+        if task.get(k) is not None:
+            out[k] = task[k]
     return out
 
 
@@ -143,11 +151,16 @@ def background_by_purpose(m: tm.Model, dtype: int, rng: np.random.Generator | No
         oz, dz = m.od_zone[:, 0], m.od_zone[:, 1]
         od_mult = (np.where(oz >= 0, zf[np.maximum(oz, 0)], 1.0)
                    * np.where(dz >= 0, zf[np.maximum(dz, 0)], 1.0))
+    freight_keys = getattr(tm, "FREIGHT_KEYS", set())  # port freight, where the model has it
     for key, group, _, _, totals, profiles in tm.PURPOSES:
         if key in tm.SCHOOL_KEYS and not (term and dtype == 0):
             continue
         prof = tm.bin_profile(tm.PROFILES[profiles[0 if dtype == 0 else 1]])
-        total = totals[dtype] * (m.scale_ext if group in tm.EXTERNAL else m.scale) * day
+        if key in freight_keys and m.purpose_od.get(key) is None:
+            continue
+        scale = (getattr(m, "scale_freight", 1.0) if group == "freight"
+                 else m.scale_ext if group in tm.EXTERNAL else m.scale)
+        total = totals[dtype] * scale * day
         if mult:
             total *= mult.get(group, mult.get("all", 1.0))
         if rng is not None:
@@ -374,8 +387,9 @@ def sample_day(ctx: sd.Ctx, task: dict, rng: np.random.Generator,
         b0 = int(rng.integers(0, N_BINS - 4))
         events.append((np.asarray(seg["edges"]), b0, b0 + int(rng.integers(4, 9)), 0.55))
     noise = rng.lognormal(-sd.PERCEPTION_SD**2 / 2, sd.PERCEPTION_SD, len(m.t0))
-    parts, groups = background_by_purpose(m, dtype, rng, term=term, spread=spread,
-                                          mult=sd.day_multipliers(d, wet))
+    mult = sd.day_multipliers(d, wet)
+    mult["freight"] = mult.get("freight", 1.0) * task.get("freight_f", 1.0)
+    parts, groups = background_by_purpose(m, dtype, rng, term=term, spread=spread, mult=mult)
     Dbg = parts_matrix(m, parts)
     Dm = tm.match_demand(m, sd.kickoff_hours(kick), rng) if kick else np.zeros_like(Dbg)
     # no calls draws nothing, as forecast() skips sample_cruise then

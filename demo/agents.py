@@ -62,6 +62,8 @@ PURPOSES = {
     "school_drop_home": ("school", "School run, driving back"),
     "school_pick": ("school", "School run, picking up"),
     "school_pick_home": ("school", "School run, driving home"),
+    "freight_in": ("freight", "Port freight lorry, to the port"),
+    "freight_out": ("freight", "Port freight lorry, from the port"),
     "match": ("match", "Match fan"),
     "cruise_car": ("cruise", "Cruise drop-off or pick-up car"),
     "cruise_park": ("cruise", "Park and cruise"),
