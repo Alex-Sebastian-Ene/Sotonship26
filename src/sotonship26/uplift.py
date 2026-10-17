@@ -19,7 +19,8 @@ import pandas as pd
 
 BINS_PER_DAY = 96
 
-# England and Wales bank holidays, from https://www.gov.uk/bank-holidays (checked 2026-10-16).
+# England and Wales bank holidays, from https://www.gov.uk/bank-holidays.json (2024-26 checked
+# 2026-10-16, 2027 added 2026-10-17).
 BANK_HOLIDAYS = {
     date(2024, 1, 1), date(2024, 3, 29), date(2024, 4, 1), date(2024, 5, 6), date(2024, 5, 27),
     date(2024, 8, 26), date(2024, 12, 25), date(2024, 12, 26),
@@ -27,6 +28,8 @@ BANK_HOLIDAYS = {
     date(2025, 8, 25), date(2025, 12, 25), date(2025, 12, 26),
     date(2026, 1, 1), date(2026, 4, 3), date(2026, 4, 6), date(2026, 5, 4), date(2026, 5, 25),
     date(2026, 8, 31), date(2026, 12, 25), date(2026, 12, 28),
+    date(2027, 1, 1), date(2027, 3, 26), date(2027, 3, 29), date(2027, 5, 3), date(2027, 5, 31),
+    date(2027, 8, 30), date(2027, 12, 27), date(2027, 12, 28),
 }
 
 

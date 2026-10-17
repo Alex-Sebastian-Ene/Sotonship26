@@ -1,6 +1,6 @@
 # Everyday traffic forecast on the dock approaches: learned model vs baselines
 
-Generated Sat 17 Oct 2026 01:15 by `python -m sotonship26.flow_forecast --cutoff 2025-07-01 --lag 105`. Data: National Highways WebTRIS 15-minute counts, 2024-01-01 to 2026-06-30 (Contains National Highways data, OGL v3.0).
+Generated Sat 17 Oct 2026 01:18 by `python -m sotonship26.flow_forecast --cutoff 2025-07-01 --lag 105`. Data: National Highways WebTRIS 15-minute counts, 2024-01-01 to 2026-06-30 (Contains National Highways data, OGL v3.0).
 
 Each test day after 2025-07-01 is forecast using only counts published 105 days before it, because WebTRIS lags about 3.5 months. Scores cover 05:00-22:00. Ridge is compared with each baseline on the days both can forecast (sensor gaps differ). `skill` = 1 - MAE(ridge) / MAE(baseline): above 0 means the learned model wins. `skill_ci5`-`skill_ci95` is its 90% interval from resampling whole test weeks. `coverage80` should be near 0.80.
 
@@ -21,19 +21,19 @@ Each test day after 2025-07-01 is forecast using only counts published 105 days 
 | 19974 | year_median | year_median | 17 | 25.60 | nan | nan | nan | 7.50 | 0.87 | 107.04 |
 | 19974 | year_median | ridge | 17 | 33.28 | -0.30 | -0.42 | -0.23 | 9.75 | 0.86 | 120.89 |
 | 19974 | recent_median | recent_median | 147 | 44.84 | nan | nan | nan | 12.38 | 0.76 | 126.58 |
-| 19974 | recent_median | ridge | 147 | 39.70 | 0.11 | 0.01 | 0.21 | 10.96 | 0.80 | 124.99 |
+| 19974 | recent_median | ridge | 147 | 39.70 | 0.11 | 0.01 | 0.21 | 10.96 | 0.80 | 124.98 |
 | 19974 | planner_rule | planner_rule | 147 | 43.51 | nan | nan | nan | 12.01 | 0.76 | 122.56 |
-| 19974 | planner_rule | ridge | 147 | 39.70 | 0.09 | -0.03 | 0.19 | 10.96 | 0.80 | 124.99 |
+| 19974 | planner_rule | ridge | 147 | 39.70 | 0.09 | -0.03 | 0.19 | 10.96 | 0.80 | 124.98 |
 | 20313 | planner_rule | planner_rule | 29 | 19.53 | nan | nan | nan | 20.45 | 0.86 | 69.80 |
 | 20313 | planner_rule | ridge | 29 | 21.11 | -0.08 | -0.24 | 0.07 | 22.10 | 0.86 | 74.66 |
 | 20025 | last_year | last_year | 350 | 43.43 | nan | nan | nan | 11.70 | 0.80 | 130.26 |
-| 20025 | last_year | ridge | 350 | 35.05 | 0.19 | 0.15 | 0.23 | 9.44 | 0.84 | 124.39 |
+| 20025 | last_year | ridge | 350 | 35.01 | 0.19 | 0.15 | 0.23 | 9.43 | 0.84 | 124.37 |
 | 20025 | year_median | year_median | 355 | 37.41 | nan | nan | nan | 10.10 | 0.80 | 105.52 |
-| 20025 | year_median | ridge | 355 | 34.96 | 0.07 | 0.01 | 0.12 | 9.43 | 0.84 | 124.24 |
+| 20025 | year_median | ridge | 355 | 34.92 | 0.07 | 0.01 | 0.12 | 9.42 | 0.84 | 124.22 |
 | 20025 | recent_median | recent_median | 355 | 48.46 | nan | nan | nan | 13.08 | 0.77 | 132.70 |
-| 20025 | recent_median | ridge | 355 | 34.96 | 0.28 | 0.20 | 0.35 | 9.43 | 0.84 | 124.24 |
+| 20025 | recent_median | ridge | 355 | 34.92 | 0.28 | 0.20 | 0.35 | 9.42 | 0.84 | 124.22 |
 | 20025 | planner_rule | planner_rule | 355 | 37.41 | nan | nan | nan | 10.10 | 0.80 | 106.68 |
-| 20025 | planner_rule | ridge | 355 | 34.96 | 0.07 | 0.01 | 0.12 | 9.43 | 0.84 | 124.24 |
+| 20025 | planner_rule | ridge | 355 | 34.92 | 0.07 | 0.01 | 0.12 | 9.42 | 0.84 | 124.22 |
 
 ![One test week at M3 J14](figures/flow_forecast_20025.png)
 
