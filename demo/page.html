@@ -1,153 +1,181 @@
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Turnaround Traffic Forecast</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <style>
-/* Layout: one column for the duty officer. Calendar, then the day: a real map of Southampton first, then actions, route choice, traffic mix, the corridor heatmap and the gates. */
+/* Layout: a duty officer's briefing. Pick a day; its verdict and the things to do come first, then the map and the road timetable; how it works is folded away below. */
 :root {
-  --bg: #F1F4F6; --surface: #FFFFFF; --surface-2: #E7EDF1; --ink: #11202A; --muted: #55666F; --line: #D2DBE1;
-  --accent: #0A5C78; --accent-ink: #FFFFFF; --accent-soft: #D9EAF1;
-  --warn-bg: #FFF3D1; --warn-ink: #5E4300; --warn-line: #E5C462;
-  --lv0-bg: #E6ECEF; --lv0-ink: #3B4F5C; --lv1-bg: #FAEBBB; --lv1-ink: #5F4600;
-  --lv2-bg: #F7CDA3; --lv2-ink: #6F300C; --lv3-bg: #EE9F8F; --lv3-ink: #5E110C;
-  --h0: #EBF0F2; --h1: #F6E5A9; --h2: #F2BC66; --h3: #E5803D; --h4: #C9472E; --h5: #8C1D1D;
-  --band: rgba(10, 92, 120, 0.18); --hatch: #DCE3E8;
+  --bg: #F4F6F8; --surface: #FFFFFF; --sunk: #EBEFF3; --ink: #15202B; --muted: #566273; --line: #D5DCE4; --line-strong: #AEB8C4;
+  --accent: #1F57A4; --accent-ink: #FFFFFF; --accent-soft: #E2EBF7;
+  --warn-bg: #FFF4D6; --warn-ink: #5C4300; --warn-line: #E8C866;
+  --lv0-bg: #E8EDF2; --lv0-ink: #3C4958; --lv1-bg: #FBEDBF; --lv1-ink: #5A4500;
+  --lv2-bg: #F8CFA8; --lv2-ink: #6A2F06; --lv3-bg: #EFA595; --lv3-ink: #5C100B;
+  --lv0-mark: #9AA6B4; --lv1-mark: #D9A90E; --lv2-mark: #E07A24; --lv3-mark: #C2321F;
+  --h0: #EEF2F5; --h1: #F7E6A6; --h2: #F2BB62; --h3: #E47F3A; --h4: #C8462D; --h5: #861B1B;
+  --band: rgba(31, 87, 164, 0.16); --hatch: #DDE3E9;
   --vms-bg: #0B0B0B; --vms-ink: #FFB21F;
-  /* map */
-  --land: #ECEFEA; --water: #B6D1E2; --water-ink: #2F6584; --mud: #D9DFD3; --green: #D2E2C6; --wood: #BFD6B1;
-  --resi: #E3E6E2; --comm: #E8E0DD; --ind: #DADBE2; --port: #D3D7E1; --campus: #E5DEEA; --airport: #DEE1E5;
-  --minor: #C8CED3; --rail: #8E98A0; --boundary: #4F7387; --casing: #FFFFFF; --road-quiet: #A9B3BA;
+  --land: #EDEFEB; --water: #B8D2E3; --water-ink: #2F6584; --mud: #DADFD4; --green: #D3E2C7; --wood: #C0D6B2;
+  --resi: #E4E7E3; --comm: #E9E1DE; --ind: #DBDCE3; --port: #D4D8E2; --campus: #E6DFEB; --airport: #DFE2E6;
+  --minor: #C9CFD4; --rail: #8E98A0; --boundary: #4F7387; --casing: #FFFFFF; --road-quiet: #AAB4BB;
   --l0: #3E9C74; --l1: #9CC45A; --l2: #E8C547; --l3: #EE8B3A; --l4: #D8432F; --l5: #7E1C1C;
-  --cruise: #7A3FD1; --queue: #D8432F;
-  --ra: #0A5C78; --rb: #B4458F; --rc: #C77A12;
+  --cruise: #6A3FC4; --queue: #D8432F;
+  --ra: #1F57A4; --rb: #B4458F; --rc: #C77A12;
   --g-through: #8C9BA5; --g-county: #2F7EA6; --g-outbound: #7FB8D8; --g-internal: #8DB86A;
-  --g-visitors: #E3B04B; --g-match: #C2553A; --g-cruise: #7A3FD1; --g-freight: #8A6A4F;
-  --font-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
-  --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-data: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
-  --step--1: 0.8125rem; --step-0: 1rem; --step-1: 1.1875rem; --step-2: 1.5rem; --step-3: 2.125rem;
-  --radius: 6px;
+  --g-visitors: #E3B04B; --g-match: #C2553A; --g-cruise: #6A3FC4; --g-freight: #8A6A4F;
+  --font-display: "Archivo", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-data: "Archivo", system-ui, "Segoe UI", sans-serif;
+  --step--1: 0.8125rem; --step-0: 1rem; --step-1: 1.25rem; --step-2: 1.625rem; --step-3: 2.25rem;
+  --radius: 4px;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0D151B; --surface: #141F27; --surface-2: #1B2832; --ink: #E2E9EE; --muted: #92A3AF; --line: #26353F;
-    --accent: #63BEDD; --accent-ink: #0D151B; --accent-soft: #173543;
-    --warn-bg: #2E2610; --warn-ink: #F3D27A; --warn-line: #5E4B17;
-    --lv0-bg: #1C2830; --lv0-ink: #A9B8C2; --lv1-bg: #3A3112; --lv1-ink: #F1D27B;
-    --lv2-bg: #4A2A14; --lv2-ink: #F7B07C; --lv3-bg: #561C17; --lv3-ink: #FF9C8C;
-    --h0: #1A262F; --h1: #4A4220; --h2: #7E5A1F; --h3: #B4632A; --h4: #D9473A; --h5: #FF6F61;
-    --band: rgba(99, 190, 221, 0.22); --hatch: #1E2B34;
-    --land: #141C22; --water: #0F2635; --water-ink: #7FB2CF; --mud: #1A2626; --green: #17261D; --wood: #1A2E21;
-    --resi: #19222A; --comm: #241E26; --ind: #1D212C; --port: #1C2230; --campus: #221C2A; --airport: #1B2228;
-    --minor: #2B3943; --rail: #4D5B66; --boundary: #6F95AA; --casing: #0D151B; --road-quiet: #3C4A55;
+    --bg: #0F151C; --surface: #161E28; --sunk: #1C2632; --ink: #E3E9EF; --muted: #9AA7B5; --line: #283340; --line-strong: #3C4A5A;
+    --accent: #86B2EA; --accent-ink: #0F151C; --accent-soft: #1A2B42;
+    --warn-bg: #2D2611; --warn-ink: #F1D27C; --warn-line: #5C4A18;
+    --lv0-bg: #1D2731; --lv0-ink: #A9B6C2; --lv1-bg: #3A3113; --lv1-ink: #F0D27B;
+    --lv2-bg: #482A15; --lv2-ink: #F6B07D; --lv3-bg: #551C18; --lv3-ink: #FF9D8D;
+    --lv0-mark: #5E6B79; --lv1-mark: #E2BB3C; --lv2-mark: #F08D45; --lv3-mark: #FF6B57;
+    --h0: #1B2530; --h1: #4A4221; --h2: #7D5A20; --h3: #B3632B; --h4: #D8483B; --h5: #FF7062;
+    --band: rgba(134, 178, 234, 0.22); --hatch: #1F2A35;
+    --land: #141B22; --water: #10263A; --water-ink: #7FB2CF; --mud: #1A2626; --green: #17261D; --wood: #1A2E21;
+    --resi: #19212A; --comm: #241E26; --ind: #1D212C; --port: #1C2230; --campus: #221C2A; --airport: #1B2228;
+    --minor: #2B3943; --rail: #4D5B66; --boundary: #6F95AA; --casing: #0F151C; --road-quiet: #3C4A55;
     --l0: #4FBF8F; --l1: #ADD36A; --l2: #F2D25A; --l3: #FF9C4A; --l4: #FF5A45; --l5: #FF8FA3;
     --cruise: #B894FF; --queue: #FF5A45;
-    --ra: #63BEDD; --rb: #E681C9; --rc: #F0B04B;
+    --ra: #86B2EA; --rb: #E681C9; --rc: #F0B04B;
     --g-through: #6E7F8B; --g-county: #4FA3CF; --g-outbound: #9CCDE8; --g-internal: #9CCB78;
     --g-visitors: #F0C25E; --g-match: #E07058; --g-cruise: #B894FF; --g-freight: #B89878;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0D151B; --surface: #141F27; --surface-2: #1B2832; --ink: #E2E9EE; --muted: #92A3AF; --line: #26353F;
-  --accent: #63BEDD; --accent-ink: #0D151B; --accent-soft: #173543;
-  --warn-bg: #2E2610; --warn-ink: #F3D27A; --warn-line: #5E4B17;
-  --lv0-bg: #1C2830; --lv0-ink: #A9B8C2; --lv1-bg: #3A3112; --lv1-ink: #F1D27B;
-  --lv2-bg: #4A2A14; --lv2-ink: #F7B07C; --lv3-bg: #561C17; --lv3-ink: #FF9C8C;
-  --h0: #1A262F; --h1: #4A4220; --h2: #7E5A1F; --h3: #B4632A; --h4: #D9473A; --h5: #FF6F61;
-  --band: rgba(99, 190, 221, 0.22); --hatch: #1E2B34;
-  --land: #141C22; --water: #0F2635; --water-ink: #7FB2CF; --mud: #1A2626; --green: #17261D; --wood: #1A2E21;
-  --resi: #19222A; --comm: #241E26; --ind: #1D212C; --port: #1C2230; --campus: #221C2A; --airport: #1B2228;
-  --minor: #2B3943; --rail: #4D5B66; --boundary: #6F95AA; --casing: #0D151B; --road-quiet: #3C4A55;
+  --bg: #0F151C; --surface: #161E28; --sunk: #1C2632; --ink: #E3E9EF; --muted: #9AA7B5; --line: #283340; --line-strong: #3C4A5A;
+  --accent: #86B2EA; --accent-ink: #0F151C; --accent-soft: #1A2B42;
+  --warn-bg: #2D2611; --warn-ink: #F1D27C; --warn-line: #5C4A18;
+  --lv0-bg: #1D2731; --lv0-ink: #A9B6C2; --lv1-bg: #3A3113; --lv1-ink: #F0D27B;
+  --lv2-bg: #482A15; --lv2-ink: #F6B07D; --lv3-bg: #551C18; --lv3-ink: #FF9D8D;
+  --lv0-mark: #5E6B79; --lv1-mark: #E2BB3C; --lv2-mark: #F08D45; --lv3-mark: #FF6B57;
+  --h0: #1B2530; --h1: #4A4221; --h2: #7D5A20; --h3: #B3632B; --h4: #D8483B; --h5: #FF7062;
+  --band: rgba(134, 178, 234, 0.22); --hatch: #1F2A35;
+  --land: #141B22; --water: #10263A; --water-ink: #7FB2CF; --mud: #1A2626; --green: #17261D; --wood: #1A2E21;
+  --resi: #19212A; --comm: #241E26; --ind: #1D212C; --port: #1C2230; --campus: #221C2A; --airport: #1B2228;
+  --minor: #2B3943; --rail: #4D5B66; --boundary: #6F95AA; --casing: #0F151C; --road-quiet: #3C4A55;
   --l0: #4FBF8F; --l1: #ADD36A; --l2: #F2D25A; --l3: #FF9C4A; --l4: #FF5A45; --l5: #FF8FA3;
   --cruise: #B894FF; --queue: #FF5A45;
-  --ra: #63BEDD; --rb: #E681C9; --rc: #F0B04B;
+  --ra: #86B2EA; --rb: #E681C9; --rc: #F0B04B;
   --g-through: #6E7F8B; --g-county: #4FA3CF; --g-outbound: #9CCDE8; --g-internal: #9CCB78;
   --g-visitors: #F0C25E; --g-match: #E07058; --g-cruise: #B894FF; --g-freight: #B89878;
   color-scheme: dark;
 }
 
-body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: var(--step-0); line-height: 1.5; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: var(--step-0); line-height: 1.55; }
 .wrap {
-  max-width: 1240px; margin: 0 auto;
+  max-width: 1120px; margin: 0 auto;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 28px 48px; display: grid; gap: 28px;
+  padding-block: 32px 56px; display: grid; gap: 40px;
 }
-h1, h2, h3 { font-family: var(--font-display); line-height: 1.15; text-wrap: balance; margin: 0; }
-h1 { font-size: var(--step-3); font-weight: 700; }
-h2 { font-size: var(--step-2); font-weight: 600; }
-h3 { font-size: var(--step-1); font-weight: 600; }
+/* every stacked grid gets one shrinkable track, so wide children (heatmap, tables) scroll in place */
+.wrap, .sec, .block, .card, .fold-body, .day-head, .notices { grid-template-columns: minmax(0, 1fr); }
+h1, h2, h3 { font-family: var(--font-display); font-stretch: 112%; line-height: 1.15; text-wrap: balance; margin: 0; letter-spacing: -0.005em; }
+h1 { font-size: var(--step-3); font-weight: 750; }
+h2 { font-size: var(--step-2); font-weight: 700; }
+h3 { font-size: var(--step-1); font-weight: 650; }
 p { margin: 0; }
-.eyebrow { font-family: var(--font-display); font-size: var(--step--1); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+a { color: var(--accent); text-underline-offset: 3px; }
 .muted { color: var(--muted); }
-.num, .mono { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+.num, .mono, .big { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
 button, select, input { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-.top { display: grid; gap: 18px; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); align-items: end; }
-.brand { display: grid; gap: 8px; }
-.lede { max-width: 62ch; color: var(--muted); font-size: var(--step-1); }
-.meta { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; font-size: var(--step--1); }
-.meta dt { color: var(--muted); }
-.meta dd { margin: 0; font-family: var(--font-data); }
-.synthetic { background: var(--warn-bg); color: var(--warn-ink); border: 1px solid var(--warn-line); border-radius: var(--radius); padding: 12px 16px; }
-.synthetic strong { font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.06em; margin-right: 6px; }
-
-.sec { display: grid; gap: 14px; }
-.sec-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 16px; }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: grid; gap: 12px; min-width: 0; align-content: start; }
-.card-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 12px; }
-.grid2 { display: grid; gap: 16px; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
+.eyebrow { font-family: var(--font-display); font-size: var(--step--1); font-weight: 650; color: var(--muted); }
 .foot-note { font-size: var(--step--1); color: var(--muted); }
 
+/* Masthead */
+.masthead { display: grid; gap: 20px 40px; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); align-items: end; padding-bottom: 22px; border-bottom: 2px solid var(--ink); }
+.title-block { display: grid; gap: 10px; }
+.lede { max-width: 60ch; font-size: var(--step-1); line-height: 1.45; }
+.meta { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; margin: 0; font-size: var(--step--1); }
+.meta dt { color: var(--muted); }
+.meta dd { margin: 0; font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+.provenance { margin-top: -24px; font-size: var(--step--1); color: var(--muted); max-width: 90ch; }
+.provenance strong { color: var(--ink); margin-right: 4px; }
+
+.sec { display: grid; gap: 16px; }
+.sec-head { display: grid; gap: 4px; }
+.sec-head p { color: var(--muted); max-width: 70ch; }
+.block { display: grid; gap: 14px; min-width: 0; align-content: start; }
+.block-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 16px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; display: grid; gap: 12px; min-width: 0; align-content: start; }
+.card-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 14px; }
+.grid2 { display: grid; gap: 20px; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+
 /* Calendar */
-.cal-wrap { display: grid; gap: 6px; }
-.cal, .cal-dow { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
-.cal-dow span { font-family: var(--font-display); font-size: var(--step--1); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; padding-left: 4px; }
-.cell { min-height: 88px; border-radius: var(--radius); border: 1px solid transparent; padding: 8px; display: grid; grid-template-rows: auto auto 1fr auto; gap: 2px; text-align: left; background: var(--lv0-bg); color: var(--lv0-ink); cursor: pointer; min-width: 0; }
-button.cell:hover { border-color: var(--ink); }
-.cell[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.cal-wrap { display: grid; gap: 4px; }
+.cal, .cal-dow { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.cal-dow span { font-family: var(--font-display); font-size: var(--step--1); font-weight: 600; color: var(--muted); padding-left: 2px; }
+.cell { min-height: 82px; border-radius: var(--radius); border: 1px solid transparent; border-left: 4px solid var(--lv0-mark); padding: 7px 8px; display: grid; grid-template-rows: auto auto 1fr auto; gap: 1px; text-align: left; background: var(--lv0-bg); color: var(--lv0-ink); cursor: pointer; min-width: 0; }
+button.cell:hover { border-color: var(--line-strong); border-left-color: inherit; }
+.cell[aria-pressed="true"] { outline: 3px solid var(--accent); outline-offset: 1px; }
 .cell-off { background: transparent; border: 1px dashed var(--line); color: var(--muted); cursor: default; }
 .cell-beyond { background: repeating-linear-gradient(135deg, var(--surface) 0 6px, var(--hatch) 6px 12px); color: var(--muted); border-color: var(--line); }
-.lv-quiet { background: var(--lv0-bg); color: var(--lv0-ink); }
-.lv-watch { background: var(--lv1-bg); color: var(--lv1-ink); }
-.lv-high { background: var(--lv2-bg); color: var(--lv2-ink); }
-.lv-severe { background: var(--lv3-bg); color: var(--lv3-ink); }
+.lv-quiet { background: var(--lv0-bg); color: var(--lv0-ink); border-left-color: var(--lv0-mark); }
+.lv-watch { background: var(--lv1-bg); color: var(--lv1-ink); border-left-color: var(--lv1-mark); }
+.lv-high { background: var(--lv2-bg); color: var(--lv2-ink); border-left-color: var(--lv2-mark); }
+.lv-severe { background: var(--lv3-bg); color: var(--lv3-ink); border-left-color: var(--lv3-mark); }
 .cell-top { display: flex; align-items: baseline; gap: 6px; }
-.dnum { font-family: var(--font-display); font-weight: 700; font-size: var(--step-1); line-height: 1; }
-.mon { font-family: var(--font-display); font-size: var(--step--1); text-transform: uppercase; letter-spacing: 0.06em; }
+.dnum { font-family: var(--font-display); font-weight: 750; font-size: var(--step-1); line-height: 1; font-variant-numeric: tabular-nums; }
+.mon { font-family: var(--font-display); font-size: var(--step--1); font-weight: 600; }
 .cell-ships { font-size: var(--step--1); }
-.cell-tags { display: flex; flex-wrap: wrap; gap: 3px; align-content: start; }
-.tag { font-family: var(--font-display); font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; padding: 0 5px; border-radius: 3px; border: 1px solid currentColor; line-height: 1.5; }
-.cell-lv { font-family: var(--font-display); font-weight: 600; font-size: var(--step--1); text-transform: uppercase; letter-spacing: 0.06em; }
-.today { font-size: 0.6875rem; font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.06em; }
-.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: var(--step--1); color: var(--muted); align-items: center; }
-.legend .sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; }
+.cell-tags { font-size: 0.75rem; line-height: 1.3; opacity: 0.9; }
+.cell-lv { font-family: var(--font-display); font-weight: 700; font-size: var(--step--1); }
+.today { font-size: 0.75rem; font-weight: 700; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: var(--step--1); color: var(--muted); align-items: center; }
+.legend .sw { display: inline-block; width: 14px; height: 14px; border-radius: 2px; vertical-align: -2px; margin-right: 6px; border-left: 4px solid; }
 
-/* Day */
-.day-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px 24px; }
-.day-stats { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
-.pill { font-family: var(--font-display); font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; padding: 3px 10px; border-radius: 999px; font-size: var(--step--1); }
-.big { font-family: var(--font-data); font-size: var(--step-1); }
+/* Day briefing */
+#day { scroll-margin-top: 16px; }
+.day-head { display: grid; gap: 10px; padding: 20px 22px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-top: 4px solid var(--lv0-mark); border-radius: var(--radius); }
+.day-head.lv-watch { border-top-color: var(--lv1-mark); } .day-head.lv-high { border-top-color: var(--lv2-mark); } .day-head.lv-severe { border-top-color: var(--lv3-mark); }
+.day-head .lv-quiet, .day-head .lv-watch, .day-head .lv-high, .day-head .lv-severe { border-left: 0; }
+.verdict { font-size: var(--step-1); line-height: 1.45; max-width: 64ch; }
+.verdict b { font-family: var(--font-data); font-weight: 700; }
+.sev { font-family: var(--font-display); font-weight: 700; padding: 1px 8px; border-radius: 2px; margin-right: 6px; font-size: var(--step-0); white-space: nowrap; }
+.facts { display: flex; flex-wrap: wrap; gap: 4px 22px; font-size: var(--step--1); color: var(--muted); }
+.facts b { color: var(--ink); font-family: var(--font-data); font-weight: 600; }
 .notices { display: grid; gap: 8px; }
-.notice { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; padding: 10px 14px; border-radius: var(--radius); background: var(--surface-2); border: 1px solid var(--line); }
-.notice .tag { color: var(--muted); }
-.notice-warn { background: var(--warn-bg); color: var(--warn-ink); border-color: var(--warn-line); }
-.notice-warn .tag { color: var(--warn-ink); }
-.linkbtn { background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.notice { display: grid; grid-template-columns: 9.5em minmax(0, 1fr); gap: 4px 14px; align-items: baseline; padding: 10px 14px; border-radius: var(--radius); background: var(--sunk); font-size: var(--step--1); }
+.notice > .tag { font-family: var(--font-display); font-weight: 700; color: var(--ink); font-size: var(--step--1); }
+.notice-warn { background: var(--warn-bg); color: var(--warn-ink); }
+.notice-warn > .tag { color: var(--warn-ink); }
+.tag { font-weight: 700; }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font-weight: 600; }
+
+/* What to do */
+.todo { list-style: none; margin: 0; padding: 0; display: grid; border-top: 1px solid var(--line); }
+.todo-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 18px; padding: 14px 2px; border-bottom: 1px solid var(--line); }
+.todo-item[data-state="accepted"] .todo-title { text-decoration: line-through; text-decoration-color: var(--muted); }
+.todo-item[data-state="accepted"] { background: linear-gradient(90deg, var(--accent-soft), transparent 70%); }
+.todo-body { display: grid; gap: 4px; min-width: 0; justify-items: start; }
+.todo-kind { font-family: var(--font-display); font-size: var(--step--1); font-weight: 650; color: var(--accent); }
+.todo-title { font-size: 1.0625rem; }
+.todo-detail { color: var(--ink); max-width: 72ch; font-size: 0.9375rem; }
+.todo-check { display: inline-flex; gap: 6px; align-items: center; font-size: var(--step--1); font-weight: 600; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.todo-check input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
+.vms { margin-top: 6px; background: var(--vms-bg); color: var(--vms-ink); font-family: "Archivo", monospace; font-stretch: 125%; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; text-align: center; padding: 10px 20px; border-radius: 3px; line-height: 1.5; font-size: var(--step--1); max-width: 100%; box-shadow: inset 0 0 0 3px #2A2A2A; }
 
 /* Map */
 .map-card { padding: 0; overflow: hidden; gap: 0; }
 .map-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
 .map-bar h3 { margin-right: auto; }
-.seg-ctl { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
-.seg-ctl button { border: 0; background: var(--surface); padding: 5px 10px; cursor: pointer; font-size: var(--step--1); font-weight: 600; }
-.seg-ctl button + button { border-left: 1px solid var(--line); }
+.seg-ctl { display: inline-flex; border: 1px solid var(--line-strong); border-radius: var(--radius); overflow: hidden; }
+.seg-ctl button { border: 0; background: var(--surface); padding: 5px 11px; cursor: pointer; font-size: var(--step--1); font-weight: 600; }
+.seg-ctl button + button { border-left: 1px solid var(--line-strong); }
 .seg-ctl button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
-.map-box { position: relative; height: clamp(380px, 62vh, 640px); background: var(--land); }
+.map-box { position: relative; height: clamp(380px, 60vh, 620px); background: var(--land); }
 .map-box svg { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
 .map-box svg:active { cursor: grabbing; }
 .lyr { stroke: none; }
@@ -167,11 +195,11 @@ button.cell:hover { border-color: var(--ink); }
 .route-casing { fill: none; stroke: var(--casing); stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; pointer-events: none; }
 .r0 { stroke: var(--ra); } .r1 { stroke: var(--rb); stroke-dasharray: 9 5; } .r2 { stroke: var(--rc); stroke-dasharray: 3 4; }
 .lbl { font-family: var(--font-display); fill: var(--muted); pointer-events: none; paint-order: stroke; stroke: var(--land); stroke-width: 3px; stroke-linejoin: round; }
-.lbl-town { font-size: 14px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; fill: var(--ink); }
-.lbl-suburb { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
-.lbl-minor { font-size: 10px; font-weight: 500; letter-spacing: 0.06em; }
+.lbl-town { font-size: 14px; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; fill: var(--ink); }
+.lbl-suburb { font-size: 11px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; }
+.lbl-minor { font-size: 10px; font-weight: 550; letter-spacing: 0.04em; }
 .lbl-water { font-family: var(--font-body); font-style: italic; font-size: 13px; fill: var(--water-ink); stroke: var(--water); letter-spacing: 0.04em; }
-.mk-label { font-family: var(--font-body); font-size: 11.5px; font-weight: 600; fill: var(--ink); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; pointer-events: none; }
+.mk-label { font-family: var(--font-body); font-size: 11.5px; font-weight: 700; fill: var(--ink); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; pointer-events: none; }
 .mk-gate { fill: var(--accent); stroke: var(--surface); stroke-width: 1.5; }
 .mk-term { fill: var(--surface); stroke: var(--accent); stroke-width: 1.5; }
 .mk-poi { fill: var(--ink); stroke: var(--surface); stroke-width: 1.5; }
@@ -181,65 +209,54 @@ button.cell:hover { border-color: var(--ink); }
 .q-dot { fill: var(--queue); stroke: var(--surface); stroke-width: 1.5; opacity: 0.9; }
 .map-tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 9px; font-size: var(--step--1); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12); max-width: 260px; }
 .map-ctl { position: absolute; right: calc(10px + env(safe-area-inset-right, 0px)); bottom: 28px; display: grid; gap: 4px; }
-.map-ctl button { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); min-width: 34px; height: 30px; cursor: pointer; font-weight: 600; font-size: var(--step--1); padding: 0 8px; }
+.map-ctl button { background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius); min-width: 34px; height: 30px; cursor: pointer; font-weight: 600; font-size: var(--step--1); padding: 0 8px; }
 .map-attr { position: absolute; left: 8px; bottom: 6px; font-size: 0.6875rem; color: var(--muted); background: var(--surface); padding: 1px 6px; border-radius: 3px; opacity: 0.9; }
 .map-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding: 10px 16px; border-top: 1px solid var(--line); font-size: var(--step--1); color: var(--muted); }
 .ramp { display: inline-flex; align-items: center; gap: 2px; }
-.ramp i { display: inline-block; width: 22px; height: 6px; border-radius: 2px; }
+.ramp i { display: inline-block; width: 22px; height: 6px; border-radius: 1px; }
 .time-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 16px; border-top: 1px solid var(--line); }
 .time-row input[type="range"] { flex: 1 1 200px; accent-color: var(--accent); min-width: 0; }
-.clock { font-family: var(--font-data); font-size: var(--step-1); }
+.clock { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
 
-/* Actions, tables */
-.actions { display: grid; gap: 10px; }
-.action { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 14px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
-.action[data-state="accepted"] { border-color: var(--accent); background: var(--accent-soft); }
-.action[data-state="dismissed"] { opacity: 0.55; }
-.action-body { display: grid; gap: 4px; min-width: 0; }
-.action-kind { color: var(--accent); }
-.action-btns { display: flex; gap: 6px; align-items: start; }
-.btn { border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius); padding: 4px 10px; cursor: pointer; font-size: var(--step--1); font-weight: 600; }
+/* Buttons, tables */
+.btn { border: 1px solid var(--line-strong); background: var(--surface); border-radius: var(--radius); padding: 5px 12px; cursor: pointer; font-size: var(--step--1); font-weight: 600; }
 .btn:hover { border-color: var(--ink); }
 .btn-primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.vms { grid-column: 1 / -1; justify-self: start; background: var(--vms-bg); color: var(--vms-ink); font-family: var(--font-data); font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; text-align: center; padding: 10px 18px; border-radius: 4px; line-height: 1.45; font-size: var(--step--1); max-width: 100%; }
 .table-scroll { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; font-size: var(--step--1); }
-th { text-align: left; font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { text-align: left; font-family: var(--font-display); font-weight: 650; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line-strong); white-space: nowrap; }
 td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
 td.num { text-align: right; white-space: nowrap; }
 
-/* Route choice */
+/* Route choice, mix */
 .od-list { display: grid; gap: 6px; }
 .od { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; text-align: left; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); cursor: pointer; }
-.od[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: var(--accent-soft); }
+.od[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
 .od small { grid-column: 1 / -1; color: var(--muted); }
 .routes { display: grid; gap: 8px; }
-.rt { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; }
+.rt { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; font-size: var(--step--1); }
 .rt-key { width: 16px; height: 4px; border-radius: 2px; }
-.rt-bar { grid-column: 2 / -1; height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.rt-bar { grid-column: 2 / -1; height: 6px; background: var(--sunk); border-radius: 3px; overflow: hidden; }
 .rt-bar i { display: block; height: 100%; }
 .chart svg { display: block; width: 100%; height: auto; }
 .ax { font-family: var(--font-data); font-size: 9px; fill: var(--muted); }
 .grid-l { stroke: var(--line); }
 .now { stroke: var(--ink); stroke-width: 1; stroke-dasharray: 3 3; }
-
-/* Mix */
 .mix-legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 4px 16px; font-size: var(--step--1); }
 .mix-legend span.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
 .gw-list { display: grid; gap: 6px; font-size: var(--step--1); }
 .gw-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; }
 .gw-row .rt-bar { grid-column: 1 / -1; }
 
-/* Heatmap */
+/* Road timetable (heatmap) */
 .scenario { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
-.scenario label { font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; font-size: var(--step--1); color: var(--muted); }
-select { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 5px 8px; max-width: 100%; }
+select { background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 5px 8px; max-width: 100%; }
 .delta { font-size: var(--step--1); }
 .hm-scroll { overflow-x: auto; }
 .hm-scroll svg { display: block; width: 100%; min-width: 780px; height: auto; }
 .hm-label { font-family: var(--font-body); font-size: 12px; fill: var(--ink); }
-.hm-label.sel { font-weight: 600; fill: var(--accent); }
-.hm-group { font-family: var(--font-display); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; fill: var(--muted); }
+.hm-label.sel { font-weight: 700; fill: var(--accent); }
+.hm-group { font-family: var(--font-display); font-size: 11.5px; font-weight: 700; fill: var(--muted); }
 .hm-axis { font-family: var(--font-data); font-size: 10px; fill: var(--muted); }
 .hm-tick { stroke: var(--line); }
 .hm-cell { cursor: pointer; }
@@ -247,13 +264,13 @@ select { background: var(--surface); border: 1px solid var(--line); border-radiu
 .hm-rowsel { fill: var(--accent-soft); }
 .info { font-size: var(--step--1); min-height: 1.5em; }
 .scale { display: flex; align-items: center; gap: 8px; font-size: var(--step--1); color: var(--muted); flex-wrap: wrap; }
-.scale-bar { width: 160px; max-width: 40vw; height: 10px; border-radius: 3px; border: 1px solid var(--line); }
+.scale-bar { width: 160px; max-width: 40vw; height: 10px; border-radius: 2px; border: 1px solid var(--line); }
 
-/* Activity timeline */
+/* Day timeline, timings */
 .tl svg { display: block; width: 100%; height: auto; }
 .tl-row { font-family: var(--font-body); font-size: 11px; fill: var(--ink); }
 .tl-sub { font-family: var(--font-body); font-size: 10px; fill: var(--muted); }
-.tl-band { rx: 3; }
+.tl-band { rx: 2; }
 .tl-commute { fill: var(--g-county); opacity: 0.55; }
 .tl-school { fill: var(--g-visitors); opacity: 0.75; }
 .tl-match { fill: var(--g-match); opacity: 0.7; }
@@ -262,68 +279,79 @@ select { background: var(--surface); border: 1px solid var(--line); border-radiu
 .tl-new { fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-dasharray: 4 3; }
 .tl-grid { stroke: var(--line); }
 .timing { display: grid; gap: 10px; }
-.timing-item { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); }
-.timing-item.better { border-color: var(--accent); background: var(--accent-soft); }
+.timing-item { display: grid; gap: 4px; padding: 10px 12px; border-left: 3px solid var(--line-strong); background: var(--sunk); }
+.timing-item.better { border-left-color: var(--accent); background: var(--accent-soft); }
 .opts { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: var(--step--1); color: var(--muted); }
-.opts b { font-weight: 600; color: var(--ink); }
+.opts b { font-weight: 600; color: var(--ink); font-family: var(--font-data); }
 
 /* Uncertainty */
-.cell-range { font-family: var(--font-data); font-size: 0.6875rem; opacity: 0.85; }
-.sure { display: grid; gap: 12px; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); align-items: start; }
+.cell-range { display: none; }
+.sure { display: grid; gap: 14px; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); align-items: start; }
 .sure svg { display: block; width: 100%; height: auto; }
 .dot { fill: var(--g-cruise); opacity: 0.8; }
 .dot-wet { fill: var(--g-county); }
 .dot-inc { stroke: var(--g-match); stroke-width: 2; }
 .range-bar { fill: var(--accent-soft); }
 .range-mid { stroke: var(--accent); stroke-width: 2; }
-@media (max-width: 900px) { .sure { grid-template-columns: minmax(0, 1fr); } }
-@media (max-width: 640px) { .cell-range { display: none; } }
 
 /* Gates */
-.gates { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.gates { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 .gate-band { fill: var(--band); }
 .gate-mean { fill: none; stroke: var(--accent); stroke-width: 1.8; }
 .gate-title { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: var(--step--1); }
 
+/* Folded detail */
+details.fold { border-top: 1px solid var(--line-strong); }
+details.fold:last-of-type { border-bottom: 1px solid var(--line-strong); }
+details.fold > summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 14px 2px; font-family: var(--font-display); font-stretch: 112%; font-weight: 650; font-size: var(--step-1); }
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary::after { content: "Show"; font-family: var(--font-body); font-stretch: 100%; font-size: var(--step--1); font-weight: 700; color: var(--accent); }
+details.fold[open] > summary::after { content: "Hide"; }
+details.fold > summary .sum-note { font-family: var(--font-body); font-stretch: 100%; font-weight: 400; font-size: var(--step--1); color: var(--muted); margin-right: auto; padding-left: 4px; }
+.fold-body { display: grid; gap: 20px; padding: 2px 2px 24px; }
 .refusal { border-style: dashed; }
-.method-grid { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.steps { margin: 0; padding-left: 1.3em; display: grid; gap: 10px; max-width: 72ch; }
+.steps { margin: 0; padding-left: 1.4em; display: grid; gap: 10px; max-width: 74ch; }
 .steps li::marker { font-family: var(--font-display); font-weight: 700; color: var(--accent); }
 .plain { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; }
-.status { color: var(--warn-ink); background: var(--warn-bg); border: 1px solid var(--warn-line); }
-footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid var(--line); padding-top: 14px; }
+.status { color: var(--warn-ink); background: var(--warn-bg); border-color: var(--warn-line); }
+.evidence { border-left: 4px solid var(--accent); }
+.prose { display: grid; gap: 10px; max-width: 74ch; }
+footer { font-size: var(--step--1); color: var(--muted); border-top: 2px solid var(--ink); padding-top: 14px; }
 
-@media (max-width: 900px) { .top, .grid2, .method-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 900px) { .masthead, .grid2, .sure { grid-template-columns: minmax(0, 1fr); } .provenance { margin-top: -12px; } }
 @media (max-width: 640px) {
-  .cell { min-height: 58px; padding: 6px; }
-  .cell-ships, .cell-lv, .mon, .today { display: none; }
-  .cell-tags .tag { font-size: 0; width: 7px; height: 7px; padding: 0; border-radius: 50%; background: currentColor; }
-  .cal, .cal-dow { gap: 4px; }
-  .action { grid-template-columns: minmax(0, 1fr); }
+  .cell { min-height: 54px; padding: 5px; border-left-width: 3px; }
+  .cell-ships, .cell-lv, .mon, .today, .cell-tags { display: none; }
+  .cal, .cal-dow { gap: 3px; }
+  .todo-item { grid-template-columns: minmax(0, 1fr); }
+  .notice { grid-template-columns: minmax(0, 1fr); }
   .map-box { height: 420px; }
+  .day-head { padding: 16px; }
 }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
 </style>
 
 <div class="wrap">
-  <header class="top">
-    <div class="brand">
-      <p class="eyebrow">Prototype for SotonShip 2026</p>
-      <h1>Turnaround traffic forecast</h1>
-      <p class="lede">How cruise turnarounds load Southampton's roads on top of everyday traffic from the city and the rest of the county, and which roads go above 85% of capacity, in 15-minute steps.</p>
+  <header class="masthead">
+    <div class="title-block">
+      <h1>Cruise-day traffic forecast</h1>
+      <p class="lede">For Southampton City Council's traffic team: which days and hours cruise ships will congest the roads around the docks, and what to do about it.</p>
     </div>
     <dl class="meta">
-      <dt>Forecast issued</dt><dd id="m-issued"></dd>
-      <dt>Schedule covers</dt><dd id="m-horizon"></dd>
-      <dt>Sampled days per date</dt><dd id="m-n"></dd>
+      <dt>Issued</dt><dd id="m-issued"></dd>
+      <dt>Ship schedule</dt><dd id="m-horizon"></dd>
+      <dt>Simulated days per date</dt><dd id="m-n"></dd>
       <dt>Road network</dt><dd id="m-net"></dd>
       <dt>Model</dt><dd id="m-model"></dd>
     </dl>
   </header>
-
-  <p class="synthetic" role="note"><strong id="m-banner-label">Real map, synthetic traffic</strong><span id="m-banner">Roads, junctions, lanes, speed limits and land use come from OpenStreetMap. The cruise schedule, ship names, trip totals, roadworks permits and match fixtures are invented, and nothing on this page is observed traffic.</span></p>
+  <p class="provenance" role="note"><strong id="m-banner-label">Real map, synthetic traffic.</strong> <span id="m-banner">Roads, junctions, lanes, speed limits and land use come from OpenStreetMap.</span></p>
 
   <section class="sec" aria-labelledby="cal-h">
-    <div class="sec-head"><h2 id="cal-h">Next six weeks</h2><p class="muted">Pick a day to see when and where its roads are at risk.</p></div>
+    <div class="sec-head">
+      <h2 id="cal-h">Next six weeks</h2>
+      <p>Each day is coloured by how much the ships add to congestion on the <span id="m-roads">27</span> main roads around the docks. Pick a day for its briefing.</p>
+    </div>
     <div class="cal-wrap">
       <div class="cal-dow" aria-hidden="true"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
       <div class="cal" id="cal"></div>
@@ -334,28 +362,26 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
   <section class="sec" id="day" aria-live="polite">
     <div class="day-head" id="day-head"></div>
     <div class="notices" id="notices"></div>
-    <div class="card" id="tl-card">
-      <div class="card-head"><h3>What else is happening today</h3><span class="foot-note" id="tl-note"></span></div>
-      <div class="tl" id="timeline"></div>
+
+    <div class="block" id="row-actions">
+      <div class="block-head"><h3>What to do</h3><span class="foot-note">Tick an item once it is arranged.</span></div>
+      <div id="actions"></div>
     </div>
-    <div class="card" id="sure-card">
-      <div class="card-head"><h3>How sure are we?</h3><span class="foot-note" id="sure-note"></span></div>
-      <div class="sure"><div class="chart" id="sure-chart"></div><ul class="plain foot-note" id="sure-drivers"></ul></div>
-    </div>
+
     <div id="day-body">
       <div class="card map-card">
         <div class="map-bar">
           <h3>Roads at <span class="clock" id="clock"></span></h3>
-          <div class="seg-ctl" role="group" aria-label="Map layer">
-            <button data-layer="load" aria-pressed="true">All traffic</button>
+          <div class="seg-ctl" role="group" aria-label="What the map shows">
+            <button data-layer="load" aria-pressed="true">How full</button>
             <button data-layer="cruise" aria-pressed="false">Cruise traffic</button>
             <button data-layer="queue" aria-pressed="false">Queues</button>
           </div>
-          <label class="foot-note" for="scenario">Scenario</label>
+          <label class="foot-note" for="scenario">Plan</label>
           <select id="scenario"></select>
         </div>
         <div class="map-box" id="map-box">
-          <svg id="map-svg" role="img" aria-label="Map of Southampton with main roads coloured by traffic load"><g id="zoom"><g id="world"></g></g><g id="ui"></g></svg>
+          <svg id="map-svg" role="img" aria-label="Map of Southampton with main roads coloured by how full they are"><g id="zoom"><g id="world"></g></g><g id="ui"></g></svg>
           <div class="map-tip" id="map-tip" hidden></div>
           <div class="map-ctl">
             <button id="z-in" aria-label="Zoom in">+</button>
@@ -367,122 +393,148 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
         </div>
         <div class="map-legend" id="map-legend"></div>
         <div class="time-row">
-          <button class="btn" id="play">Play</button>
+          <button class="btn" id="play">Play the day</button>
           <input type="range" id="slider" min="0" max="59" step="1" value="24" aria-label="Time of day">
           <span class="delta" id="delta"></span>
         </div>
       </div>
     </div>
-    <div class="grid2" id="row-actions">
-      <div class="card">
-        <div class="card-head"><h3>Suggested actions</h3><span class="foot-note">Suggestions only. The duty officer decides.</span></div>
-        <div class="actions" id="actions"></div>
-      </div>
-      <div class="card">
-        <div class="card-head"><h3>Ships and suggested timings</h3><span class="foot-note" id="m-sched">Synthetic schedule</span></div>
-        <div id="ships"></div>
-        <div class="timing" id="timing"></div>
-        <p class="foot-note">Arrival times are fixed by tides, pilots and itineraries. What can move is when disembarkation starts and when check-in opens, so these are requests to the cruise line and the port.</p>
-      </div>
-    </div>
-    <div class="grid2" id="row-model">
-      <div class="card">
-        <div class="card-head"><h3>How cruise traffic is routed</h3><span class="foot-note">Shares and times at <span class="mono" id="rt-clock"></span></span></div>
-        <div class="od-list" id="od-list"></div>
-        <div class="routes" id="routes"></div>
-        <div class="chart" id="share-chart"></div>
-      </div>
-      <div class="card">
-        <div class="card-head"><h3>Who is on the roads</h3><span class="foot-note">Trips starting, vehicles per hour</span></div>
-        <div class="chart" id="mix-chart"></div>
-        <div class="mix-legend" id="mix-legend"></div>
-        <h3 style="font-size: var(--step-0)">Coming in from the county now</h3>
-        <div class="gw-list" id="gw-list"></div>
-      </div>
-    </div>
-    <div class="card" id="heat-card">
-      <div class="card-head">
-        <h3>When each road is at risk</h3>
-        <div class="seg-ctl" role="group" aria-label="Heatmap measure">
-          <button data-metric="risk" aria-pressed="true">Chance at risk</button>
-          <button data-metric="delay" aria-pressed="false">Typical delay</button>
-          <button data-metric="delay90" aria-pressed="false">Delay, 1 day in 10</button>
+
+    <div class="block" id="heat-card">
+      <div class="block-head">
+        <h3>When each road gets congested</h3>
+        <div class="seg-ctl" role="group" aria-label="What the timetable shows">
+          <button data-metric="risk" aria-pressed="true">Chance of congestion</button>
+          <button data-metric="delay" aria-pressed="false">Usual delay</button>
+          <button data-metric="delay90" aria-pressed="false">Delay on a bad day</button>
         </div>
-        <div class="scale"><span id="scale-label">Chance above 85% of capacity</span><span class="scale-bar" id="scale-bar"></span><span class="mono" id="scale-range">0–100%</span></div>
       </div>
+      <div class="scale"><span id="scale-label">Chance the road is over 85% full</span><span class="scale-bar" id="scale-bar"></span><span class="mono" id="scale-range">0–100%</span><span>· Click a square to move the map to that time.</span></div>
       <div class="hm-scroll" id="hm"></div>
       <p class="info" id="info"></p>
     </div>
-    <div class="card" id="gates-card">
-      <div class="card-head"><h3>Dock gate cruise traffic</h3><span class="foot-note">Vehicles per hour, coaches count as 2</span></div>
-      <div class="gates" id="gates"></div>
+
+    <div class="block" id="ships-block">
+      <div class="block-head"><h3>Ships today</h3><span class="foot-note" id="m-sched">Synthetic schedule</span></div>
+      <div id="ships"></div>
+      <div class="timing" id="timing"></div>
+      <p class="foot-note">Arrival times are set by tides, pilots and itineraries. What can move is when disembarkation starts and when check-in opens, so these are requests to the cruise line and the port.</p>
+    </div>
+
+    <div class="folds">
+      <details class="fold" id="tl-card">
+        <summary>What else is happening today <span class="sum-note" id="tl-note"></span></summary>
+        <div class="fold-body"><div class="tl" id="timeline"></div></div>
+      </details>
+      <details class="fold" id="sure-card">
+        <summary>How sure the forecast is <span class="sum-note" id="sure-note"></span></summary>
+        <div class="fold-body"><div class="sure"><div class="chart" id="sure-chart"></div><ul class="plain foot-note" id="sure-drivers"></ul></div></div>
+      </details>
+      <details class="fold" id="row-model">
+        <summary>Routes and traffic mix <span class="sum-note">How cruise traffic spreads over the roads, and who else is driving</span></summary>
+        <div class="fold-body grid2">
+          <div class="block">
+            <div class="block-head"><h3>How cruise traffic is routed</h3><span class="foot-note">Shares and times at <span class="mono" id="rt-clock"></span></span></div>
+            <div class="od-list" id="od-list"></div>
+            <div class="routes" id="routes"></div>
+            <div class="chart" id="share-chart"></div>
+          </div>
+          <div class="block">
+            <div class="block-head"><h3>Who is on the roads</h3><span class="foot-note">Trips starting, vehicles per hour</span></div>
+            <div class="chart" id="mix-chart"></div>
+            <div class="mix-legend" id="mix-legend"></div>
+            <h3 style="font-size: var(--step-0)">Coming in from the county now</h3>
+            <div class="gw-list" id="gw-list"></div>
+          </div>
+        </div>
+      </details>
+      <details class="fold" id="gates-card">
+        <summary>Dock gates <span class="sum-note">Cruise vehicles per hour at each gate; a coach counts as 2</span></summary>
+        <div class="fold-body"><div class="gates" id="gates"></div></div>
+      </details>
     </div>
   </section>
 
   <section class="sec" aria-labelledby="method-h">
-    <h2 id="method-h">How this forecast is made</h2>
-    <div class="method-grid">
-      <div class="card">
-        <ol class="steps">
-          <li><strong>The network is Southampton's.</strong> <span id="m-edges"></span> one-way road links from OpenStreetMap, with lanes and speed limits, from motorways down to unclassified roads.</li>
-          <li><strong>Zones and gateways come from geography.</strong> <span id="m-zones"></span> zones built from OSM places. Each zone's homes, jobs and shops come from nearby residential, commercial, industrial, port and retail land. <span id="m-gw"></span> county gateways sit where the M27, M3, A35, A33 and other roads cross into the area. Where cutting the map to the area broke the M27 and M3 (a missing carriageway, slip roads standing in for the motorway), and where OpenStreetMap lacks the M3 to M27 eastbound link, the model joins them up.</li>
-          <li><strong>General traffic is generated, not assumed.</strong> Commuters from the county to the area's jobs and back, residents working outside, trips between zones (more between big, close zones), through traffic between gateways, county visitors to the shops, and lorries to and from the port (fitted to DfT lorry counts on the M271). Each has its own pattern over the day, different at weekends. The school run adds drop-off and pick-up peaks on term-time weekdays only (city council half-term 26–30 Oct). Match days add fans to St Mary's.</li>
-          <li><strong>Counted roads use the counts.</strong> On Portswood Road, Highfield Lane and Bevois Hill, measured peak speeds of 16–20 mph on 30 mph roads show they are at their limit, so the counted peak-hour flow sets their capacity. Local traffic the zones miss is added so flows match the counts, plus <span id="m-uni"></span> for university term, because the counts were taken in July.</li>
-          <li><strong>Cruise traffic is added per ship.</strong> Car drop-offs, park and cruise, taxis and coaches, timed by disembarkation and boarding and sent to the terminal's nearest dock gate.</li>
-          <li><strong>Routes are allocated dynamically.</strong> Every 15 minutes each of the <span id="m-ods"></span> origin–destination flows splits over up to three real routes and shifts towards the quickest given everyone's congestion. Traffic that cannot get through a full road waits and joins the next 15 minutes, so queues build and clear.</li>
-          <li><strong>Randomness that hangs together.</strong> Drivers misjudge road speeds and everyone on a road shares the error, so overlapping routes are misjudged together. They choose between routes with some randomness rather than all taking the quickest. Everyday traffic swings by day, by kind of trip, by area (neighbours together) and through the day (busy spells persist). Passengers on one ship share its delay and travel mix. Wet days and incidents happen at their usual rates, and dates further ahead get wider ranges.</li>
-          <li><strong>Many sampled days.</strong> Ship delays, loads, travel choices and background traffic vary across <span id="m-n2"></span> samples. A road's chance of being at risk is the share of samples where it goes above 85% of capacity. Each sample is also run without the ships, so the cruise effect is measured on the same day.</li>
-        </ol>
+    <div class="sec-head">
+      <h2 id="method-h">How the forecast works</h2>
+      <p>A model of Southampton's road network, loaded with everyday traffic and each ship's passengers, run many times per date. The cruise effect is learned from past traffic counts and tested on days the model had not seen.</p>
+    </div>
+    <div class="grid2">
+      <div class="card status evidence" id="backtest-card">
+        <p class="eyebrow" style="color: inherit">Not yet tested against past days</p>
+        <p>The cruise effect has not been checked against observed cruise days in this build.</p>
       </div>
-      <div class="card status" id="backtest-card">
-        <p class="eyebrow" style="color: inherit">Backtest: not run yet</p>
-        <p>The demo is fitted to annual and July counts but has no observed cruise days, so it cannot show accuracy. County commuters already come from Census 2021 travel-to-work flows and county traffic is fitted to DfT annual counts. The product also learns the cruise travel assumptions from 15-minute counts on past cruise days (lead candidate: National Highways WebTRIS on the M271), and tests on later days it has not seen.</p>
-        <p>It reports average error, Brier score and how often observations fall inside the 80% range, against three baselines: the last comparable cruise day, a model using passenger numbers only, and no cruise effect.</p>
-      </div>
-      <div class="card" id="fit-card" hidden style="grid-column: 1 / -1">
+      <div class="card evidence" id="fit-card" hidden>
         <h3>Cruise assumptions learned from the M271</h3>
-        <div class="sure"><div class="chart" id="fit-chart"></div><div id="fit-text" class="foot-note"></div></div>
+        <div class="chart" id="fit-chart"></div>
+        <div id="fit-text" class="foot-note prose"></div>
       </div>
-      <div class="card">
-        <h3>Trip totals in this demo</h3>
-        <div class="table-scroll"><table id="purposes"></table></div>
-        <p class="foot-note">Scaled <span id="m-scale"></span>. Commuters from the county and residents working outside are Census 2021 car drivers crossing the edge of the area (<span id="m-census"></span>), with where they come from and which road they use. Through traffic and other county trips come from DfT counts on the roads into the area. Port freight is in car-equivalents (a lorry counts as 2.5 cars on a busy road), fitted to DfT lorry counts. Visitors, trips within the area and the school run are invented totals. Trips within the area are fitted to council counts. Everything crossing the edge of the area is fitted to DfT counts (below), because census day fell in lockdown. Cruise travel split: <span id="m-modes"></span>.</p>
-      </div>
-      <div class="card" style="grid-column: 1 / -1">
-        <h3>Checked against council traffic counts</h3>
-        <p class="foot-note">Trips within the area are scaled so that, summed over four counting sites around Portswood, modelled weekday flows match what was counted. Saturday is a check, not fitted. Single roads are less accurate because each zone loads the network at one point; finer zones are the next step. Source: <span id="calib-src"></span>.</p>
-        <div class="table-scroll"><table id="calib"></table></div>
-        <p class="foot-note">The same report gives bus run times on Portswood Road (Table 3-5): in July 2024 services ran 0:24 to 4:22 minutes behind timetable in the peaks, and a quarter of Bluestar 2 southbound buses were 5 or more minutes late. The modelled delays on Portswood Road should sit in that range out of term and above it in term. Longer waits that residents report, such as 30 minutes, build up across several junctions on a whole journey; checking them needs term-time journey times, for example bus positions from the Bus Open Data Service.</p>
-      </div>
-      <div class="card" style="grid-column: 1 / -1">
-        <h3>Checked against DfT traffic counts</h3>
-        <p class="foot-note">County commuters, visitors and through traffic are scaled together so that modelled average daily two-way flows match the DfT annual average daily flow (all motor vehicles) at these count points. Modelled flows are 05:00–20:00 on a weekday, Saturday and Sunday, weighted 5:1:1 and grossed up to 24 hours (<span id="dft-window"></span> of traffic assumed between 05:00 and 20:00). "Estimated" points are DfT figures factored from an older count and count half in the fit. Itchen Bridge is tolled and the model has no tolls, so some of its traffic sits on Northam Bridge instead; both are checks, not fitted. At each gateway, what the DfT count on that road leaves after census commuters, visitors and port lorries is split: 30% through traffic, 70% other trips to and from the area (business, other deliveries, shopping), going to bigger and nearer zones first. Modelled port lorries count once here, not as 2.5 cars. Source: <span id="dft-src"></span>, downloaded <span id="dft-date"></span>.</p>
-        <div class="table-scroll"><table id="calib-dft"></table></div>
-      </div>
-      <div class="card" id="freight-card" hidden style="grid-column: 1 / -1">
-        <h3>Port freight checked against DfT lorry counts</h3>
-        <p class="foot-note">Lorries run between the county gateways (shared by each gateway road's DfT lorry count) and the port: <span id="fr-gates"></span>. Their number is scaled so that the M271 between the A35 and junction 1, which leads only to the Western Docks and Redbridge, carries <span id="fr-share"></span> of its DfT lorry count (assumed port share). The other points also carry lorries that are not going to the port, so they are checks: modelled port lorries should sit below the count. Weekend days run at <span id="fr-days"></span> of a weekday, and lorries follow the hour-by-hour pattern of articulated lorries leaving the docks on the M271 (National Highways WebTRIS site 19974, 410 complete days, Oct 2024 to Jun 2026).<span id="fr-vts"></span> The port's own gate counts would replace these assumptions. Counted lorries are all HGVs, both directions. Source: <span id="fr-src"></span>.</p>
-        <div class="table-scroll"><table id="calib-freight"></table></div>
-      </div>
-      <div class="card">
-        <h3>Not modelled yet</h3>
-        <ul class="plain">
-          <li>Queues blocking junctions upstream (queues wait at the bottleneck only)</li>
-          <li>School locations: OpenStreetMap was overloaded, so school trips follow where people live for now</li>
-          <li>Signal timings at individual junctions</li>
-          <li>Incidents, breakdowns and weather</li>
-          <li>Buses, rail and people switching mode when roads are busy</li>
-          <li>Traffic inside the port</li>
-          <li>Where county trips other than commuting go inside the area (bigger, nearer zones first; port freight is not separate)</li>
-          <li>Itchen Bridge toll (the model sends some Northam Bridge traffic over Itchen Bridge)</li>
-          <li>Commuters' routes outside the area (each picks a gateway by a straight-line estimate)</li>
-        </ul>
-        <p class="foot-note">Only roads with sensors can be checked against reality. Every other road on this page is a model output.</p>
-      </div>
+    </div>
+    <div class="folds">
+      <details class="fold">
+        <summary>Method, step by step</summary>
+        <div class="fold-body">
+          <ol class="steps">
+            <li><strong>The network is Southampton's.</strong> <span id="m-edges"></span> one-way road links from OpenStreetMap, with lanes and speed limits, from motorways down to unclassified roads.</li>
+            <li><strong>Zones and gateways come from geography.</strong> <span id="m-zones"></span> zones built from OpenStreetMap places. Each zone's homes, jobs and shops come from nearby residential, commercial, industrial, port and retail land. <span id="m-gw"></span> county gateways sit where the M27, M3, A35, A33 and other roads cross into the area. Where cutting the map to the area broke the M27 and M3, and where OpenStreetMap lacks the M3 to M27 eastbound link, the model joins them up.</li>
+            <li><strong>Everyday traffic is generated from data.</strong> Commuters from the county and back, residents working outside, trips between zones (more between big, close zones), through traffic, county visitors to the shops, and lorries to and from the port (fitted to DfT lorry counts on the M271). Each has its own pattern over the day, different at weekends. The school run adds drop-off and pick-up peaks on term-time weekdays (city council half-term 26–30 Oct). Match days add fans to St Mary's.</li>
+            <li><strong>Counted roads use the counts.</strong> On Portswood Road, Highfield Lane and Bevois Hill, measured peak speeds of 16–20 mph on 30 mph roads show they are at their limit, so the counted peak-hour flow sets their capacity. Local traffic the zones miss is added so flows match the counts, plus <span id="m-uni"></span> for university term, because the counts were taken in July.</li>
+            <li><strong>Cruise traffic is added ship by ship.</strong> Car drop-offs, park and cruise, taxis and coaches, timed by disembarkation and boarding and sent to the terminal's nearest dock gate.</li>
+            <li><strong>Drivers choose routes as roads fill.</strong> Every 15 minutes each of the <span id="m-ods"></span> origin–destination flows splits over up to three real routes and shifts towards the quickest. Traffic that cannot get through a full road waits for the next 15 minutes, so queues build and clear.</li>
+            <li><strong>Days vary.</strong> Drivers misjudge speeds, and everyone on a road shares the error. Everyday traffic swings by day, by kind of trip, by area and through the day. Passengers on one ship share its delay and travel mix. Wet days and incidents happen at their usual rates, and dates further ahead get wider ranges.</li>
+            <li><strong>Many simulated days.</strong> Each date is simulated <span id="m-n2"></span> times. A road's chance of congestion is the share of those days on which it goes over 85% of its capacity. Each simulated day is also run without the ships, so the ships' effect is measured on the same day.</li>
+          </ol>
+        </div>
+      </details>
+      <details class="fold">
+        <summary>Trips per day <span class="sum-note">What loads the network</span></summary>
+        <div class="fold-body">
+          <div class="table-scroll"><table id="purposes"></table></div>
+          <p class="foot-note">Scaled <span id="m-scale"></span>. Commuters from the county and residents working outside are Census 2021 car drivers crossing the edge of the area (<span id="m-census"></span>). Through traffic and other county trips come from DfT counts on the roads into the area. Port freight is in car-equivalents (a lorry counts as 2.5 cars on a busy road), fitted to DfT lorry counts. Visitors, trips within the area and the school run are invented totals; trips within the area are fitted to council counts, and everything crossing the edge of the area to DfT counts, because census day fell in lockdown. Cruise travel split: <span id="m-modes"></span>.</p>
+        </div>
+      </details>
+      <details class="fold">
+        <summary>Checked against council counts <span class="sum-note">Portswood, July 2024</span></summary>
+        <div class="fold-body">
+          <p class="foot-note">Trips within the area are scaled so that, summed over four counting sites around Portswood, modelled weekday flows match what was counted. Saturday is a check, not fitted. Single roads are less accurate, because each zone loads the network at one point. Source: <span id="calib-src"></span>.</p>
+          <div class="table-scroll"><table id="calib"></table></div>
+          <p class="foot-note">The same report gives bus run times on Portswood Road (Table 3-5): in July 2024 services ran 0:24 to 4:22 minutes behind timetable in the peaks, and a quarter of Bluestar 2 southbound buses were 5 or more minutes late. Modelled delays on Portswood Road should sit in that range out of term and above it in term.</p>
+        </div>
+      </details>
+      <details class="fold">
+        <summary>Checked against DfT counts <span class="sum-note">Main roads into the area</span></summary>
+        <div class="fold-body">
+          <p class="foot-note">County commuters, visitors and through traffic are scaled together so that modelled average daily two-way flows match the DfT annual average daily flow (all motor vehicles) at these count points. Modelled flows are 05:00–20:00 on a weekday, Saturday and Sunday, weighted 5:1:1 and grossed up to 24 hours (<span id="dft-window"></span> of traffic assumed between 05:00 and 20:00). Estimated points are DfT figures factored from an older count and count half in the fit. Itchen Bridge is tolled and the model has no tolls, so some of its traffic sits on Northam Bridge instead; both are checks, not fitted. Modelled port lorries count once here, not as 2.5 cars. Source: <span id="dft-src"></span>, downloaded <span id="dft-date"></span>.</p>
+          <div class="table-scroll"><table id="calib-dft"></table></div>
+        </div>
+      </details>
+      <details class="fold" id="freight-card" hidden>
+        <summary>Port freight <span class="sum-note">Lorries checked against DfT counts</span></summary>
+        <div class="fold-body">
+          <p class="foot-note">Lorries run between the county gateways (shared by each gateway road's DfT lorry count) and the port: <span id="fr-gates"></span>. Their number is scaled so that the M271 between the A35 and junction 1, which leads only to the Western Docks and Redbridge, carries <span id="fr-share"></span> of its DfT lorry count (assumed port share). The other points also carry lorries that are not going to the port, so modelled port lorries should sit below their counts. Weekend days run at <span id="fr-days"></span> of a weekday, and lorries follow the hour-by-hour pattern of articulated lorries leaving the docks on the M271 (National Highways WebTRIS site 19974, 410 complete days, Oct 2024 to Jun 2026).<span id="fr-vts"></span> The port's own gate counts would replace these assumptions. Source: <span id="fr-src"></span>.</p>
+          <div class="table-scroll"><table id="calib-freight"></table></div>
+        </div>
+      </details>
+      <details class="fold">
+        <summary>Not modelled yet</summary>
+        <div class="fold-body">
+          <ul class="plain">
+            <li>Queues blocking junctions upstream (queues wait at the bottleneck only)</li>
+            <li>School locations: school trips follow where people live for now</li>
+            <li>Signal timings at individual junctions</li>
+            <li>Buses, rail, and people switching mode when roads are busy</li>
+            <li>Traffic inside the port</li>
+            <li>The Itchen Bridge toll</li>
+            <li>Commuters' routes outside the area (each picks a gateway by a straight-line estimate)</li>
+          </ul>
+          <p class="foot-note">Only roads with sensors can be checked against reality. Every other road on this page is a model output.</p>
+        </div>
+      </details>
     </div>
   </section>
 
-  <footer>Map data © OpenStreetMap contributors, available under the Open Database Licence. Generated by <span class="mono">demo/synthetic_demo.py</span> (seed <span id="m-seed"></span>). Gate positions and terminal-to-gate assignments are assumptions for the demo.</footer>
+  <footer>Map data © OpenStreetMap contributors, available under the Open Database Licence. Generated by <span class="mono">demo/synthetic_demo.py</span> (seed <span id="m-seed"></span>). Gate positions and terminal-to-gate assignments are assumptions.</footer>
 </div>
 
 <script id="demo-data" type="application/json">__DEMO_DATA__</script>
@@ -502,8 +554,8 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
   const GROUP_ORDER = ['through', 'freight', 'county', 'outbound', 'internal', 'visitors', 'match', 'cruise'];
   const WIDTH = { motorway: 3.4, trunk: 3.0, primary: 2.6, secondary: 2.1, tertiary: 1.7, unclassified: 1.3 };
   const LEVELS = [
-    { key: 'quiet', label: 'Quiet', min: 0, n: 0 }, { key: 'watch', label: 'Watch', min: 1.5, n: 1 },
-    { key: 'high', label: 'High', min: 5, n: 2 }, { key: 'severe', label: 'Severe', min: 10, n: 3 },
+    { key: 'quiet', label: 'Minor', min: 0, n: 0 }, { key: 'watch', label: 'Moderate', min: 1.5, n: 1 },
+    { key: 'high', label: 'Heavy', min: 5, n: 2 }, { key: 'severe', label: 'Severe', min: 10, n: 3 },
   ];
   const EXTERNAL = new Set(['county', 'outbound', 'through', 'visitors']);
   const uplift = d => Math.max(0, d.range ? d.range.uplift[1] : d.score - d.bg_score);
@@ -573,8 +625,8 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
   function scenScore(d, key) { if (key === 'bg') return d.bg_score; if (key === 'cruise') return uplift(d); if (key !== 'base' && d.whatif[key]) return d.whatif[key].score; return d.score; }
   function scenLabel(d, key) {
     if (key === 'base') return d.permits.length ? 'As planned (permit in place)' : 'As planned';
-    if (key === 'bg') return 'Without cruise traffic (heatmap only)';
-    if (key === 'cruise') return 'Added by cruise traffic (heatmap only)';
+    if (key === 'bg') return 'Without the ships (timetable only)';
+    if (key === 'cruise') return 'What the ships add (timetable only)';
     if (key === 'move_permit') return `Move permit ${d.permits.join(', ')} to another day`;
     if (key.startsWith('close_')) return `Cone off one lane on ${CORR[key.slice(6)] ? CORR[key.slice(6)].name : key.slice(6)}`;
     return key;
@@ -612,7 +664,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     if (S.freight) real.push(`container and ro-ro ship calls from ${S.freight.label.split(':')[0]} (${S.freight.short})`);
     const list = a => a.length < 2 ? a.join('') : `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}`;
     const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
-    $('#m-banner-label').textContent = sc.synthetic ? 'Real map, synthetic traffic' : 'Real map and inputs, modelled traffic';
+    $('#m-banner-label').textContent = sc.synthetic ? 'Real map, invented traffic.' : 'Real map and inputs; traffic is modelled, not measured.';
     $('#m-banner').textContent = 'Roads, junctions, lanes, speed limits and land use come from OpenStreetMap.'
       + (real.length ? ` ${cap(list(real))}.` : '')
       + ` ${cap(list(made))} are invented, and nothing on this page is observed traffic.`;
@@ -629,6 +681,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     $('#m-zones').textContent = int(c.zones);
     $('#m-gw').textContent = int(c.gateways);
     $('#m-ods').textContent = int(c.ods);
+    $('#m-roads').textContent = DATA.corridors.length;
     $('#m-scale').textContent = `×${M.scale} for trips within the area, ×${M.scale_ext} for county and through trips` + (M.scale_freight ? ` and ×${M.scale_freight} for port freight` : '');
     const scaleOf = g => g === 'freight' ? (M.scale_freight || 1) : EXTERNAL.has(g) ? M.scale_ext : M.scale;
     const ms = M.assumptions.mode_share;
@@ -672,8 +725,10 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     const cz = M.census;
     if (cz && cz.drivers) $('#m-census').textContent = `${int(cz.drivers.county)} in and ${int(cz.drivers.outbound)} out per weekday in 2021, ${Math.round(cz.commute_day * 100)}% assumed to travel on a given weekday`;
     $('#m-uni').textContent = `+${Math.round((M.uni_term - 1) * 100)}%`;
-    $('#legend').innerHTML = LEVELS.map(l => { const nx = LEVELS[l.n + 1]; return `<span><span class="sw lv-${l.key}"></span>${l.label} <span class="mono">${nx ? `${l.min}–${nx.min}` : `${l.min}+`}</span></span>`; }).join('') +
-      '<span>extra corridor-hours at risk from cruise traffic</span><span><span class="tag">Works</span> roadworks permit</span><span><span class="tag">Match</span> home match</span><span><span class="tag">?</span> passenger figure missing</span>';
+    $('#legend').innerHTML = '<span>Extra hours of congested road the ships add:</span>' + LEVELS.map(l => {
+      const nx = LEVELS[l.n + 1];
+      return `<span><span class="sw lv-${l.key}"></span>${l.label}, ${nx ? (l.min === 0 ? `under ${nx.min}` : `${l.min} to ${nx.min}`) : `${l.min} or more`}</span>`;
+    }).join('');
   }
 
   function renderCalendar() {
@@ -687,13 +742,14 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       const pressed = iso === state.date ? 'true' : 'false';
       if (dd.beyond) { cells.push(`<button class="cell cell-beyond" data-date="${iso}" aria-pressed="${pressed}" aria-label="${esc(longDate(iso))}: no published schedule"><span class="cell-top"><span class="dnum">${d.getDate()}</span>${mon}</span><span class="cell-ships">No schedule</span></button>`); continue; }
       const lv = level(uplift(dd)), n = dd.calls.length, tags = [];
-      dd.permits.forEach(id => tags.push(`<span class="tag" title="Roadworks permit ${id}">Works</span>`));
-      if (dd.match) tags.push(`<span class="tag" title="Home match, kick-off ${dd.match}">Match</span>`);
-      if (dd.calls.some(c => c.pax == null)) tags.push('<span class="tag" title="A ship has no published passenger figure">?</span>');
-      cells.push(`<button class="cell lv-${lv.key}" data-date="${iso}" aria-pressed="${pressed}" aria-label="${esc(`${longDate(iso)}: ${n} ships, ${lv.label}, cruise traffic adds ${fmt1(uplift(dd))} corridor-hours at risk`)}">
+      if (dd.permits.length) tags.push(dd.permits.length === 1 ? 'Roadworks' : `${dd.permits.length} roadworks`);
+      if (dd.match) tags.push(`Match ${dd.match}`);
+      if (dd.calls.some(c => c.pax == null)) tags.push('Passengers unknown');
+      const said = `${longDate(iso)}: ${n ? `${n} ${n === 1 ? 'ship' : 'ships'}, ${lv.label.toLowerCase()} impact, the ships add ${fmt1(uplift(dd))} hours of congested road` : 'no ships'}${tags.length ? '. ' + tags.join(', ') : ''}`;
+      cells.push(`<button class="cell lv-${lv.key}" data-date="${iso}" aria-pressed="${pressed}" aria-label="${esc(said)}">
         <span class="cell-top"><span class="dnum">${d.getDate()}</span>${mon}</span>
         <span class="cell-ships">${n ? `${n} ${n === 1 ? 'ship' : 'ships'}` : 'No ships'}</span>
-        <span class="cell-tags">${tags.join('')}</span><span class="cell-lv">${lv.label}${n && dd.range ? ` <span class="cell-range">+${fmt1(uplift(dd))} (${upRange(dd)})</span>` : ''}</span></button>`);
+        <span class="cell-tags">${esc(tags.join(' · '))}</span><span class="cell-lv">${n ? lv.label : ''}</span></button>`);
     }
     $('#cal').innerHTML = cells.join('');
   }
@@ -718,7 +774,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     void fills;
     layout();
     if (window.d3) {
-      zoomer = d3.zoom().scaleExtent([0.8, 16]).on('zoom', e => { T = e.transform; $('#zoom').setAttribute('transform', `translate(${T.x},${T.y}) scale(${T.k})`); placeUI(); });
+      zoomer = d3.zoom().scaleExtent([0.8, 16]).filter(e => (e.type !== 'wheel' || e.ctrlKey || e.metaKey) && !e.button).on('zoom', e => { T = e.transform; $('#zoom').setAttribute('transform', `translate(${T.x},${T.y}) scale(${T.k})`); placeUI(); });
       d3.select(svg).call(zoomer).on('dblclick.zoom', null);
       zoomTo('docks', false);
     }
@@ -859,10 +915,10 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     const L = state.layer;
     let html = '';
     if (L === 'cruise') html = `<span><svg width="44" height="10" aria-hidden="true"><line x1="2" y1="5" x2="42" y2="5" stroke="var(--cruise)" stroke-width="2"/></svg> 50</span><span><svg width="44" height="12" aria-hidden="true"><line x1="3" y1="6" x2="41" y2="6" stroke="var(--cruise)" stroke-width="6" stroke-linecap="round"/></svg> 200 cruise vehicles per hour</span>`;
-    else html = `<span class="ramp">${[0.3, 0.6, 0.78, 0.92, 1.1, 1.3].map(x => `<i style="background:${loadColor(x)}"></i>`).join('')}</span><span>Load: under 50% · 70% · 85% · full · over capacity</span>`;
+    else html = `<span class="ramp">${[0.3, 0.6, 0.78, 0.92, 1.1, 1.3].map(x => `<i style="background:${loadColor(x)}"></i>`).join('')}</span><span>How full: under 50%, 70%, 85%, full, over capacity</span>`;
     if (L === 'queue') html += '<span><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="5" class="q-dot"/></svg> vehicles waiting at a bottleneck</span>';
     html += '<span><svg width="12" height="12" aria-hidden="true"><rect x="1" y="1" width="10" height="10" rx="2" class="mk-gate"/></svg> dock gate</span><span><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="5" class="mk-gw"/></svg> county gateway, vehicles per hour coming in</span>';
-    html += '<span class="muted">Drag to pan, scroll or pinch to zoom.</span>';
+    html += '<span class="muted">Drag to move. Pinch, Ctrl + scroll or the buttons to zoom.</span>';
     $('#map-legend').innerHTML = html;
   }
   function onRoadHover(e) {
@@ -872,7 +928,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     const x = segLevel(d, i, h) * 0.05;
     const cr = d.cruise[i] ? CH.indexOf(d.cruise[i][h]) * 20 : 0;
     const corr = DATA.corridors.find(c => c.segs.includes(i));
-    tip.innerHTML = `<strong>${esc(SEGS[i].n || 'Unnamed ' + SEGS[i].c + ' road')}</strong><br>Load <span class="mono">${Math.round(x * 100)}%</span> of capacity${cr ? ` · cruise <span class="mono">${cr}</span>/h` : ''}${corr ? `<br><span class="muted">Click to show ${esc(corr.name)} in the heatmap</span>` : ''}`;
+    tip.innerHTML = `<strong>${esc(SEGS[i].n || 'Unnamed ' + SEGS[i].c + ' road')}</strong><br><span class="mono">${Math.round(x * 100)}%</span> full${cr ? ` · cruise <span class="mono">${cr}</span>/h` : ''}${corr ? `<br><span class="muted">Click to show ${esc(corr.name)} in the timetable</span>` : ''}`;
     const r = $('#map-box').getBoundingClientRect();
     tip.hidden = false;
     const tx = Math.min(e.clientX - r.left + 14, r.width - tip.offsetWidth - 8);
@@ -1004,9 +1060,9 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     if (typeof id !== 'string') { id = state.corr; b = state.bin; }
     const d = day(), c = CORR[id]; if (!c) { $('#info').textContent = ''; return; }
     const p = scenP85(d, state.scenario)[id][b];
-    let t = `<strong>${esc(c.name)}</strong>, ${binRange(b, b)}: <span class="mono">${p}%</span> chance above 85% of capacity · extra delay typically <span class="mono">${d.delay[id][b]}</span> min${d.delay90 ? `, 1 day in 10 <span class="mono">${d.delay90[id][b]}</span> min` : ''}`;
+    let t = `<strong>${esc(c.name)}</strong>, ${binRange(b, b)}: <span class="mono">${p}%</span> chance of congestion (over 85% full) · usual extra delay <span class="mono">${d.delay[id][b]}</span> min${d.delay90 ? `, 1 day in 10 <span class="mono">${d.delay90[id][b]}</span> min` : ''}`;
     if (state.scenario === 'base') t += ` · <span class="mono">${d.p100[id][b]}%</span> chance over capacity · average load <span class="mono">${(d.vc[id][b] / 100).toFixed(2)}</span>`;
-    t += ` · <span class="muted">${c.sensor ? esc(c.sensor) : 'Modelled, no sensor'}</span>`;
+    t += ` · <span class="muted">${c.sensor ? esc(c.sensor) : 'Modelled; no sensor on this road'}</span>`;
     $('#info').innerHTML = t;
   }
 
@@ -1036,7 +1092,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     const d = day(), p = added(d), acts = [];
     for (const c of DATA.corridors.filter(c => c.group === 'Dock gates')) {
       const ws = runs(p[c.id], 40);
-      if (ws.length) acts.push({ id: 'm-' + c.id, kind: 'Marshals', title: `Put marshals at the ${c.name.replace(' access', '')}`, detail: `${windowsText(ws)}. Cruise traffic pushes the gate approach above 85% of capacity on up to <span class="mono">${Math.max(...ws.map(w => w[2]))}%</span> more sampled days.` });
+      if (ws.length) acts.push({ id: 'm-' + c.id, kind: 'Marshals', title: `Put marshals at the ${c.name.replace(' access', '')}`, detail: `${windowsText(ws)}. The ships make the gate approach congested on up to <span class="mono">${Math.max(...ws.map(w => w[2]))}%</span> more of the simulated days.` });
     }
     const groups = [...new Set(DATA.corridors.map(c => c.group))].filter(g => SIGNS[g]);
     for (const g of groups) {
@@ -1045,7 +1101,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       const ws = runs(series, 50); if (!ws.length) continue;
       const roads = cs.filter(c => runs(p[c.id], 50).length).map(c => c.name);
       acts.push({ id: 'sign-' + g, kind: 'Sign message', title: `Set signs on the ${SIGNS[g].where}`,
-        detail: `${windowsText(ws.map(([a, b, pk]) => [Math.max(0, a - 2), b, pk]))}, each starting 30 minutes before the risk window. Cruise traffic adds risk on ${esc(roads.join(', '))} (up to <span class="mono">${Math.max(...ws.map(w => w[2]))}</span> percentage points).`, vms: SIGNS[g].lines });
+        detail: `${windowsText(ws.map(([a, b, pk]) => [Math.max(0, a - 2), b, pk]))}, starting 30 minutes before congestion is likely. The ships raise the chance of congestion on ${esc(roads.join(', '))} by up to <span class="mono">${Math.max(...ws.map(w => w[2]))}</span> points.`, vms: SIGNS[g].lines });
     }
     for (const od of d.routes) {
       if (od.routes.length < 2) continue;
@@ -1058,13 +1114,13 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     if (d.timing && d.timing.best < d.timing.base - 0.15) {
       const moves = d.timing.shifts.map((sh, i) => [sh, d.calls[i]]).filter(([sh]) => sh[0] || sh[1]);
       acts.push({ id: 'timing', kind: 'Ship timing', title: `Ask the port to move ${moves.length === 1 ? 'one ship\'s' : moves.length + ' ships\''} disembarkation or check-in`,
-        detail: `${moves.map(([sh, c]) => esc(c.ship) + (sh[0] ? ` disembarkation ${sh[0] > 0 ? '+' : '−'}${Math.abs(sh[0])} min` : '') + (sh[1] ? ` check-in ${sh[1] > 0 ? '+' : '−'}${Math.abs(sh[1])} min` : '')).join('; ')}. Corridor-hours at risk <span class="mono">${fmt1(d.timing.base)}</span> → <span class="mono">${fmt1(d.timing.best)}</span>.` });
+        detail: `${moves.map(([sh, c]) => esc(c.ship) + (sh[0] ? ` disembarkation ${sh[0] > 0 ? '+' : '−'}${Math.abs(sh[0])} min` : '') + (sh[1] ? ` check-in ${sh[1] > 0 ? '+' : '−'}${Math.abs(sh[1])} min` : '')).join('; ')}. Congested road-hours <span class="mono">${fmt1(d.timing.base)}</span> → <span class="mono">${fmt1(d.timing.best)}</span>.` });
     }
     for (const id of d.permits) {
       const pm = PERMIT[id], moved = d.whatif.move_permit;
       const ws = CORR[pm.corridor] ? runs(d.p85[pm.corridor], 30, 1) : [];
       let detail = `${esc(pm.what)} on ${esc(CORR[pm.corridor] ? CORR[pm.corridor].name : pm.corridor)} overlaps today's turnarounds${ws.length ? `, with that road at risk ${windowsText(ws)}` : ''}.`;
-      if (moved) detail += ` Moving it cuts corridor-hours at risk from <span class="mono">${fmt1(d.score)}</span> to <span class="mono">${fmt1(moved.score)}</span>.`;
+      if (moved) detail += ` Moving it cuts congested road-hours from <span class="mono">${fmt1(d.score)}</span> to <span class="mono">${fmt1(moved.score)}</span>.`;
       acts.push({ id: 'p-' + id, kind: 'Roadworks', title: `Ask the works promoter to move permit ${id}`, detail, scenario: moved ? 'move_permit' : null });
     }
     if (d.match) {
@@ -1072,20 +1128,21 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       if (hits.length) acts.push({ id: 'match', kind: 'Event', title: "Agree a joint plan with the club's match-day traffic team", detail: `Kick-off ${d.match}. At risk: ${esc(hits.map(h => h.name).join(', '))}.` });
     }
     const el = $('#actions');
-    if (!acts.length) { el.innerHTML = '<p class="muted">Nothing to do. Cruise traffic does not push any named road above 85% of capacity for 30 minutes or more on most sampled days.</p>'; return; }
-    el.innerHTML = acts.map(a => {
-      const key = `${state.date}:${a.id}`, st = decisions[key] || 'open';
-      return `<div class="action" data-key="${esc(key)}" data-state="${st}">
-        <div class="action-body"><span class="eyebrow action-kind">${esc(a.kind)}${st !== 'open' ? ` · ${st === 'accepted' ? 'Accepted' : 'Dismissed'}` : ''}</span>
-          <strong>${esc(a.title)}</strong><span class="foot-note" style="color: var(--ink)">${a.detail}</span>
-          ${a.scenario ? `<span><button class="linkbtn" data-scenario="${a.scenario}">Show the forecast with it moved</button></span>` : ''}</div>
-        <div class="action-btns"><button class="btn ${st === 'accepted' ? '' : 'btn-primary'}" data-act="accepted">${st === 'accepted' ? 'Undo' : 'Accept'}</button><button class="btn" data-act="dismissed">${st === 'dismissed' ? 'Undo' : 'Dismiss'}</button></div>
-        ${a.vms ? `<div class="vms" aria-label="Suggested sign text">${a.vms.map(esc).join('<br>')}</div>` : ''}</div>`;
-    }).join('') + '<p class="foot-note">In the product each decision is logged with who made it and why.</p>';
+    if (!acts.length) { el.innerHTML = '<p class="muted">Nothing to arrange. The ships do not make any main road congested for 30 minutes or more on most simulated days.</p>'; return; }
+    el.innerHTML = `<ul class="todo">${acts.map(a => {
+      const key = `${state.date}:${a.id}`, done = decisions[key] === 'accepted';
+      const cid = 'todo-' + a.id.replace(/[^A-Za-z0-9_-]/g, '');
+      return `<li class="todo-item" data-key="${esc(key)}" data-state="${done ? 'accepted' : 'open'}">
+        <div class="todo-body"><span class="todo-kind">${esc(a.kind)}</span><strong class="todo-title">${esc(a.title)}</strong><p class="todo-detail">${a.detail}</p>
+          ${a.scenario ? `<button class="linkbtn" data-scenario="${a.scenario}">Show the forecast with it moved</button>` : ''}
+          ${a.vms ? `<div class="vms" role="img" aria-label="${esc('Suggested sign text: ' + a.vms.join(', '))}">${a.vms.map(esc).join('<br>')}</div>` : ''}</div>
+        <label class="todo-check" for="${cid}"><input type="checkbox" id="${cid}"${done ? ' checked' : ''}> Arranged</label></li>`;
+    }).join('')}</ul><p class="foot-note">Suggestions only; the duty officer decides. In the product each decision is logged with who made it and why.</p>`;
     el.querySelectorAll('[data-scenario]').forEach(b => b.addEventListener('click', () => setScenario(b.dataset.scenario)));
-    el.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => {
-      const key = b.closest('.action').dataset.key, want = b.dataset.act;
-      decisions[key] = decisions[key] === want ? 'open' : want; renderActions();
+    el.querySelectorAll('.todo-check input').forEach(cb => cb.addEventListener('change', () => {
+      const li = cb.closest('.todo-item');
+      decisions[li.dataset.key] = cb.checked ? 'accepted' : 'open';
+      li.dataset.state = decisions[li.dataset.key];
     }));
   }
 
@@ -1144,7 +1201,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       <tr><td>${esc(c.ship)}</td><td>${esc(c.terminal)}<br><span class="muted">${esc(c.gate)}</span></td><td class="num">${c.arr}–${c.dep}${c.times && c.times !== 'exact' ? `<br><span class="muted" title="${esc(c.times)}">typical times</span>` : ''}</td>
       <td class="num">${c.pax == null ? '<span class="tag" style="color: var(--warn-ink)">Not published</span>' : int(c.pax)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">None.</p>';
     if (!d.calls.length) { el.innerHTML = ''; return; }
-    if (!d.timing) { el.innerHTML = `<p class="foot-note">${uplift(d) < 1 ? 'No timing change needed: cruise traffic adds little risk today.' : 'Timing advice is computed for the busiest days in this demo.'}</p>`; return; }
+    if (!d.timing) { el.innerHTML = `<p class="foot-note">${uplift(d) < 1 ? 'No timing change needed: the ships add little congestion today.' : 'Timing advice is computed for the busiest days in this demo.'}</p>`; return; }
     const acts = activities(d), T = d.timing;
     const items = d.calls.map((c, i) => {
       const sh = T.shifts[i], o = T.options[i];
@@ -1165,8 +1222,8 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
         <div class="opts"><span>Check-in:</span>${fmtOpts('emb')}</div></div>`;
     }).join('');
     const gain = T.base - T.best;
-    el.innerHTML = `<p>${gain > 0.15 ? `Trying earlier and later windows for each ship, the best combination cuts corridor-hours at risk from <span class="mono">${fmt1(T.base)}</span> to <span class="mono">${fmt1(T.best)}</span>.` : 'None of the windows tried does better than the current timings.'}</p>${items}
-      <p class="foot-note">Numbers after each option are corridor-hours at risk for the whole day with that change (same sampled days for every option).</p>`;
+    el.innerHTML = `<p>${gain > 0.15 ? `Trying earlier and later windows for each ship, the best combination cuts congested road-hours from <span class="mono">${fmt1(T.base)}</span> to <span class="mono">${fmt1(T.best)}</span>.` : 'None of the windows tried does better than the current timings.'}</p>${items}
+      <p class="foot-note">The number after each option is the day's congested road-hours with that change, on the same simulated days.</p>`;
   }
 
   /* ---------- backtest ---------- */
@@ -1232,15 +1289,15 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     const X0 = 16, X1 = 304, x = v => X0 + (v - lo) / (hi - lo) * (X1 - X0);
     const stacks = {}, dots = ups.map(u => {
       const k = Math.round(x(u.v) / 7); stacks[k] = (stacks[k] || 0) + 1;
-      return `<circle class="dot${u.wet ? ' dot-wet' : ''}${u.inc ? ' dot-inc' : ''}" cx="${x(u.v).toFixed(1)}" cy="${(70 - stacks[k] * 7).toFixed(1)}" r="3.2"><title>${fmt1(u.v)} corridor-hours${u.wet ? ', wet day' : ''}${u.inc ? ', incident' : ''}</title></circle>`;
+      return `<circle class="dot${u.wet ? ' dot-wet' : ''}${u.inc ? ' dot-inc' : ''}" cx="${x(u.v).toFixed(1)}" cy="${(70 - stacks[k] * 7).toFixed(1)}" r="3.2"><title>${fmt1(u.v)} hours of congested road${u.wet ? ', wet day' : ''}${u.inc ? ', incident' : ''}</title></circle>`;
     }).join('');
     const ticks = [lo, (lo + hi) / 2, hi].map(v => `<text class="ax" x="${x(v)}" y="88" text-anchor="middle">${fmt1(v)}</text>`).join('');
-    $('#sure-chart').innerHTML = `<svg viewBox="0 0 320 96" role="img" aria-label="Extra corridor-hours at risk from cruise traffic on each sampled day">
+    $('#sure-chart').innerHTML = `<svg viewBox="0 0 320 96" role="img" aria-label="Extra hours of congested road from the ships on each simulated day">
       <rect class="range-bar" x="${x(R.uplift[0])}" y="74" width="${Math.max(2, x(R.uplift[2]) - x(R.uplift[0]))}" height="5" rx="2"/>
       <line class="range-mid" x1="${x(R.uplift[1])}" x2="${x(R.uplift[1])}" y1="71" y2="82"/>${dots}${ticks}</svg>
-      <p class="foot-note">Each dot is one sampled day: extra corridor-hours at risk from the ships, measured against the same day without them. Blue: wet day. Red ring: a breakdown or crash on a main road. Bar: the middle 8 days in 10.</p>`;
+      <p class="foot-note">Each dot is one simulated day: the extra hours of congested road the ships cause, against the same day without them. Blue: wet day. Red ring: a breakdown or crash on a main road. Bar: the middle 8 days in 10.</p>`;
     const nWet = R.wet.filter(Boolean).length, nInc = R.incident.filter(Boolean).length;
-    $('#sure-note').textContent = `${R.pairs.length} sampled days, ${d.lead} days ahead`;
+    $('#sure-note').textContent = `${R.pairs.length} simulated days, ${d.lead} days ahead`;
     const arr = Math.round((U.arrival_sd || 20) * (d.spread || 1));
     $('#sure-drivers').innerHTML = [
       `<li><strong>How far ahead:</strong> ${d.lead} days, so ranges are ${Math.round(((d.spread || 1) - 1) * 100)}% wider than for tomorrow.</li>`,
@@ -1271,7 +1328,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
   function renderDay() {
     const d = day();
     const show = !d.beyond;
-    ['#day-body', '#row-actions', '#row-model', '#heat-card', '#gates-card', '#tl-card', '#sure-card'].forEach(s => { $(s).hidden = !show; });
+    ['#day-head', '#day-body', '#row-actions', '#ships-block', '#row-model', '#heat-card', '#gates-card', '#tl-card', '#sure-card'].forEach(s => { $(s).hidden = !show; });
     if (d.beyond) {
       $('#day-head').innerHTML = '';
       $('#notices').innerHTML = `<div class="card refusal"><p class="eyebrow">Outside coverage</p><h2>No forecast for ${esc(longDate(d.date))}</h2>
@@ -1280,17 +1337,24 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       $('#goto-last').addEventListener('click', () => selectDay(M.horizon, true));
       return;
     }
-    const lv = level(uplift(d));
-    $('#day-head').innerHTML = `<div><p class="eyebrow">Day view</p><h2>${esc(longDate(d.date))}</h2></div>
-      <div class="day-stats"><span class="pill lv-${lv.key}">${lv.label}</span><span>Cruise traffic adds <span class="big">${fmt1(uplift(d))}</span> corridor-hours at risk${d.range ? ` <span class="muted">(8 days in 10: ${upRange(d)})</span>` : ''}</span><span class="muted"><span class="mono">${fmt1(d.range ? d.range.score[1] : d.score)}</span> in total, <span class="mono">${fmt1(d.range ? d.range.bg[1] : d.bg_score)}</span> without ships</span></div>`;
+    const lv = level(uplift(d)), n = d.calls.length;
+    const add = added(d); let hit = null;
+    for (const c of DATA.corridors) for (let b = 0; b < N_BINS; b++) if (!hit || add[c.id][b] > hit.v) hit = { v: add[c.id][b], b, c };
+    const head = $('#day-head');
+    head.className = `day-head lv-${lv.key}`;
+    const verdict = !n ? 'No cruise ships today. The map and timetable show everyday traffic only.'
+      : `<span class="sev lv-${lv.key}">${lv.label}</span>${n} ${n === 1 ? 'ship' : 'ships'} turning around. The ships add about <b>${fmt1(uplift(d))}</b> hours of congested road${d.range ? ` (likely ${upRange(d)})` : ''}.${hit && hit.v >= 20 ? ` They hit hardest around <b>${binTime(hit.b)}</b> on ${esc(hit.c.name)}, where they raise the chance of congestion by ${hit.v} points.` : ''}`;
+    head.innerHTML = `<h2>${esc(longDate(d.date))}</h2><p class="verdict">${verdict}</p>
+      <p class="facts"><span>All traffic: <b>${fmt1(d.range ? d.range.score[1] : d.score)}</b> hours of congested road</span><span>Without the ships: <b>${fmt1(d.range ? d.range.bg[1] : d.bg_score)}</b></span><span>${M.n} simulated days${d.lead != null ? `, ${d.lead} days ahead` : ''}</span></p>
+      <p class="foot-note">A road counts as congested when it is over 85% of its capacity. Hours are added up over the ${DATA.corridors.length} main roads on a typical simulated day; the likely range covers 8 days in 10.</p>`;
     const notes = [];
-    d.permits.forEach(id => { const p = PERMIT[id]; notes.push(`<div class="notice"><span class="tag">Works</span><span><strong>Permit ${id}:</strong> ${esc(p.what)} on ${esc(CORR[p.corridor] ? CORR[p.corridor].name : p.corridor)}, ${esc(shortDate(p.from))} to ${esc(shortDate(p.to))}${p.source ? ` (${esc(p.source)})` : ''}. Already included: everyone reroutes around it.${d.whatif.move_permit ? ' <button class="linkbtn" data-scenario="move_permit">See it moved</button>' : ''}</span></div>`); });
+    d.permits.forEach(id => { const p = PERMIT[id]; notes.push(`<div class="notice"><span class="tag">Roadworks</span><span><strong>Permit ${id}:</strong> ${esc(p.what)} on ${esc(CORR[p.corridor] ? CORR[p.corridor].name : p.corridor)}, ${esc(shortDate(p.from))} to ${esc(shortDate(p.to))}${p.source ? ` (${esc(p.source)})` : ''}. Already in the forecast: traffic reroutes around it.${d.whatif.move_permit ? ' <button class="linkbtn" data-scenario="move_permit">See it moved</button>' : ''}</span></div>`); });
     const fixture = (DATA.matches || []).find(x => x.date === d.date);
-    if (d.match) notes.push(`<div class="notice"><span class="tag">Match</span><span>Home match at St Mary's${fixture && fixture.opponent ? ` v ${esc(fixture.opponent)}` : ''}, kick-off ${d.match}. About 9,000 extra car trips arrive in the 2½ hours before kick-off and leave after the final whistle, from the county gateways and the city's zones.</span></div>`);
-    d.calls.filter(c => c.pax == null).forEach(c => notes.push(`<div class="notice notice-warn"><span class="tag">Missing data</span><span><strong>${esc(c.ship)}</strong> has no published passenger figure. The forecast assumes ${int(M.unknown_pax_range[0])} to ${int(M.unknown_pax_range[1])} passengers, so its gate traffic has a wider range than usual.</span></div>`));
+    if (d.match) notes.push(`<div class="notice"><span class="tag">Home match</span><span>Home match at St Mary's${fixture && fixture.opponent ? ` v ${esc(fixture.opponent)}` : ''}, kick-off ${d.match}. About 9,000 extra car trips arrive in the 2½ hours before kick-off and leave after the final whistle, from the county gateways and the city's zones.</span></div>`);
+    d.calls.filter(c => c.pax == null).forEach(c => notes.push(`<div class="notice notice-warn"><span class="tag">Passengers unknown</span><span><strong>${esc(c.ship)}</strong> has no published passenger figure. The forecast assumes ${int(M.unknown_pax_range[0])} to ${int(M.unknown_pax_range[1])} passengers, so its gate traffic has a wider range than usual.</span></div>`));
     const wd = dateOf(d.date).getDay();
     if (wd >= 1 && wd <= 5 && !d.term) notes.push('<div class="notice"><span class="tag">Half-term</span><span>No school run this week (Southampton City Council half-term), so the 08:15 and 15:00 peaks are lighter.</span></div>');
-    if (d.freight) notes.push(`<div class="notice${d.freight.unconfirmed ? ' notice-warn' : ''}"><span class="tag">Freight</span><span>Port lorries ×${d.freight.factor.toFixed(2)}: ${d.freight.moves} container and ro-ro ship arrivals and departures planned today, against ${d.freight.mean_moves} a day over the days the feed covers (Southampton VTS, ABP). Scaling lorries by ship calls is an assumption, not fitted, so the swing is halved.${d.freight.unconfirmed ? ` ${d.freight.unconfirmed} of today's times are not yet confirmed.` : ''}</span></div>`);
+    if (d.freight) notes.push(`<div class="notice${d.freight.unconfirmed ? ' notice-warn' : ''}"><span class="tag">Port freight</span><span>Port lorries ×${d.freight.factor.toFixed(2)}: ${d.freight.moves} container and ro-ro ship arrivals and departures planned today, against ${d.freight.mean_moves} a day over the days the feed covers (Southampton VTS, ABP). Scaling lorries by ship calls is an assumption, not fitted, so the swing is halved.${d.freight.unconfirmed ? ` ${d.freight.unconfirmed} of today's times are not yet confirmed.` : ''}</span></div>`);
     if (!d.calls.length) notes.push('<div class="notice"><span class="tag">No ships</span><span>No turnarounds today. The map shows everyday traffic only.</span></div>');
     $('#notices').innerHTML = notes.join('');
     $('#notices').querySelectorAll('[data-scenario]').forEach(b => b.addEventListener('click', () => setScenario(b.dataset.scenario)));
@@ -1306,8 +1370,8 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     let delta = '';
     if (state.scenario !== 'base') {
       const base = d.score, now = scenScore(d, state.scenario), diff = now - base;
-      delta = state.scenario === 'cruise' ? `Cruise traffic adds <span class="mono">${fmt1(now)}</span> of the <span class="mono">${fmt1(base)}</span> corridor-hours at risk.`
-        : `Corridor-hours at risk: <span class="mono">${fmt1(base)}</span> as planned → <span class="mono">${fmt1(now)}</span> (<span class="mono">${diff >= 0 ? '+' : '−'}${fmt1(Math.abs(diff))}</span>)`;
+      delta = state.scenario === 'cruise' ? `The ships add <span class="mono">${fmt1(now)}</span> of the <span class="mono">${fmt1(base)}</span> congested road-hours.`
+        : `Congested road-hours: <span class="mono">${fmt1(base)}</span> as planned → <span class="mono">${fmt1(now)}</span> (<span class="mono">${diff >= 0 ? '+' : '−'}${fmt1(Math.abs(diff))}</span>)`;
     } else if (!Object.keys(d.whatif).length && d.calls.length) {
       delta = '<span class="foot-note">Road closure what-ifs are precomputed for the busiest days and permit days in this demo.</span>';
     }
@@ -1324,7 +1388,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
   document.querySelectorAll('[data-metric]').forEach(b => b.addEventListener('click', () => {
     state.metric = b.dataset.metric;
     document.querySelectorAll('[data-metric]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
-    $('#scale-label').textContent = state.metric === 'delay' ? 'Typical extra delay, as planned' : state.metric === 'delay90' ? 'Extra delay on a bad day (1 in 10)' : 'Chance above 85% of capacity';
+    $('#scale-label').textContent = state.metric === 'delay' ? 'Usual extra delay' : state.metric === 'delay90' ? 'Extra delay on a bad day (1 in 10)' : 'Chance the road is over 85% full';
     $('#scale-range').textContent = state.metric === 'risk' ? '0–100%' : '0–30+ min';
     renderHeat(); renderInfo();
   }));
@@ -1335,7 +1399,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     $('#play').textContent = 'Pause';
     state.playing = setInterval(() => { if (state.bin >= N_BINS - 1) return stopPlay(); setBin(state.bin + 1); }, 260);
   });
-  function stopPlay() { if (state.playing) clearInterval(state.playing); state.playing = null; $('#play').textContent = 'Play'; }
+  function stopPlay() { if (state.playing) clearInterval(state.playing); state.playing = null; $('#play').textContent = 'Play the day'; }
 
   function onTheme() { readPalette(); if (state.date && !day().beyond) renderVisuals(); }
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', onTheme);
