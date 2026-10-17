@@ -1,6 +1,6 @@
 # Upsample factor sweep (SOT-23 follow-up)
 
-Measured Sat 17 Oct 2026 by Keanu's Claude, to set `MAX_UPSAMPLE` in
+Measured Sat 17 Oct 2026 in Keanu's session, to set `MAX_UPSAMPLE` in
 `src/sotonship26/vision/detect.py` from evidence instead of a guess.
 
 ## Question

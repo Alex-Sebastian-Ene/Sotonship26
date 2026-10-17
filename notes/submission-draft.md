@@ -1,6 +1,6 @@
 # Submission draft (SOT-16): evaluation lane's input
 
-Draft from Keanu's Claude Code session, Sat 17 Oct 2026, for the team to cut and edit.
+Draft from Keanu's session, Sat 17 Oct 2026, for the team to cut and edit.
 Only the evaluation numbers are checked here. Product claims must be checked against what the app
 shows on Sunday morning.
 

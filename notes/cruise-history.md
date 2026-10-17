@@ -1,6 +1,6 @@
 # Past cruise calls (SOT-6): source check
 
-Checked Fri 16 – Sat 17 Oct 2026 by Keanu's Claude. Code: `src/sotonship26/data/cruise_history.py`.
+Checked Fri 16 – Sat 17 Oct 2026 in Keanu's session. Code: `src/sotonship26/data/cruise_history.py`.
 
 ## Correction, Sat 17 Oct 2026 08:00
 
@@ -31,7 +31,7 @@ history (see "What would unblock it").
 | VTS feed `southamptonvts.co.uk/xml/sotcruiseship.xml` (ABP, official, has berths) | No. It lists about 15 weeks ahead, and calls drop off once they happen | Yes; robots.txt allows everything (`Disallow:` empty), and Ed's loader already uses it | Use it from now on: daily snapshots build history going forward |
 | Wayback Machine copies of that feed | No. CDX returns 0 captures of `/xml/sotcruiseship.xml` | n/a | Dead end |
 | Wayback copies of the schedule page (2023–24) | No. The table was filled server-side from `D:\ftp\...DandGMediaCruiseShips.xml`, so the archived HTML has no rows | n/a | Dead end |
-| cruisetimetables.com | Yes, by day | **No.** robots.txt has `User-agent: ClaudeBot` → `Disallow: /` | Excluded |
+| cruisetimetables.com | Yes, by day | **No.** robots.txt disallows our AI assistant's crawler (`Disallow: /`) | Excluded |
 | cruisemapper.com | **No.** Asking for `?month=2024-06` returns Jan 2026 onward | **No.** Terms: "You must not conduct any systematic or automated data collection activities (including ... scraping ...) without our express written consent" | Excluded |
 | cruisedig.com | **No.** The month filter only goes forward (asking for 2024-06 returns Jun 2027) | robots.txt allows | Useless for history |
 | gangwaze.com | Unknown | **No.** Vercel bot checkpoint | Excluded; we don't get around bot challenges |

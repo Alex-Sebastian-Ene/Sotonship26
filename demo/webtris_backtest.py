@@ -906,8 +906,8 @@ def write_doc(r: dict) -> None:
     lines = [
         "# Backtest: learned cruise uplift on the M271",
         "",
-        f"Generated {r['generated']} by `demo/webtris_backtest.py` (written with Claude Code; "
-        "see the README provenance section). Summary numbers for the page are in "
+        f"Generated {r['generated']} by `demo/webtris_backtest.py` (see the README "
+        "provenance section). Summary numbers for the page are in "
         "`demo/out/backtest.json`.",
         "",
         "## Summary",

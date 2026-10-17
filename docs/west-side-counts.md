@@ -1,6 +1,6 @@
 # Why the simulator over-predicted the M271, the Redbridge Causeway and the A335 (SOT-27)
 
-Written Sat 17 Oct 2026 with Claude Code in Alex-Sebastian's session (SOT-27).
+Written Sat 17 Oct 2026 in Alex-Sebastian's session (SOT-27).
 Counts: DfT road traffic statistics, annual average daily flow 2025 (published June 2026, OGL v3).
 Model numbers are the city simulator (`demo/traffic_model.py`), one deterministic weekday,
 05:00-20:00, in car-equivalents (a lorry is 2.5), on `seb/SOT-24-port-freight` (fcf09fd) unless
