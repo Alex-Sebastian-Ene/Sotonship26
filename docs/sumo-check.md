@@ -69,6 +69,13 @@ times) are shown next to both. Nothing in this document feeds the forecast page.
    half demand) and Civic Centre Road southbound (a tenth to a quarter of free speed even at half
    demand).
 
+6. **The gridlock is volume against junctions, not wandering routes or missing side streets.**
+   Routes are only 5-7% longer in the jam than on empty roads. With rerouting off the jams get
+   worse; with residential streets added they ease by 19-47% but still lock the network by
+   10:00 at 75% demand. Half of SUMO's teleports are vehicles unable to enter a priority road or
+   roundabout, and SUMO's queues take road space and block the junctions behind them, which the
+   macro model's point queues never do.
+
 What this means for the forecast: the order of the macro model's congestion (which corridors and
 hours are worst) is partly supported, its absolute load is too high in the peaks on the west side,
 and its gate-approach delays come from loading every cruise vehicle at one node. Neither model,
@@ -98,13 +105,47 @@ cover only the hours they reached, and the macro figures next to them cover the 
 | Sat 7 Nov | 100% | no ring signals | micro | 10:45 | 10,300 | 230 | 572 | 9,400 / 3,155 |
 | Sat 7 Nov | 100% | no ring signals | meso | 15:30 | 39,700 | 2,600 | 6,597 | 75,199 / 12,837 |
 
-<!-- MORE RUNS -->
-
 SUMO's delay is time lost against each driver's wanted speed on the roads (junction and signal
 delay included); the macro model's is BPR running time plus 15 minutes per vehicle its point
 queues carry into the next 15 minutes. At half the demand the macro model has almost no delay
 (V/C around 0.4 gives BPR next to nothing), while SUMO still loses 2-3 minutes a trip at
 junctions and signals; the two are not the same measure at low load.
+
+### Why SUMO gridlocks: routing and side streets
+
+Two suspects were tested on the weekday at 75% of the demand (423,600 trips, the same trips in
+every run; `cluster/iridis/sumo_routing_test.slurm`, both networks without roundabout signals):
+
+- **Rerouting off.** In the other runs every vehicle re-plans its route every 5 minutes on the
+  travel times it meets. Here each keeps the route it gets when it enters, the quickest on empty
+  roads (with the same up-to-20% cost spread, so not everyone takes the identical road).
+- **Residential streets added** (OSM residential and living streets, extract of 17 Oct 2026, 13:25
+  UTC: 33,200 edges and 2,646 lane-km instead of 5,000 and 1,234), and zone trips may start and
+  end on them, as homes are there.
+
+| SUMO time lost on the roads, vehicle-hours | rerouting on, main roads | rerouting off, main roads | rerouting off, with residential streets |
+| --- | --- | --- | --- |
+| micro, 05:00-08:30 | 10,395 | 11,680 | 9,427 |
+| micro, 05:00-11:45 | (run stopped at 08:30) | 182,831 | 126,329 |
+| meso, 05:00-13:00 | 92,729 | 170,011 | 90,738 |
+| micro, vehicles on the roads at 10:00 | (stopped) | 57,000 | 41,300 |
+| meso, vehicles on the roads at 10:00 | 21,500 | 36,300 | 19,300 |
+
+Routes do not wander: the median SUMO route is 1.16 times the macro model's shortest path for
+the same origin and destination on empty roads at 05:00 (trips start and end anywhere in their
+zone rather than at its centre node) and 1.21-1.24 times in the 07:00-08:00 jam, so rerouting
+round queues makes routes 5-7% longer (finished trips of the 50-100% weekday runs). Turning rerouting
+off makes the jams worse, not better (+12% delay by 08:30, +83% by 13:00 in meso): drivers stay
+on the few quickest roads. Residential streets help (19-47% less delay than the main roads alone
+with the same fixed routes), and with them the fixed-route run is about as good as the
+rerouting run on main roads. **Neither removes the gridlock**: with side streets and 75% of the
+demand there are still 41,000 vehicles on the roads at 10:00 in the microscopic run, at 9% of
+free speed. What locks the network is the volume against the junctions: at full demand half of
+SUMO's teleports are vehicles that waited five minutes to enter a priority road or roundabout
+("yield"), 37% stuck behind a blocked junction ("jam") and 13% that could not reach their lane
+in time ("wrong lane"). In SUMO a queue takes road space and reaches back through the junctions
+behind it, which a point queue never does. The routing test was stopped at 11:45-17:00
+simulated time once it had answered this.
 
 ### Agreement per corridor and 15 minutes
 
@@ -179,8 +220,6 @@ At full demand the buses that got past the section before the runs stopped (1-8 
 direction) were between on time and 28 minutes late in SUMO, against the macro model's 2 minutes
 early to 81 minutes late (the 81 is Bluestar 2 southbound, 4 buses).
 
-<!-- DETAIL -->
-
 ## How it is built
 
 ### Network (`demo/sumo_net.py`)
@@ -204,6 +243,9 @@ early to 81 minutes late (the 81 is Bluestar 2 southbound, 4 buses).
   roundabout are linked so the ring keeps moving. The variant drops the signals at the 28 junctions
   run by 24 roundabout-only signal controllers (the roundabouts then give way to circulating traffic). Both are
   run; neither is the real junction control.
+- **Variant with residential streets** (`sumo_net.py fetch --residential`, then `build` and
+  `no-ring-signals` with the same flag): adds OSM residential and living streets (30 and 10 mph
+  where untagged), used only in the routing test (see "Why SUMO gridlocks").
 
 ### Demand (`demo/sumo_demand.py`)
 
