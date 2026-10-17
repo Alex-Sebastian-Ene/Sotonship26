@@ -1109,6 +1109,7 @@ def main(argv=None) -> None:
                  "scale": round(m.scale, 3), "scale_ext": round(m.scale_ext, 3),
                  "scale_freight": round(m.scale_freight, 3),
                  "capacity_notes": ctx.extra["capacity"], "uni_term": tm.UNI_TERM,
+                 "count_headroom": tm.COUNT_HEADROOM,
                  "uncertainty": {"p_wet": P_WET, "wet_capacity": WET_CAPACITY, "wet_demand": WET_DEMAND,
                                  "incident_p": INCIDENT_P, "perception_sd": PERCEPTION_SD,
                                  "logit_beta": tm.LOGIT_BETA, "noise": tm.NOISE,
