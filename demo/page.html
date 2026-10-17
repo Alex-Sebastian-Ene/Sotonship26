@@ -1854,7 +1854,7 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
     $('#fit-text').innerHTML = `<p>The machine-learned cruise effect now sets the simulator's cruise assumptions. For each combination of the three assumptions below, the simulator ran ${F.n} paired days (with and without the ships) and was compared with what the model learned from counts. The best fit is used for every forecast on this page.</p>
       <ul class="plain">
         <li><strong>Passengers by car or taxi:</strong> ×${P.road} the starting split (was ×${D.road})</li>
-        <li><strong>Car and taxi trips from the county</strong> rather than the city: ${Math.round(P.county * 100)}% (was ${Math.round(D.county * 100)}%)</li>
+        <li><strong>Car and taxi trips from the county</strong> rather than the city: ${Math.round(P.county * 100)}% (was ${Math.round(D.county * 100)}%); one share for both, and taxis from the station are kept apart</li>
         <li><strong>Disembarkation traffic leaves</strong> ${P.dis_shift ? `${P.dis_shift} minutes later` : 'at the starting time'} (was +${D.dis_shift} min)</li>
       </ul>
       <p>Error per 15 minutes fell from <span class="mono">${F.rmse_before}</span> to <span class="mono">${F.rmse}</span> vehicles. Extra vehicles 05:00–20:00: learned <span class="mono">${sum(F.learned)}</span>, simulated <span class="mono">${sum(F.fitted)}</span> (was <span class="mono">${sum(F.before)}</span>). The sensor sees only northbound traffic 4–7 km from the terminals, so roads nearer the docks are still modelled, not measured.</p>`;
