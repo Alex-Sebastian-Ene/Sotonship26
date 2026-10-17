@@ -326,3 +326,11 @@ def test_batched_gpu_env_matches_cpu_env(ctx):
         got = info["day_costs"]
         for k, (rel, ab) in tol.items():
             assert got[k] == pytest.approx(env.totals[k], rel=rel, abs=ab), k
+
+
+def test_recommended_windows_join_gaps_and_drop_blips():
+    import train_ppo
+
+    on = np.array([1, 0, 1, 0, 0, 1, 1, 0, 1], bool)
+    assert train_ppo.windows(on) == [(0, 0), (2, 2), (5, 6), (8, 8)]
+    assert train_ppo.windows(on, min_len=2, gap=1) == [(0, 2), (5, 8)]

@@ -68,6 +68,8 @@ def main(argv=None) -> None:
     ap.add_argument("--page", type=Path, default=HERE / "out" / "demo.html")
     ap.add_argument("--agents", type=Path, default=HERE / "out" / "agents.json")
     ap.add_argument("--ppo", type=Path, default=HERE / "out" / "ppo.json")
+    ap.add_argument("--ablation", type=Path, default=HERE / "out" / "ppo_ablation.json",
+                    help="train_ppo.py ablation output for the same policy, shown with it")
     ap.add_argument("--out", type=Path, help="default: overwrite --page")
     ap.add_argument("--max-mb", type=float, default=15.5)
     ap.add_argument("--template", type=Path,
@@ -91,6 +93,8 @@ def main(argv=None) -> None:
         extra["agents"] = json.loads(args.agents.read_text(encoding="utf-8"))
     if args.ppo.exists():
         extra["ppo"] = json.loads(args.ppo.read_text(encoding="utf-8"))
+        if args.ablation.exists():
+            extra["ppo"]["ablation"] = json.loads(args.ablation.read_text(encoding="utf-8"))
     keep = 1.0
     while True:
         payload = json.dumps(extra, separators=(",", ":")).replace("</", "<\\/")

@@ -292,7 +292,13 @@ def summary(rows: list[dict], boot: int = 2000) -> dict:
     return out
 
 
-def windows(active: np.ndarray, min_len: int = 1) -> list[tuple[int, int]]:
+def windows(active: np.ndarray, min_len: int = 1, gap: int = 0) -> list[tuple[int, int]]:
+    """Runs of active bins, after joining runs at most ``gap`` bins apart, at least ``min_len``."""
+    active = np.asarray(active, bool).copy()
+    on = np.flatnonzero(active)
+    for a, b in zip(on[:-1], on[1:], strict=True):
+        if 1 < b - a <= gap + 1:
+            active[a:b] = True
     out, s = [], None
     for b, on in enumerate(list(active) + [False]):
         if on and s is None:
@@ -309,9 +315,33 @@ def bin_time(b: int) -> str:
     return f"{m // 60:02d}:{m % 60:02d}"
 
 
+MIN_BINS, GAP_BINS = 2, 1  # recommended windows: at least 30 minutes, 15-minute gaps joined
+
+
+def rewindow(args) -> None:
+    """Redo the page's sign and marshal windows of an evaluate output from its per-bin shares."""
+    data = json.loads(Path(args.json).read_text(encoding="utf-8"))
+    groups, gates = data["levers"]["sign_groups"], data["levers"]["gates"]
+    for r in data["days"].values():
+        keep = [a for a in r["actions"] if a["kind"] not in ("signs", "marshals")]
+        for kind, names, key, owner in (("signs", groups, "group", OWNERS["signs"]),
+                                        ("marshals", gates, "gate", OWNERS["marshals"])):
+            share = np.asarray(r["per_bin"][kind])  # bins x levers
+            for k, name in enumerate(names):
+                for b0, b1 in windows(share[:, k] >= 0.5, MIN_BINS, GAP_BINS):
+                    keep.append({"kind": kind, key: name, "from": bin_time(b0),
+                                 "to": bin_time(b1 + 1),
+                                 "share": round(float(share[b0:b1 + 1, k].mean()), 2),
+                                 "owner": owner})
+        r["actions"] = sorted(keep, key=lambda a: a.get("from", "00:00"))
+    Path(args.json).write_text(json.dumps(data, default=float), encoding="utf-8")
+    log(f"rewrote the page windows in {args.json}")
+
+
 def recommendations(env: pe.CruiseDayEnv, task: dict, runs: list[dict], base: list[dict]) -> dict:
     """Turn PPO's actions on K sampled days into actions with times: a lever is recommended in
-    the 15 minutes where PPO used it on at least half of the days."""
+    the 15 minutes where PPO used it on at least half of the days, shown as windows of 30
+    minutes or more (gaps of 15 minutes joined) so the plan does not flicker."""
     K = len(runs)
     meter = np.array([[s["meter"] for s in r["log"]] for r in runs])  # K x bins x terminals
     held = np.array([[s["held_t"] for s in r["log"]] for r in runs])
@@ -326,7 +356,7 @@ def recommendations(env: pe.CruiseDayEnv, task: dict, runs: list[dict], base: li
             continue
         ships = ", ".join(c.ship for c in calls)
         on = (meter[:, :, ti] > 0).mean(axis=0) >= 0.5
-        for b0, b1 in windows(on):
+        for b0, b1 in windows(on, MIN_BINS, GAP_BINS):
             lv = meter[:, b0:b1 + 1, ti]
             lv = int(np.bincount(lv[lv > 0]).argmax())
             recs.append({"kind": "meter", "terminal": term, "ships": ships, "from": bin_time(b0),
@@ -344,12 +374,12 @@ def recommendations(env: pe.CruiseDayEnv, task: dict, runs: list[dict], base: li
                          "new": f"{int(new) // 60:02d}:{int(new) % 60:02d}",
                          "share": round(float(counts.max() / K), 2), "owner": OWNERS["checkin"]})
     for k, g in enumerate(env.sign_groups):
-        for b0, b1 in windows(signs[:, :, k].mean(axis=0) >= 0.5):
+        for b0, b1 in windows(signs[:, :, k].mean(axis=0) >= 0.5, MIN_BINS, GAP_BINS):
             recs.append({"kind": "signs", "group": g, "from": bin_time(b0), "to": bin_time(b1 + 1),
                          "share": round(float(signs[:, b0:b1 + 1, k].mean()), 2),
                          "owner": OWNERS["signs"]})
     for k, g in enumerate(env.gates):
-        for b0, b1 in windows(marsh[:, :, k].mean(axis=0) >= 0.5):
+        for b0, b1 in windows(marsh[:, :, k].mean(axis=0) >= 0.5, MIN_BINS, GAP_BINS):
             recs.append({"kind": "marshals", "gate": env.m.centroids[g].name, "from": bin_time(b0),
                          "to": bin_time(b1 + 1), "share": round(float(marsh[:, b0:b1 + 1, k].mean()), 2),
                          "owner": OWNERS["marshals"]})
@@ -547,9 +577,11 @@ def main(argv=None) -> None:
     a.add_argument("--n-days", type=int, default=20)
     a.add_argument("--n-seen-dates", type=int, default=6)
     a.add_argument("--json", default=str(HERE / "out" / "ppo_ablation.json"))
+    w = sub.add_parser("rewindow")
+    w.add_argument("--json", required=True)
     args = ap.parse_args(argv)
-    {"prepare": prepare, "train": train, "evaluate": evaluate,
-     "ablation": ablation}[args.cmd](args)
+    {"prepare": prepare, "train": train, "evaluate": evaluate, "ablation": ablation,
+     "rewindow": rewindow}[args.cmd](args)
 
 
 if __name__ == "__main__":
