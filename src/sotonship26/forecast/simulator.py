@@ -141,6 +141,7 @@ class _DemoUnpickler(pickle.Unpickler):
 
 
 _CONTEXTS: dict[str, object] = {}
+_SHARE_CACHES: dict[int, dict] = {}  # id(ctx) -> the demo's _SHARES cache for that context
 
 
 def load_context(path: str | Path | None = None, *, build: bool = False):
@@ -265,11 +266,18 @@ def _local(t) -> datetime:
 
 @contextlib.contextmanager
 def _borrowed(sd: ModuleType, ctx, params: SimParams):
-    """Point the demo at ``ctx`` with ``params`` applied, and put everything back afterwards."""
+    """Point the demo at ``ctx`` with ``params`` applied, and put everything back afterwards.
+
+    The demo caches starting route shares in ``_SHARES`` without saying which model they belong
+    to, so each context gets its own cache while it is borrowed.
+    """
     m = ctx.m
     saved = (sd.CTX, sd.MODE_MEAN, m.scale, m.scale_ext, getattr(m, "scale_freight", None))
+    saved_shares = getattr(sd, "_SHARES", None)
     try:
         sd.CTX = ctx
+        if saved_shares is not None:
+            sd._SHARES = _SHARE_CACHES.setdefault(id(ctx), {})
         sd.MODE_MEAN = np.asarray(params.mode_shares, float)
         m.scale = saved[2] * params.background_scale
         m.scale_ext = saved[3] * params.background_scale
@@ -280,6 +288,8 @@ def _borrowed(sd: ModuleType, ctx, params: SimParams):
         sd.CTX, sd.MODE_MEAN, m.scale, m.scale_ext = saved[:4]
         if saved[4] is not None:
             m.scale_freight = saved[4]
+        if saved_shares is not None:
+            sd._SHARES = saved_shares
 
 
 def simulate_uplift(
