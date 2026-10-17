@@ -129,8 +129,9 @@ CORDON_DAYS = (1.0, 0.8, 0.7)  # assumed weekday, Saturday, Sunday ratio
 # Port freight (SOT-24): lorries between the county gateways and the port gates, in car-equivalents
 # (PCU 2.5, DfT TAG M3.1 for motorways and dual carriageways). Daily lorries per direction on a
 # weekday before calibration; calibrate_freight() scales them to DfT HGV counts on the M271 between
-# the A35 and junction 1, which lead only to the Western Docks and Redbridge. Gate shares and the
-# port share of that count are assumptions. The day ratios and hourly shapes are articulated
+# the A35 and junction 1, which lead only to the Western Docks and Redbridge, keeping every HGV
+# count point at or under FREIGHT_HGV_LIMIT port lorries. Gate shares and the port share of that
+# count are assumptions. The day ratios and hourly shapes are articulated
 # lorries (over 11.6 m) on the M271 northbound from the docks, WebTRIS site 19974, 410 complete
 # days 8 Oct 2024 to 29 Jun 2026: 2,570 on a weekday, 672 on a Saturday, 488 on a Sunday.
 HGV_PCU = 2.5
@@ -1355,10 +1356,18 @@ def modelled_lorries(m: Model, edges: list[list[int]]) -> np.ndarray:
     return out
 
 
+FREIGHT_HGV_LIMIT = 0.95  # port lorries may be at most this share of all lorries counted anywhere
+
+
 def calibrate_freight(m: Model, sites: list[dict], log=print,
-                      grid=(0.5, 0.7, 0.85, 1.0, 1.2, 1.45, 1.75, 2.1, 2.5)) -> list[dict]:
+                      grid=(0.5, 0.7, 0.85, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.75, 2.1, 2.5)
+                      ) -> list[dict]:
     """Scale port lorries so the M271 (A35 to junction 1) carries PORT_SHARE_M271 of its DfT HGV
-    count. The other HGV count points are reported as checks (they also carry non-port lorries)."""
+    count, as near as it can without any HGV count point getting more port lorries than
+    FREIGHT_HGV_LIMIT of all the lorries counted there. The other points are checks (they also
+    carry other lorries). Every lorry for Dock Gate 20 also passes the A33 Redbridge Road (90217),
+    whose 4,700 counted lorries are fewer than 85% of the M271's estimated 5,882, so that limit
+    can bind; the row it binds at says so ("binding")."""
     if m.purpose_od.get("freight_in") is None:
         log("calibrate freight: no port gates, skipped")
         return []
@@ -1368,28 +1377,40 @@ def calibrate_freight(m: Model, sites: list[dict], log=print,
     if not target:
         log("calibrate freight: no M271 A35-J1 count point, skipped")
         return []
-    t = target[0]
-    best = None
-    for g in grid:
+    t = use.index(target[0])
+    hgv = np.array([sites[i]["hgv"] for i in use], float)
+    want = PORT_SHARE_M271 * hgv[t]
+    tried = []  # (scale, error against the M271 target, lorries per point, points over the limit)
+    for g in sorted(grid):
         m.scale_freight = g
-        mod = modelled_lorries(m, [edges[t]])[0]
-        want = PORT_SHARE_M271 * sites[t]["hgv"]
-        err = abs(math.log((mod + 1) / (want + 1)))
-        log(f"calibrate freight: scale {g:.2f} -> M271 port lorries {mod:6.0f} vs {want:6.0f}")
-        if best is None or err < best[0]:
-            best = (err, g)
-    m.scale_freight = best[1]
-    mods = modelled_lorries(m, [edges[i] for i in use])
+        mods = modelled_lorries(m, [edges[i] for i in use])
+        over = [k for k in range(len(use)) if mods[k] > FREIGHT_HGV_LIMIT * hgv[k]]
+        tried.append((g, abs(math.log((mods[t] + 1) / (want + 1))), mods, over))
+        log(f"calibrate freight: scale {g:.2f} -> M271 port lorries {mods[t]:6.0f} vs {want:6.0f}"
+            + "".join(f"; {sites[use[k]]['count_point']} at {mods[k] / hgv[k]:.0%} of its lorries"
+                      for k in over))
+    free = min(tried, key=lambda r: r[1])
+    allowed = [r for r in tried if not r[3]] or tried[:1]  # none allowed: the smallest scale
+    best = min(allowed, key=lambda r: r[1])
+    m.scale_freight, mods = best[0], best[2]
+    binding = None
+    if free[3] and free[0] > best[0]:  # the limit changed the choice: name the point it bound at
+        binding = max(free[3], key=lambda k: free[2][k] / hgv[k])
     rows = []
-    for i, md in zip(use, mods, strict=True):
+    for k, (i, md) in enumerate(zip(use, mods, strict=True)):
         s = sites[i]
         rows.append({"road": s["label"], "count_point": s["count_point"], "year": s["year"],
                      "observed_hgv": s["hgv"], "modelled_port_lorries": round(float(md)),
-                     "fitted": i == t})
+                     "fitted": k == t, "binding": k == binding})
         log(f"  HGV {s['count_point']:6d} {s['label'][:42]:42s} observed {s['hgv']:6d} lorries, "
-            f"modelled port lorries {md:6.0f}" + ("  (fitted)" if i == t else ""))
+            f"modelled port lorries {md:6.0f} ({md / hgv[k]:.0%})"
+            + ("  (fitted)" if k == t else "")
+            + (f"  (limit {FREIGHT_HGV_LIMIT:.0%} binds here)" if k == binding else ""))
     log(f"calibrate freight: chose scale {m.scale_freight:.2f} "
-        f"({m.scale_freight * FREIGHT_LORRIES:.0f} lorries each way on a weekday)")
+        f"({m.scale_freight * FREIGHT_LORRIES:.0f} lorries each way on a weekday); M271 port "
+        f"lorries {mods[t] / hgv[t]:.0%} of its count against the {PORT_SHARE_M271:.0%} aimed for"
+        + (f", held down by count point {sites[use[binding]]['count_point']}"
+           if binding is not None else ""))
     return rows
 
 

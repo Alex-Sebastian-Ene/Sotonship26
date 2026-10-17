@@ -240,6 +240,8 @@ data improves it by about 4% a day (not significant) and 2% per 15 minutes.
   junction 3, the A326 northbound into M27 junction 2 and the M3 southbound lanes
   (`MISSING_LINKS`, `LANE_FIXES`), the count-point link choice at the A33 Redbridge Road, the
   refitted through share and other-trip decay, the alternating DfT and council fits in
-  `build_ctx`, and `docs/west-side-counts.md` were written with Claude Code on Sat 17 Oct 2026.
+  `build_ctx`, the lorry fit's limit of 95% port lorries at any HGV count point
+  (`FREIGHT_HGV_LIMIT`), and `docs/west-side-counts.md` were written with Claude Code on
+  Sat 17 Oct 2026.
 - **Existed before the event:** TODO, confirm with the organisers.
 - **Who helped:** TODO.

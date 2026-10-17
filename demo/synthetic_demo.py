@@ -1134,6 +1134,7 @@ def main(argv=None) -> None:
                                          "estimated_weight": tm.ESTIMATED_WEIGHT},
                                  "freight": {"rows": ctx.extra["freight"], "hgv_pcu": tm.HGV_PCU,
                                              "port_share_m271": tm.PORT_SHARE_M271,
+                                             "hgv_limit": tm.FREIGHT_HGV_LIMIT,
                                              "gate_share": tm.PORT_GATE_SHARE,
                                              "day_ratio": tm.FREIGHT_DAYS,
                                              "lorries_each_way":

@@ -83,33 +83,43 @@ real); port freight was added after the over-prediction already existed (+58% on
 5. Refitted with those: `THROUGH_SHARE` 0.3 to 0.6 and `OTHER_T_S` 900 to 1800 s (scan in the
    comment in `traffic_model.py`). The county scale now comes out at x1.00, so every gateway carries
    its own DfT count.
+6. The lorry fit (`calibrate_freight`) keeps every HGV count point at or under 95% port lorries
+   (`FREIGHT_HGV_LIMIT`). Every lorry to or from Dock Gate 20 (70% of them) runs M271, Redbridge,
+   A33 Redbridge Road, Millbrook roundabout, so the A33 Redbridge Road (90217, 4,700 lorries
+   counted) must carry at least the M271's port lorries; 85% of the M271's 5,882 (an estimated
+   count) is 5,000, more than that. With the inbound side counted properly (fix 3) the old fit put
+   121% of 90217's lorries on it. The fit now takes the scale nearest the M271 target that keeps
+   every point under the limit, and marks the row where the limit binds (`binding`); the M271 then
+   carries less than 85% and says so.
 
-### Result (full rebuild on Iridis, job 1890271, against job 1888960 on fcf09fd)
+### Result (full rebuild on Iridis, job 1890434, against job 1888960 on fcf09fd)
 
 | DfT count point (AADF 2025) | Observed | Before | After |
 |---|---:|---:|---:|
-| 26062 M271, A35 to junction 1 | 53,320 | +90% | +11% |
-| 90217 A33 Redbridge Road | 69,132 | -23% | -9% |
+| 26062 M271, A35 to junction 1 | 53,320 | +90% | +10% |
+| 90217 A33 Redbridge Road | 69,132 | -23% | -10% |
 | 36375 A35 Redbridge Causeway | 61,994 | +66% | +34% |
 | 56347 A33 Millbrook Road West | 49,004 | -21% | -38% |
-| 57434 A33 The Avenue | 27,474 | -23% | -25% |
+| 57434 A33 The Avenue | 27,474 | -23% | -26% |
 | 18312 A335 Thomas Lewis Way | 31,027 | +62% | +31% |
-| 17793 M27 junctions 3-4 | 136,437 | -5% | -11% |
+| 17793 M27 junctions 3-4 | 136,437 | -5% | -12% |
 | 48091 M27 junctions 4-5 | 112,272 | +4% | +11% |
 | 38083 M27 junctions 7-8 | 114,831 | +3% | +4% |
 | 16321 M3 junctions 13-14 | 140,751 | -12% | -7% |
-| Mean absolute error, 10 fitted points | | 30.9% | 18.1% |
-| Same without the M271 | | 24.3% | 18.9% |
+| Mean absolute error, 10 fitted points | | 30.9% | 18.3% |
+| Same without the M271 | | 24.3% | 19.2% |
 | Checks: Itchen Bridge / Northam Bridge | 18,300 / 24,312 | +69% / -33% | +51% / -35% |
 
 - Scales: county x0.80 to x1.00, trips within the area x0.95 to x1.42, port lorries x1.20 to
-  x1.75 (4,550 each way on a weekday, fitted to 85% of the M271 HGV count).
+  x1.30 (3,380 each way on a weekday). The lorry limit binds at the A33 Redbridge Road (91% of its
+  4,700 lorries); the M271 carries 3,728 port lorries, 63% of its 5,882, short of the 85% aimed
+  for. Every other HGV check point is at 60% or less.
 - Portswood count sites, weekday sums (fitted): AM 6,404 against 5,534 counted (+16%), PM 5,796
   against 6,549 (-11%). Before: +17% and -4%.
-- M271 cruise fit: RMSE 13.8 vehicles per 15 minutes (was 14.1). It now picks the default cruise
+- M271 cruise fit: RMSE 13.7 vehicles per 15 minutes (was 14.1). It now picks the default cruise
   assumptions (car and taxi x1.0, 80% from the county, no shift) instead of x1.15 and 60%.
-- The forecast shows more congestion: corridor-hours at risk per day average 110.0 over the 44
-  days (was 76.6), maximum 158.5 (was 135.1). The model now carries traffic volumes that match the
+- The forecast shows more congestion: corridor-hours at risk per day average 106.4 over the 44
+  days (was 76.6), maximum 154.0 (was 135.1). The model now carries traffic volumes that match the
   counts when each vehicle is counted once, while the risk measure (demand over capacity) still
   includes queued traffic on the links before its bottleneck (see below).
 
@@ -123,7 +133,7 @@ real); port freight was added after the over-prediction already existed (+58% on
   back on every link of its route each 15 minutes, so it uses the capacity of links it has already
   passed. That is why the M271 cruise fit still compares link loads: counted once, extra cruise
   cars mostly displace other traffic at Redbridge, and the fit's error is 19.6 vehicles per
-  15 minutes instead of 13.8. The fix is to keep each route's queue at its bottleneck and load it
+  15 minutes instead of 13.7. The fix is to keep each route's queue at its bottleneck and load it
   only on the links from there on.
 - A33 Millbrook Road West (-38%) and The Avenue (-25%) are under; the Itchen Bridge (no toll in
   the model) is over.
