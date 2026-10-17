@@ -420,7 +420,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
 .theme-pick button[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 2px; }
 h1, h2 { transition: color .3s; }
 body { transition: background-color .35s, color .35s; }
-@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes rise { from { transform: translateY(10px); } to { transform: none; } }
 @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 var(--glow); } 50% { box-shadow: 0 0 0 7px var(--glow); } }
 .cal-intro .cell { animation: rise .5s cubic-bezier(.2, .7, .2, 1) both; animation-delay: calc(var(--i, 0) * 14ms); }
 button.cell { transition: transform .15s, box-shadow .15s, border-color .15s; }
@@ -441,6 +441,40 @@ button.cell:hover { transform: translateY(-3px); box-shadow: 0 8px 18px var(--gl
 @media (max-width: 640px) { .masthead { grid-template-columns: minmax(0, 1fr); } .theme-pick { grid-column: 1; grid-row: auto; } }
 @media (prefers-reduced-motion: reduce) { .cal-intro .cell, .day-head.enter, .notices.enter > *, .sev.lv-severe, .sev.lv-high { animation: none !important; } button.cell:hover { transform: none; } }
 
+/* App shell: one top bar, four views over the same blocks */
+.appbar { position: sticky; top: 0; z-index: 40; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px;
+  padding: 10px max(16px, env(safe-area-inset-left, 0px)); background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; white-space: nowrap; }
+.brand-mark { width: 26px; height: 26px; border-radius: 7px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; }
+.brand small { font-weight: 500; color: var(--muted); font-size: .8rem; }
+.views { display: flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--sunk); border: 1px solid var(--line); }
+.views button { border: 0; background: transparent; padding: 7px 16px; min-height: 36px; border-radius: 999px; cursor: pointer; font-weight: 650; font-size: var(--step--1); color: var(--muted); transition: background .2s, color .2s; }
+.views button:hover { color: var(--ink); }
+.views button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); box-shadow: 0 2px 10px var(--glow); }
+.stepper { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.stepper button { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line-strong); background: var(--surface); cursor: pointer; font-size: 1.1rem; line-height: 1; }
+.stepper button:disabled { opacity: .35; cursor: default; }
+.day-chip { min-width: 9.5em; text-align: center; font-family: var(--font-data); font-variant-numeric: tabular-nums; font-weight: 700; font-size: var(--step--1); padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); }
+.day-chip i { font-style: normal; display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+.appbar .theme-pick { grid-column: auto; grid-row: auto; }
+.appbar .theme-pick > span { display: none; }
+.appbar .theme-pick button { width: 24px; height: 24px; }
+[data-views].off-view { display: none !important; }
+.view-enter { animation: rise .35s cubic-bezier(.2, .7, .2, 1) both; }
+body[data-view="map"] .wrap { max-width: 1560px; }
+body[data-view="map"] #day { grid-template-columns: minmax(0, 1fr) 360px; align-items: start; }
+body[data-view="map"] #day > #day-head { grid-column: 1 / -1; padding: 12px 18px; }
+body[data-view="map"] #day > #day-head .trust, body[data-view="map"] #day > #day-head .foot-note, body[data-view="map"] #day > #day-head .facts { display: none; }
+body[data-view="map"] #day > #day-body { grid-column: 1; grid-row: 2 / span 3; }
+body[data-view="map"] #day > #ships-block, body[data-view="map"] #day > #row-vehicles, body[data-view="map"] #day > #ppo-card { grid-column: 2; }
+body[data-view="map"] #row-vehicles { grid-template-columns: minmax(0, 1fr); }
+body[data-view="map"] .map-box { height: max(420px, calc(100vh - 330px)); }
+body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates-card > summary { font-size: var(--step-1); }
+@media (max-width: 1100px) { body[data-view="map"] #day { grid-template-columns: minmax(0, 1fr); } body[data-view="map"] #day > * { grid-column: 1 !important; grid-row: auto !important; } }
+@media (max-width: 760px) { .views { order: 3; width: 100%; justify-content: space-between; } .views button { padding: 7px 10px; } .brand small { display: none; } }
+@media (prefers-reduced-motion: reduce) { .view-enter { animation: none; } }
+
 @media (max-width: 900px) { .grid2, .sure { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 640px) {
   .cell { min-height: 54px; padding: 5px; }
@@ -454,6 +488,21 @@ button.cell:hover { transform: translateY(-3px); box-shadow: 0 8px 18px var(--gl
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
 </style>
 
+<nav class="appbar" aria-label="App">
+  <div class="brand"><span class="brand-mark" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 11h12M3.5 11l1.5-5h6l1.5 5M8 6V2.5M8 2.5l3 1.5"/></svg></span>Cruise-day traffic <small>Southampton docks</small></div>
+  <div class="views" role="tablist" aria-label="Views">
+    <button role="tab" data-go="briefing" aria-selected="true">Briefing</button>
+    <button role="tab" data-go="map" aria-selected="false">Live map</button>
+    <button role="tab" data-go="timeline" aria-selected="false">Timeline</button>
+    <button role="tab" data-go="insights" aria-selected="false">Insights</button>
+  </div>
+  <div class="stepper">
+    <button type="button" id="day-prev" aria-label="Previous day">‹</button>
+    <span class="day-chip" id="day-chip" aria-live="polite"></span>
+    <button type="button" id="day-next" aria-label="Next day">›</button>
+  </div>
+  <div id="appbar-themes"></div>
+</nav>
 <div class="wrap">
   <header class="masthead">
     <div class="title-block">
@@ -1931,7 +1980,7 @@ button.cell:hover { transform: translateY(-3px); box-shadow: 0 8px 18px var(--gl
       for (const c of DATA.corridors) if (d.p85[c.id][state.bin] > tp) { tp = d.p85[c.id][state.bin]; top = c.id; }
       state.corr = top;
     }
-    renderCalendar(); renderDay();
+    renderCalendar(); renderDay(); if ($('#day-chip')) renderChip();
     if (scroll) $('#day').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
   }
   function renderDay() {
@@ -1987,12 +2036,17 @@ button.cell:hover { transform: translateY(-3px); box-shadow: 0 8px 18px var(--gl
     const txt = el.textContent, target = parseFloat(txt.replace(/,/g, ''));
     if (!isFinite(target) || !/^[\d.,]+$/.test(txt)) return;
     const dp = (txt.split('.')[1] || '').length, t0 = performance.now();
+    let done = false;
+    const finish = () => { done = true; el.textContent = txt; };
     const step = now => {
-      const k = Math.min(1, (now - t0) / 650), v = target * (1 - (1 - k) ** 3);
+      if (done) return;
+      const k = Math.max(0, Math.min(1, (now - t0) / 650)), v = target * (1 - (1 - k) ** 3);
+      if (k >= 1) return finish();
       el.textContent = dp ? v.toFixed(dp) : Math.round(v).toLocaleString('en-GB');
-      if (k < 1) requestAnimationFrame(step); else el.textContent = txt;
+      requestAnimationFrame(step);
     };
     requestAnimationFrame(step);
+    setTimeout(finish, 900);  // lands on the real figure even if frames are throttled
   }
   function renderVisuals() {
     const d = day();
@@ -2208,6 +2262,48 @@ button.cell:hover { transform: translateY(-3px); box-shadow: 0 8px 18px var(--gl
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', onTheme);
   new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
+  /* ---------- app shell: which blocks each view shows ---------- */
+  const VIEWS = ['briefing', 'map', 'timeline', 'insights'];
+  const VIEW_OF = {
+    '.masthead': 'briefing', '.provenance': 'briefing', '#cal-h': 'briefing',
+    '#day-head': 'briefing map', '#notices': 'briefing', '#row-actions': 'briefing', '#ppo-card': 'briefing map',
+    '#day-body': 'map', '#row-vehicles': 'map', '#ships-block': 'briefing map timeline',
+    '#heat-card': 'timeline', '#tl-card': 'timeline', '#sure-card': 'timeline', '#gates-card': 'timeline',
+    '#row-model': 'insights', '#bus-card': 'insights', '#bus-live': 'insights', '#method-h': 'insights',
+  };
+  for (const [sel, v] of Object.entries(VIEW_OF)) {
+    let el = $(sel);
+    if (!el) continue;
+    if (sel === '#cal-h' || sel === '#method-h') el = el.closest('section');
+    el.dataset.views = v;
+  }
+  $('#appbar-themes').replaceWith($('.theme-pick'));
+  function showView(v, fromHash) {
+    if (!VIEWS.includes(v)) v = 'briefing';
+    document.body.dataset.view = v;
+    document.querySelectorAll('[data-views]').forEach(el => el.classList.toggle('off-view', !el.dataset.views.split(' ').includes(v)));
+    document.querySelectorAll('[data-go]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.go === v)));
+    const w = $('.wrap'); w.classList.remove('view-enter'); void w.offsetWidth; w.classList.add('view-enter');
+    if (v === 'timeline') { $('#tl-card').open = true; $('#gates-card').open = true; }
+    if (v === 'map') {
+      requestAnimationFrame(() => { layout(); if (!showView.zoomed) { zoomTo('docks', false); showView.zoomed = true; } drawAgents(); });
+      if (state.layer !== 'agents' && agentDay() && !REDUCED) $('#layer-agents').click();
+    } else stopVehicles();
+    if (!fromHash) history.replaceState(null, '', '#' + v);
+    window.scrollTo(0, 0);
+  }
+  document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => showView(b.dataset.go)));
+  addEventListener('hashchange', () => showView(location.hash.slice(1), true));
+  const DATES = DATA.days.map(d => d.date);
+  function renderChip() {
+    const d = day(), i = DATES.indexOf(state.date);
+    const lv = d && !d.beyond ? level(uplift(d)) : null;
+    $('#day-chip').innerHTML = `${lv ? `<i class="lv-${lv.key}"></i>` : ''}${esc(shortDate(state.date))}`;
+    $('#day-prev').disabled = i <= 0; $('#day-next').disabled = i >= DATES.length - 1;
+  }
+  $('#day-prev').addEventListener('click', () => { const i = DATES.indexOf(state.date); if (i > 0) selectDay(DATES[i - 1], false); });
+  $('#day-next').addEventListener('click', () => { const i = DATES.indexOf(state.date); if (i < DATES.length - 1) selectDay(DATES[i + 1], false); });
+
   readPalette();
   $('#cal').classList.add('cal-intro'); setTimeout(() => $('#cal').classList.remove('cal-intro'), 1600);
   renderMeta(); renderPPOTest(); wirePPOViz();
@@ -2216,5 +2312,6 @@ button.cell:hover { transform: translateY(-3px); box-shadow: 0 8px 18px var(--gl
   buildMap();
   selectDay(BY_DATE['2026-10-24'] ? '2026-10-24' : DATA.days[0].date, false);
   requestAnimationFrame(() => { layout(); zoomTo('docks', false); });
+  renderChip(); showView(location.hash.slice(1), true);
 })();
 </script>
