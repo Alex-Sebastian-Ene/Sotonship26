@@ -28,9 +28,13 @@ COMMON_JS = r"""
   }
   function tag(sel, views) { const el = typeof sel === 'string' ? $(sel) : sel; if (el) el.dataset.views = views; return el; }
   const calSec = $('#cal-h').closest('section'), methodSec = $('#method-h').closest('section');
+  let liveDay = null;
   function mapLive(play) {
     requestAnimationFrame(() => { layout(); zoomTo('docks', false); drawAgents(); });
-    if (play && state.layer !== 'agents' && agentDay() && !REDUCED) $('#layer-agents').click();
+    if (!play || REDUCED || !agentDay()) return;
+    if (liveDay !== state.date) { liveDay = state.date; setBin(7); }        // 06:45, before the morning build-up
+    if (state.layer !== 'agents') $('#layer-agents').click();
+    else if (!vehAnim) $('#veh-play').click();
   }
 """
 
@@ -68,23 +72,37 @@ body[data-variant="focus"] .map-box { height: max(420px, calc(100vh - 360px)) !i
 
 # 2 ---------------------------------------------------------------- Story: a landing page, then five guided steps
 VARIANTS["story"] = ("""
-.storybar { position: sticky; top: 58px; z-index: 35; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: 10px max(16px, env(safe-area-inset-left, 0px));
+.storybar { position: sticky; top: 58px; z-index: 35; display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 10px 14px; padding: 10px max(16px, env(safe-area-inset-left, 0px));
   background: color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
-.story-q { display: flex; align-items: center; gap: 12px; font-family: var(--font-display); font-size: clamp(1.3rem, 2.6vw, 2rem); font-weight: 750; margin-right: auto; }
+.story-q { display: flex; align-items: center; gap: 12px; min-width: 0; white-space: nowrap; font-family: var(--font-display); font-size: clamp(1.3rem, 2.6vw, 2rem); font-weight: 750; }
+#story-q { overflow: hidden; text-overflow: ellipsis; }
+.storybar .v-btn { min-width: 88px; }
 .story-q .spr { height: 46px; width: auto; flex: none; }
 .story-ico { display: inline-flex; animation: stk-pop .45s cubic-bezier(.2, 1.6, .4, 1) both; }
 .story-n { font-family: var(--font-data); color: var(--accent); }
 @keyframes stk-pop { from { transform: scale(.3) rotate(-20deg); } to { transform: none; } }
 /* voyage: the current step is a steamship sailing between buoys */
-.voyage { position: relative; width: 260px; height: 56px; margin-right: 28px; --k: 0; }
+.voyage { position: relative; width: 260px; height: 56px; margin-right: 28px; flex: none; --k: 0; }
 .voy-sea { position: absolute; left: 0; right: 0; bottom: 6px; height: 10px; opacity: .8;
   background: radial-gradient(circle at 5px -1px, transparent 5px, var(--accent) 5.5px 7px, transparent 7.5px) 0 0 / 10px 10px repeat-x; }
 .voy-port { position: absolute; bottom: 4px; left: calc(var(--x) * (100% - 18px)); width: 18px; height: 18px; padding: 0; border-radius: 50%; cursor: pointer;
   border: 2px solid var(--ink); background: var(--surface); transition: transform .2s, background .2s; }
 .voy-port:hover { transform: scale(1.2); }
 .voy-port.done { background: var(--accent); }
+.voy-port[aria-selected="true"] { opacity: 0; }
 .voy-ship { position: absolute; bottom: 9px; left: calc(var(--k) * (100% - 18px) - 18px); width: 52px; transition: left .7s cubic-bezier(.45, 0, .2, 1); pointer-events: none; }
-.voy-ship .spr { display: block; width: 100%; }
+.voy-ship .ship-svg { width: 100%; }
+/* the steamship is drawn as vector art (same palette and outline as the generated icons) so it stays sharp at any size */
+.ship-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.ship-svg .rock { transform-box: view-box; transform-origin: 300px 400px; animation: rock 3s ease-in-out infinite; }
+@keyframes rock { 0%, 100% { transform: rotate(-1.5deg) translateY(0); } 50% { transform: rotate(1.5deg) translateY(-7px); } }
+.ship-svg .puff2 { transform-box: fill-box; transform-origin: center; opacity: 0; animation: steam 1.76s linear infinite; }
+.ship-svg .pu-o { fill: #1D2B45; stroke: #1D2B45; stroke-width: 12; animation-name: steam-o; }
+@keyframes steam-o { 0% { transform: translate(0, 10px) scale(.3); opacity: 0; } 8% { opacity: 1; } 50% { opacity: 1; } 78% { opacity: 0; } 100% { transform: translate(-120px, -160px) scale(1.8); opacity: 0; } }
+.ship-svg .pu-i { fill: #FFF8EC; }
+@keyframes steam { 0% { transform: translate(0, 10px) scale(.3); opacity: 0; } 8% { opacity: 1; } 65% { opacity: .95; } 100% { transform: translate(-120px, -160px) scale(1.8); opacity: 0; } }
+.ship-svg .wv { animation: lap 1.6s ease-in-out infinite; }
+@keyframes lap { 50% { transform: translateX(-12px); } }
 .voyage.back .voy-ship { transform: scaleX(-1); }
 .puff { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #fff; border: 1.5px solid #1D2B45; opacity: 0; animation: puff 2.4s ease-out infinite; }
 .voy-ship .puff { left: 20px; top: -2px; }
@@ -96,6 +114,34 @@ body[data-variant="story"] .wrap { max-width: 1400px; padding-top: 18px; }
 body[data-variant="story"] #day { grid-template-columns: minmax(0, 1fr) !important; }
 body[data-variant="story"] #day > * { grid-column: 1 !important; grid-row: auto !important; }
 body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !important; }
+/* What to do: the cards on the left, the docks map with what is arranged on the right */
+@media (min-width: 1000px) {
+  body[data-variant="story"][data-view="step3"] #day { grid-template-columns: minmax(0, 1fr) minmax(380px, .9fr) !important; align-items: start; }
+  body[data-variant="story"][data-view="step3"] #day > #row-actions, body[data-variant="story"][data-view="step3"] #day > #ppo-card { grid-column: 1 !important; }
+  body[data-variant="story"][data-view="step3"] #day > #day-body { grid-column: 2 !important; grid-row: 1 / span 2 !important; position: sticky; top: 150px; }
+  body[data-variant="story"][data-view="step3"] .map-box { height: calc(100vh - 290px) !important; min-height: 380px; }
+}
+body[data-variant="story"][data-view="step3"] .map-bar .seg-ctl, body[data-variant="story"][data-view="step3"] .map-bar select,
+body[data-variant="story"][data-view="step3"] .map-bar label, body[data-variant="story"][data-view="step3"] .map-legend,
+body[data-variant="story"][data-view="step3"] .time-row { display: none !important; }
+.scroll-next { position: fixed; left: 50%; bottom: 18px; z-index: 50; display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-radius: 999px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); box-shadow: 0 10px 30px rgba(0, 0, 0, .3); font-weight: 700; font-size: .9rem;
+  transform: translate(-50%, 140%); opacity: 0; transition: transform .3s cubic-bezier(.2, .8, .2, 1), opacity .3s; pointer-events: none; }
+.scroll-next.on { transform: translate(-50%, 0); opacity: 1; }
+.scroll-next.up { top: 150px; bottom: auto; transform: translate(-50%, -40%); }
+.scroll-next.up.on { transform: translate(-50%, 0); }
+.sn-arrow { font-size: 1.1rem; color: var(--accent); animation: sn-bob 1.2s ease-in-out infinite; }
+@keyframes sn-bob { 50% { transform: translateY(3px); } }
+.sn-bar { width: 70px; height: 6px; border-radius: 3px; background: var(--sunk); overflow: hidden; }
+.sn-bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .12s; }
+:root[data-theme="steam"] .scroll-next { border: 2px solid #1D2B45; box-shadow: 3px 3px 0 #1D2B45; }
+.home-btn { width: 46px; height: 40px; padding: 2px 4px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--surface); cursor: pointer; transition: transform .15s; }
+.home-btn:hover { transform: translateY(-2px) rotate(-3deg); }
+.home-btn .ship-svg { width: 100%; }
+.appbar .brand-mark { display: none; }
+:root[data-theme="steam"] .home-btn { border: 2px solid #FFF8EA; background: #FFF8EA; }
+.landing.enter { animation: land-in .7s cubic-bezier(.2, .7, .2, 1) both; }
+@keyframes land-in { from { transform: translateY(-104%); } to { transform: none; } }
 .stk { display: inline-block; background-position: center; background-size: contain; background-repeat: no-repeat; }
 :root[data-theme="steam"] .storybar { background: #FFF6E2; border-bottom: 2px dashed #1D2B45; }
 :root[data-theme="steam"] .v-btn { border: 2px solid #1D2B45; box-shadow: 3px 3px 0 #1D2B45; }
@@ -103,10 +149,16 @@ body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !i
 :root[data-theme="steam"] .brand-mark { background: none; width: 40px; height: 32px; }
 :root[data-theme="steam"] .brand-mark svg { display: none; }
 :root[data-theme="steam"] .brand-mark::after { content: ''; width: 40px; height: 32px; background: var(--ico-ship) center / contain no-repeat; }
-.deco-gull { position: fixed; z-index: 1; top: 130px; left: -80px; width: 56px; pointer-events: none; display: none; animation: fly 26s linear infinite; }
+.deco-gull { position: fixed; z-index: 1; top: 150px; left: -80px; width: 56px; pointer-events: none; display: none; animation: fly 26s linear infinite; }
 .deco-gull .spr { display: block; width: 100%; }
 :root[data-theme="steam"] .deco-gull { display: block; }
-@keyframes fly { from { transform: translate(0, 0); } 50% { transform: translate(60vw, 40px); } to { transform: translate(calc(100vw + 160px), -10px); } }
+@keyframes fly { from { transform: translateX(0); } to { transform: translateX(calc(100vw + 160px)); } }
+/* gulls fly curves: a steady glide across, an eased swoop up and down on a separate wrapper, and a tilt into each turn */
+.gl { display: block; animation: swoop 4.6s ease-in-out infinite alternate; }
+.gl.b { animation-duration: 3.7s; animation-delay: -1.9s; }
+@keyframes swoop { 0% { transform: translateY(-34px) rotate(6deg); } 50% { transform: translateY(6px) rotate(-7deg); } 100% { transform: translateY(40px) rotate(4deg); } }
+.gl > .gl2 { display: block; animation: drift-y 9.5s ease-in-out infinite alternate; }
+@keyframes drift-y { from { transform: translateY(-18px); } to { transform: translateY(22px); } }
 /* landing page */
 .landing { position: fixed; inset: 0; z-index: 100; overflow: hidden; display: grid; place-items: center; color: #1D2B45; font-family: "Fredoka", "Trebuchet MS", sans-serif;
   background: linear-gradient(#FFE9C7 0%, #FFD7B0 46%, #FFC9A8 62%, #A9D9D3 62.2%, #7CC3BE 100%); transition: transform .8s cubic-bezier(.6, 0, .3, 1); }
@@ -122,14 +174,14 @@ body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !i
 .l-gull.g1 { top: 24%; animation: cross 28s linear infinite; animation-delay: -6s; }
 .l-gull.g2 { top: 11%; width: 50px; animation: cross 36s linear infinite reverse; animation-delay: -20s; }
 .l-gull.g2 .spr { transform: scaleX(-1); --dur: .85s; }
-@keyframes cross { from { transform: translate(-12vw, 0); } 25% { transform: translate(18vw, -24px); } 50% { transform: translate(48vw, 6px); } 75% { transform: translate(78vw, -18px); } to { transform: translate(112vw, 0); } }
+@keyframes cross { from { transform: translateX(-12vw); } to { transform: translateX(112vw); } }
 .l-light { position: absolute; right: 1vw; bottom: 31%; width: 32vmin; z-index: 1; }
-.l-light .spr, .l-anchor .spr, .l-wheel .spr, .l-ship .spr, .l-spray .spr { display: block; width: 100%; }
+.l-light .spr, .l-anchor .spr, .l-wheel .spr, .l-spray .spr { display: block; width: 100%; }
 .l-anchor { position: absolute; left: 3vw; bottom: 4%; width: 11vmin; z-index: 4; }
 .l-wheel { position: absolute; right: 5vw; bottom: 4%; width: 12vmin; z-index: 4; }
 .l-ship { position: absolute; left: 66%; bottom: 18%; width: min(40vmin, 360px); transform: translateX(-50%); z-index: 2; transition: transform 1.3s cubic-bezier(.5, 0, .7, .4); }
-.l-spray { position: absolute; width: 34%; right: -16%; bottom: 2%; }
-.l-spray.s2 { width: 26%; right: auto; left: -8%; bottom: 0; transform: scaleX(-1); }
+.l-spray { position: absolute; width: 30%; left: -14%; bottom: 4%; transform: scaleX(-1); }
+.l-spray.s2 { width: 22%; left: auto; right: -6%; bottom: 2%; transform: none; }
 .l-rock-spray { position: absolute; right: 13vmin; bottom: 28%; width: 12vmin; z-index: 1; }
 .l-rock-spray .spr { display: block; width: 100%; --dur: 1.3s; }
 .landing.sail .l-ship { transform: translateX(70vw); }
@@ -139,7 +191,7 @@ body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !i
 @keyframes wave { to { transform: translateX(-50%); } }
 .l-sun { left: 66%; }
 /* the words sit in the sky on the left; the ship sails the right half */
-.l-card { position: relative; z-index: 5; display: grid; justify-items: start; gap: 14px; text-align: left; padding: 0 16px; place-self: center start; margin: -14vh 0 0 6vw; max-width: min(660px, 56vw); }
+.l-card { position: relative; z-index: 5; display: grid; justify-items: start; gap: 14px; text-align: left; padding: 0 16px; place-self: center start; margin: -14vh 0 0 6vw; max-width: min(660px, 52vw); }
 .l-kicker { font-weight: 600; letter-spacing: .12em; text-transform: uppercase; font-size: .85rem; }
 .l-plate { position: relative; padding: 14px 38px 16px; border-radius: 18px; background: #1D2B45; color: #FFF6E2; box-shadow: 0 0 0 4px #FFF6E2, 0 0 0 7px #1D2B45, 8px 10px 0 7px rgba(29, 43, 69, .3); }
 .l-plate::before, .l-plate::after { content: ''; position: absolute; top: 50%; width: 9px; height: 9px; margin-top: -4.5px; border-radius: 50%; background: #F2B84B; }
@@ -156,7 +208,7 @@ body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !i
 .l-go:hover { transform: translate(-1px, -2px); box-shadow: 5px 7px 0 #1D2B45; }
 .l-go:active { transform: translate(3px, 4px); box-shadow: 1px 1px 0 #1D2B45; }
 .l-go .spr { width: 40px; flex: none; }
-.l-src { font-size: .78rem; font-weight: 500; max-width: 60ch; padding: 3px 10px; border-radius: 999px; background: rgba(255, 246, 226, .7); }
+.l-src { font-size: .78rem; font-weight: 500; max-width: min(60ch, 100%); padding: 3px 10px; border-radius: 999px; background: rgba(255, 246, 226, .7); }
 .l-sound { position: absolute; top: 16px; right: 16px; z-index: 6; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 2.5px solid #1D2B45;
   background: #FFF6E2; color: #1D2B45; font: 600 .95rem "Fredoka", sans-serif; cursor: pointer; box-shadow: 3px 3px 0 #1D2B45; }
 .l-sound svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -165,21 +217,53 @@ body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !i
 @keyframes hint { 50% { transform: scale(1.08); } }
 /* portrait and narrow screens: words on top, the ship below them on the horizon */
 @media (max-width: 820px), (max-aspect-ratio: 1/1) {
-  .l-card { place-self: start center; margin: 64px 0 0; justify-items: center; text-align: center; max-width: none; }
-  .l-ship { left: 50%; width: min(46vmin, 300px); bottom: 17%; }
+  .l-card { place-self: start center; margin: 72px 0 0; justify-items: center; text-align: center; max-width: none; }
+  .l-ship { left: 50%; width: min(46vmin, 300px); bottom: 21%; }
   .l-sun { left: 50%; }
   .l-light { width: 26vmin; right: -4vw; }
   .l-tickets { justify-content: center; }
 }
+/* short landscape screens (a phone on its side): a compact card, the ship pushed right */
+@media (max-height: 520px) and (min-aspect-ratio: 1/1) {
+  .l-card { margin: 0 0 0 4vw; gap: 8px; place-self: center start; justify-items: start; text-align: left; max-width: 58vw; }
+  .l-kicker, .l-sub { display: none; }
+  .l-ticket { padding: 3px 12px 5px; } .l-ticket b { font-size: 1.2rem; }
+  .l-go { font-size: 1.1rem; padding: 6px 20px 6px 8px; } .l-go .spr { width: 30px; }
+  .l-ship { left: 79%; width: 30vmax; bottom: 16%; } .l-sun { left: 79%; } .l-light { display: none; } .l-rock-spray { display: none; }
+}
 @media (max-width: 640px) { .l-light { display: none; } .l-rock-spray { display: none; }
-  .storybar { gap: 8px 10px; } .story-q { flex-basis: 100%; } .voyage { flex: 1 1 150px; width: auto; } .storybar .v-btn { padding: 6px 12px; min-height: 36px; } }
+  .storybar { grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px 10px; } .story-q { grid-column: 1 / -1; } .voyage { width: auto; margin-right: 22px; }
+  .storybar .v-btn { padding: 6px 12px; min-height: 36px; min-width: 64px; } }
 @media (prefers-reduced-motion: reduce) { .landing *, .voy-ship, .deco-gull { animation: none !important; transition: none !important; } .landing { transition: none; } }
 """, r"""
+  const NAVY = '#1D2B45', CREAM = '#FFF6E6', RED = '#E4573F';
+  const HULL = 'M24 262 L576 262 L548 378 Q545 388 534 388 L92 388 Q80 388 74 378 Z';
+  // steam: the same puffs drawn twice, a navy layer under a cream one, so they merge into one outlined cloud
+  const puffSet = cls => [259, 381].map((x, f) => Array.from({ length: 8 }, (_, i) => `<circle class="puff2 ${cls}" cx="${x}" cy="62" r="26" style="animation-delay:${-(i * 0.22 + f * 0.11).toFixed(2)}s"/>`).join('')).join('');
+  const puffs = puffSet('pu-o') + puffSet('pu-i');
+  const range = (a, b, st) => Array.from({ length: Math.floor((b - a) / st) + 1 }, (_, i) => a + i * st);
+  const SHIP_SVG = id => `<svg class="ship-svg" viewBox="0 0 600 440" aria-hidden="true"><defs><clipPath id="hc-${id}"><path d="${HULL}"/></clipPath></defs>
+    <g class="rock" stroke="${NAVY}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">
+      <g stroke="none">${puffs}</g>
+      <line x1="160" y1="170" x2="160" y2="98"/><line x1="146" y1="118" x2="174" y2="118"/><circle cx="160" cy="92" r="7" fill="${NAVY}"/>
+      <line x1="528" y1="216" x2="528" y2="150"/><path d="M528 152 L580 165 L528 180 Z" fill="${RED}"/>
+      ${[228, 350].map(x => `<path d="M${x} 72 L${x + 62} 72 L${x + 56} 172 L${x + 6} 172 Z" fill="${RED}"/><path d="M${x} 72 L${x + 62} 72 L${x + 61} 92 L${x + 1} 92 Z" fill="${NAVY}"/><line x1="${x + 4}" y1="128" x2="${x + 58}" y2="128" stroke="${CREAM}" stroke-width="6"/>`).join('')}
+      <rect x="170" y="168" width="290" height="50" rx="9" fill="${CREAM}"/>
+      ${range(192, 436, 34).map(x => `<rect x="${x}" y="184" width="18" height="16" rx="4" fill="${NAVY}" stroke="none"/>`).join('')}
+      <rect x="116" y="214" width="396" height="52" rx="9" fill="${CREAM}"/>
+      ${range(140, 488, 34).map(x => `<rect x="${x}" y="232" width="18" height="16" rx="4" fill="${NAVY}" stroke="none"/>`).join('')}
+      <g clip-path="url(#hc-${id})" stroke="none"><path d="${HULL}" fill="${CREAM}"/><rect x="0" y="328" width="600" height="22" fill="${NAVY}"/><rect x="0" y="350" width="600" height="50" fill="${RED}"/></g>
+      <path d="${HULL}" fill="none"/>
+      ${range(150, 530, 40).map(x => `<circle cx="${x}" cy="298" r="9" fill="${CREAM}" stroke-width="5"/>`).join('')}
+      <g stroke-width="5" fill="none"><circle cx="96" cy="282" r="5"/><path d="M96 287 V318 M84 297 H108 M80 306 Q96 330 112 306"/></g>
+      <g class="wv"><path d="M30 404 ${range(0, 10, 1).map(() => 'q27 -20 54 0').join(' ')} V440 H30 Z" fill="#3E9E9C"/>
+      <path d="M30 404 ${range(0, 10, 1).map(() => 'q27 -20 54 0').join(' ')}" fill="none" stroke="#FFF8EC" stroke-width="6"/></g>
+    </g></svg>`;
   const STEPS = [
     { q: 'When are the hard days?', ico: 'lighthouse', show: [calSec] },
     { q: 'How bad is it?', ico: 'ring', show: ['#day-head', '#notices'] },
     { q: 'Watch the day', ico: 'gull', show: ['#day-head', '#day-body'], map: true },
-    { q: 'What to do', ico: 'wheel', show: ['#row-actions', '#ppo-card'] },
+    { q: 'What to do', ico: 'wheel', show: ['#row-actions', '#ppo-card', '#day-body'], map: true },
     { q: 'Does the AI help?', ico: 'hat', show: [methodSec, '#ppo-viz', '#bus-live'] },
   ];
   // everything starts hidden; each step lists what it shows
@@ -191,12 +275,14 @@ body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !i
   bar.innerHTML = `<span class="story-q"><span class="story-ico" id="story-stk" aria-hidden="true"></span><span class="story-n" id="story-n"></span><span id="story-q"></span><span id="story-src"></span></span>
     <div class="voyage" id="voyage" role="tablist" aria-label="Steps"><span class="voy-sea"></span>
       ${STEPS.map((s, i) => `<button class="voy-port" role="tab" data-step="${i}" style="--x:${i / (STEPS.length - 1)}" aria-label="Step ${i + 1}: ${esc(s.q)}" title="${esc(s.q)}"></button>`).join('')}
-      <span class="voy-ship" aria-hidden="true"><span class="spr spr-ship"></span></span></div>
+      <span class="voy-ship" aria-hidden="true">${SHIP_SVG('bar')}</span></div>
     <button class="v-btn" id="story-back">Back</button><button class="v-btn primary" id="story-next">Next</button>`;
   $('.appbar').after(bar);
-  const gull = document.createElement('span'); gull.className = 'deco-gull'; gull.innerHTML = '<span class="spr spr-gull"></span>'; gull.setAttribute('aria-hidden', 'true'); document.body.append(gull);
+  const home = document.createElement('button'); home.type = 'button'; home.className = 'home-btn'; home.title = 'Back to the start'; home.setAttribute('aria-label', 'Back to the start');
+  home.innerHTML = SHIP_SVG('home'); $('.brand').prepend(home);
+  const gull = document.createElement('span'); gull.className = 'deco-gull'; gull.innerHTML = '<span class="gl"><span class="gl2"><span class="spr spr-gull"></span></span></span>'; gull.setAttribute('aria-hidden', 'true'); document.body.append(gull);
   let step = 0;
-  function showStep(i) {
+  function showStep(i, fromBelow) {
     const prev = step;
     step = Math.max(0, Math.min(STEPS.length - 1, i));
     showSet('step' + step);
@@ -208,12 +294,54 @@ body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !i
     if (STEPS[step].map) mapLive(true); else stopVehicles();
     if (step === 4) { const v = $('#ppo-viz'); if (v && !v.open) { v.open = true; v.dispatchEvent(new Event('toggle')); } }
     const w = $('.wrap'); w.classList.remove('view-enter'); void w.offsetWidth; w.classList.add('view-enter');
-    window.scrollTo(0, 0);
+    window.scrollTo(0, fromBelow ? document.documentElement.scrollHeight : 0);
+    scrollHint();
   }
   $('#story-back').addEventListener('click', () => showStep(step - 1));
+
+  /* scroll through: past the end of a step, keep scrolling (wheel, trackpad, swipe, Page Down) to reach the
+     next one, and past the top to go back. A bar fills as you pull, so a stray flick never turns the page. */
+  const hint = document.createElement('div'); hint.className = 'scroll-next'; hint.setAttribute('aria-hidden', 'true');
+  hint.innerHTML = '<span class="sn-arrow"></span><span class="sn-t"></span><span class="sn-bar"><i></i></span>';
+  document.body.append(hint);
+  const NEED = 280, tgt = e => (e.target instanceof Element ? e.target : document.body);
+  let pull = 0, lock = 0, relax = null;
+  const atBottom = () => innerHeight + scrollY >= document.documentElement.scrollHeight - 6;
+  const atTop = () => scrollY <= 2;
+  const blocked = () => performance.now() < lock || !!document.querySelector('.landing') || document.body.classList.contains('selecting');
+  function scrollHint() {
+    const down = pull >= 0, target = step + (down ? 1 : -1), show = !blocked() && STEPS[target] && (down ? atBottom() : pull < 0);
+    hint.classList.toggle('on', !!show); hint.classList.toggle('up', !down);
+    if (!show) return;
+    hint.querySelector('.sn-arrow').textContent = down ? '↓' : '↑';
+    hint.querySelector('.sn-t').textContent = `${down ? 'Keep scrolling' : 'Back to'}: ${STEPS[target].q}`;
+    hint.querySelector('.sn-bar i').style.width = `${Math.min(100, Math.abs(pull) / NEED * 100)}%`;
+  }
+  function pullBy(d) {
+    if (blocked()) { pull = 0; return scrollHint(); }
+    if (d > 0 && atBottom() && step < STEPS.length - 1) pull = Math.max(0, pull) + d;
+    else if (d < 0 && atTop() && step > 0) pull = Math.min(0, pull) + d;
+    else pull = 0;
+    if (Math.abs(pull) >= NEED) { const dir = Math.sign(pull); pull = 0; lock = performance.now() + 900; showStep(step + dir, dir < 0); return; }
+    scrollHint();
+    clearTimeout(relax); relax = setTimeout(() => { pull = 0; scrollHint(); }, 700);
+  }
+  addEventListener('wheel', e => { if (!e.ctrlKey && !tgt(e).closest('.dial')) pullBy(e.deltaY * (e.deltaMode === 1 ? 32 : e.deltaMode === 2 ? innerHeight : 1)); }, { passive: true });
+  let touchY = null;
+  addEventListener('touchstart', e => { touchY = e.touches[0].clientY; }, { passive: true });
+  addEventListener('touchmove', e => { if (touchY == null || tgt(e).closest('.map-box')) return; const y = e.touches[0].clientY; pullBy((touchY - y) * 2); touchY = y; }, { passive: true });
+  addEventListener('touchend', () => { touchY = null; });
+  addEventListener('scroll', scrollHint, { passive: true });
+  addEventListener('keydown', e => {
+    if (blocked() || e.defaultPrevented || tgt(e).closest('input, select, textarea, [role="slider"]')) return;
+    const fwd = e.key === 'PageDown' || (e.key === ' ' && !tgt(e).closest('button')) || e.key === 'ArrowDown', back = e.key === 'PageUp' || e.key === 'ArrowUp';
+    if (fwd && atBottom() && step < STEPS.length - 1) { e.preventDefault(); lock = performance.now() + 400; showStep(step + 1); }
+    else if (back && atTop() && step > 0) { e.preventDefault(); lock = performance.now() + 400; showStep(step - 1, true); }
+  });
   $('#story-next').addEventListener('click', () => showStep(step + 1));
   bar.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => showStep(+b.dataset.step)));
-  $('#cal').addEventListener('click', e => { if (e.target.closest('button[data-date]') && step === 0) setTimeout(() => showStep(1), 250); });
+  // a new day on a map step (stepper, calendar or the map's own day chips) starts its vehicles straight away
+  new MutationObserver(() => { if (STEPS[step].map && !document.querySelector('.landing')) setTimeout(() => mapLive(true), 60); }).observe($('#day-chip'), { childList: true, characterData: true, subtree: true });
   // sources stay one ? away, beside the step question
   setTimeout(() => { const pw = $('.provenance') && $('.provenance').closest('.qwrap'); if (pw) $('#story-src').append(pw); }, 0);
 
@@ -224,9 +352,9 @@ body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !i
   const land = document.createElement('div'); land.className = 'landing'; land.setAttribute('role', 'dialog'); land.setAttribute('aria-modal', 'true'); land.setAttribute('aria-labelledby', 'l-title');
   const wave = (y, a) => `M0 ${y} ` + Array.from({ length: 12 }, () => `q 50 ${-a} 100 0 t 100 0`).join(' ') + ' V300 H0Z';
   land.innerHTML = `<div class="l-sun"></div><div class="l-cloud c1"></div><div class="l-cloud c2"></div><div class="l-cloud c3"></div>
-    <span class="l-gull g1" aria-hidden="true"><span class="spr spr-gull"></span></span><span class="l-gull g2" aria-hidden="true"><span class="spr spr-gull"></span></span>
+    <span class="l-gull g1" aria-hidden="true"><span class="gl"><span class="gl2"><span class="spr spr-gull"></span></span></span></span><span class="l-gull g2" aria-hidden="true"><span class="gl b"><span class="gl2"><span class="spr spr-gull"></span></span></span></span>
     <span class="l-light" aria-hidden="true"><span class="spr spr-lighthouse"></span></span><span class="l-rock-spray" aria-hidden="true"><span class="spr spr-spray"></span></span>
-    <div class="l-ship" aria-hidden="true"><span class="spr spr-ship"></span><span class="l-spray"><span class="spr spr-spray"></span></span><span class="l-spray s2"><span class="spr spr-spray"></span></span></div>
+    <div class="l-ship" aria-hidden="true">${SHIP_SVG('land')}<span class="l-spray"><span class="spr spr-spray"></span></span><span class="l-spray s2"><span class="spr spr-spray"></span></span></div>
     <button type="button" class="l-sound hint" id="l-sound" aria-pressed="false" aria-label="Sound"><svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="on" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="off" d="M16 9.5l5 5M21 9.5l-5 5"/></svg><span id="l-sound-t">Sound on</span></button>
     <svg class="l-waves" viewBox="0 0 2400 300" preserveAspectRatio="none" aria-hidden="true"><path class="w1" d="${wave(70, 30)}"/><path class="w2" d="${wave(140, 24)}"/><path class="w3" d="${wave(210, 18)}"/></svg>
     <span class="l-anchor" aria-hidden="true"><span class="spr spr-anchor"></span></span><span class="l-wheel" aria-hidden="true"><span class="spr spr-wheel"></span></span>
@@ -242,7 +370,7 @@ body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !i
      sawtooth), a horn, and "Drunken Sailor" (traditional, public domain) on a two-reed accordion with an
      oom-pah bass. Browsers only allow sound after a click or key press, so it starts on the first one. */
   const Sea = (() => {
-    let ctx = null, out = null, music = null, timers = [], on = false;
+    let ctx = null, out = null, music = null, on = false;
     const N = { D3: 146.83, C3: 130.81, A2: 110, G2: 98, F3: 174.61, A3: 220, C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392, A4: 440, B4: 493.88, C5: 523.25, D5: 587.33, E5: 659.25 };
     const TUNE = 'A4 A4 A4 A4 A4 D4 F4 A4 G4 G4 G4 G4 G4 C4 E4 G4 A4 A4 A4 A4 A4 B4 C5 D5 C5 A4 G4 E4 D4 - D4 -'.split(' ');
     const BASS = ['D3', 'D3', 'C3', 'C3', 'D3', 'D3', 'C3', 'D3'], CHORD = { D3: ['D4', 'F4', 'A4'], C3: ['C4', 'E4', 'G4'] };
@@ -290,24 +418,31 @@ body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !i
         o.connect(lp).connect(g).connect(out); o.start(t + dt); o.stop(t + dt + 0.75);
       });
     }
+    // one track only: the music is scheduled once into a single context; sound off fades it and pauses
+    // the context, sound on resumes the same track where it stopped, so toggling never stacks copies
+    let next = 0, ticker = null, cryT = null, lastGull = -9, offT = null;
+    const tick = () => { if (!on) return; if (next < ctx.currentTime) next = ctx.currentTime + 0.1; while (next < ctx.currentTime + 1) next += playLoop(next); };
     function start() {
       if (on) return; on = true;
+      clearTimeout(offT);
       if (!ctx) {
         ctx = new (window.AudioContext || window.webkitAudioContext)(); out = ctx.createGain(); out.gain.value = 0.0001; out.connect(ctx.destination);
-        music = ctx.createGain(); music.gain.value = 0.9; music.connect(out); waves();
+        music = ctx.createGain(); music.gain.value = 0.9; music.connect(out); waves(); next = ctx.currentTime + 0.6;
       }
-      ctx.resume(); out.gain.cancelScheduledValues(ctx.currentTime); out.gain.setTargetAtTime(0.8, ctx.currentTime, 0.4);
-      gull(1);
-      let next = ctx.currentTime + 0.6;
-      const tick = () => { if (!on) return; while (next < ctx.currentTime + 1) next += playLoop(next); };
-      tick(); timers.push(setInterval(tick, 250));
-      const cry = () => { if (!on) return; gull(0.85 + Math.random() * 0.35); timers.push(setTimeout(cry, 3500 + Math.random() * 5000)); };
-      timers.push(setTimeout(cry, 2600));
+      ctx.resume().then(() => {
+        if (!on) return;
+        out.gain.cancelScheduledValues(ctx.currentTime); out.gain.setTargetAtTime(0.8, ctx.currentTime, 0.3);
+        if (ctx.currentTime - lastGull > 1.5) { gull(1); lastGull = ctx.currentTime; }
+        tick(); if (!ticker) ticker = setInterval(tick, 250);
+        const cry = () => { if (!on) return; gull(0.85 + Math.random() * 0.35); lastGull = ctx.currentTime; cryT = setTimeout(cry, 3500 + Math.random() * 5000); };
+        clearTimeout(cryT); cryT = setTimeout(cry, 2600);
+      });
     }
-    function stop(fade = 0.3) {
-      if (!on || !ctx) return; on = false; timers.forEach(t => { clearInterval(t); clearTimeout(t); }); timers = [];
-      out.gain.setTargetAtTime(0.0001, ctx.currentTime, fade);
-      setTimeout(() => { if (!on) ctx.suspend(); }, fade * 6000);
+    function stop(fade = 0.25) {
+      if (!on || !ctx) return; on = false;
+      clearInterval(ticker); ticker = null; clearTimeout(cryT);
+      out.gain.cancelScheduledValues(ctx.currentTime); out.gain.setTargetAtTime(0.0001, ctx.currentTime, fade);
+      clearTimeout(offT); offT = setTimeout(() => { if (!on) ctx.suspend(); }, fade * 5000);
     }
     return { start, stop, horn: () => { if (on && ctx) horn(); }, get on() { return on; } };
   })();
@@ -326,17 +461,31 @@ body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !i
   land.addEventListener('keydown', firstTouch, { once: true });
   // browsers that already allow sound here (the visitor has interacted with the site before) play it straight away
   setTimeout(() => { try { const t = new (window.AudioContext || window.webkitAudioContext)(), ok = t.state === 'running'; t.close(); if (ok && wantSound && document.body.contains(land)) setSound(true); } catch (e) { /* no audio */ } }, 400);
+  function showLanding() {
+    stopVehicles();
+    land.classList.remove('sail', 'gone'); land.classList.add('enter');
+    document.body.append(land);
+    setTimeout(() => land.classList.remove('enter'), 800);
+    if (wantSound) setSound(true);
+    $('#l-go').focus({ preventScroll: true });
+  }
+  home.addEventListener('click', showLanding);
   const sail = () => {
     if (land.classList.contains('sail')) return;
     Sea.horn(); setTimeout(() => Sea.stop(1.2), 900);
     land.classList.add('sail');
     setTimeout(() => land.classList.add('gone'), REDUCED ? 0 : 650);
-    setTimeout(() => { land.remove(); $('#story-next').focus({ preventScroll: true }); }, REDUCED ? 0 : 1500);
+    setTimeout(() => { land.remove(); $('#story-next').focus({ preventScroll: true }); if (STEPS[step].map) mapLive(true); }, REDUCED ? 0 : 1500);
   };
+  land.querySelector('#l-go').addEventListener('click', sail);
   if (location.hash !== '#app') {
     document.body.append(land);
-    $('#l-go').addEventListener('click', sail);
-    land.addEventListener('keydown', e => { if (e.key === 'Escape') sail(); });
+    land.addEventListener('keydown', e => { if (e.key === 'Escape' || e.key === 'PageDown' || e.key === 'ArrowDown') sail(); });
+    // scrolling down on the landing page sets sail too
+    land.addEventListener('wheel', e => { if (e.deltaY > 20) sail(); }, { passive: true });
+    let ly = null;
+    land.addEventListener('touchstart', e => { ly = e.touches[0].clientY; }, { passive: true });
+    land.addEventListener('touchmove', e => { if (ly != null && ly - e.touches[0].clientY > 60) { ly = null; sail(); } }, { passive: true });
     setTimeout(() => $('#l-go').focus({ preventScroll: true }), 50);
   }
   renderChip(); showStep(0);
@@ -434,9 +583,71 @@ for tag_ in ("demo-data", "extra-data"):
     tpl = re.sub(rf'(<script id="{tag_}" type="application/json">)(.*?)(</script>)', lambda k: k[1] + m[2] + k[3], tpl, count=1, flags=re.S)
 assert tpl.count(INIT) == 1 and tpl.count("</style>") == 1
 TITLES = {"focus": "Forecast · Focus", "story": "Cruise-day traffic", "officer": "Forecast · Officer", "wall": "Forecast · Wallboard"}
+
+# Story with a friendly "Does the AI help?" overview: two embedded designs (one on the learned policy, one on the
+# buses observed) and an Advanced view switch that brings back every statistic. The designs are standalone pages
+# (optional 4th argument: a folder holding viz-ai/emb-*.html and viz-bus/emb-*.html), shown in srcdoc iframes.
+AI_CSS = """
+.ai-simple { display: grid; gap: 22px; }
+.ai-frame { width: 100%; border: 0; display: block; min-height: 320px; background: transparent; color-scheme: normal; }
+.ai-card { border-radius: 18px; overflow: hidden; border: 1px solid var(--line); background: var(--surface); }
+:root[data-theme="steam"] .ai-card { border: 2px solid #1D2B45; box-shadow: 4px 4px 0 #1D2B45; }
+.ai-mode { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--sunk); border: 1px solid var(--line); }
+.ai-mode button { border: 0; background: transparent; color: var(--muted); padding: 8px 18px; border-radius: 999px; font-weight: 750; cursor: pointer; }
+.ai-mode button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.ai-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.ai-bar h2 { font-size: var(--step-2); }
+body:not(.ai-adv) .adv-only { display: none !important; }
+body.ai-adv .simple-only { display: none !important; }
+"""
+AI_JS = r"""
+  /* Does the AI help?: an overview of two designs, and an Advanced view with every statistic */
+  const AI_EMBEDS = __EMBEDS__;
+  const aiSec = document.createElement('section'); aiSec.className = 'sec ai-simple';
+  aiSec.innerHTML = `<div class="ai-bar"><h2>The learned plan, and the buses on the day</h2>
+    <div class="ai-mode" role="group" aria-label="View"><button type="button" data-ai="simple" aria-pressed="true">Overview</button><button type="button" data-ai="adv" aria-pressed="false">Advanced view</button></div></div>
+    ${AI_EMBEDS.map((e, i) => `<div class="ai-card simple-only"><iframe class="ai-frame" title="${esc(e.title)}" id="ai-f${i}"></iframe></div>`).join('')}`;
+  $('#day').before(aiSec);   // top of the step, above the observed buses fold that lives in the day section
+  aiSec.dataset.views = 'step4';
+  [methodSec, '#ppo-viz', '#bus-live'].forEach(x => { const el = typeof x === 'string' ? $(x) : x; if (el) el.classList.add('adv-only'); });
+  // the switch also sits at the top of the advanced statistics, so it is always in reach
+  const advBar = aiSec.querySelector('.ai-mode');
+  function aiMode(adv) {
+    document.body.classList.toggle('ai-adv', adv);
+    advBar.querySelectorAll('[data-ai]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.ai === 'adv') === adv)));
+    aiSec.querySelector('h2').textContent = adv ? 'Every statistic behind the answer' : 'The learned plan, and the buses on the day';
+    if (adv) { const v = $('#ppo-viz'); if (v && !v.open) { v.open = true; v.dispatchEvent(new Event('toggle')); } const b = $('#bus-live'); if (b && !b.open) b.open = true; }
+    else sizeFrames();
+  }
+  advBar.addEventListener('click', e => { const b = e.target.closest('[data-ai]'); if (b) aiMode(b.dataset.ai === 'adv'); });
+  aiSec.querySelector('.ai-bar').classList.remove('simple-only');
+  const frames = AI_EMBEDS.map((e, i) => { const f = $('#ai-f' + i); f.srcdoc = e.html; return f; });
+  const themeOf = () => document.documentElement.dataset.theme || 'harbour';
+  function sizeFrames() {
+    frames.forEach(f => { try { const d = f.contentDocument; if (!d || !d.documentElement) return; d.documentElement.dataset.theme = themeOf(); const h = d.documentElement.scrollHeight; if (h > 40) f.style.height = h + 'px'; } catch (err) { /* not ready */ } });
+  }
+  frames.forEach(f => f.addEventListener('load', () => {
+    sizeFrames();
+    try { new ResizeObserver(sizeFrames).observe(f.contentDocument.body); } catch (err) { /* sized on messages instead */ }
+  }));
+  addEventListener('message', e => { const f = frames.find(x => x.contentWindow === e.source); if (f && e.data && e.data.embedH) f.style.height = e.data.embedH + 'px'; });
+  new MutationObserver(sizeFrames).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  addEventListener('resize', () => setTimeout(sizeFrames, 50));
+  showStep(step);
+"""
+AI_PAIRS = {"race": ("policy-race", "map"), "days": ("every-test-day", "ladder"), "saves": ("where-ppo-saves", "board")}
+EMBEDS = Path(sys.argv[4]) if len(sys.argv) > 4 else None
+if EMBEDS:
+    for key, (ai, bus) in AI_PAIRS.items():
+        pages = [(EMBEDS / "viz-ai" / f"emb-{ai}.html", "Does the AI help?"), (EMBEDS / "viz-bus" / f"emb-{bus}.html", "Buses observed on the day")]
+        if all(f.exists() for f, _ in pages):
+            emb = json.dumps([{"title": t, "html": f.read_text(encoding="utf-8")} for f, t in pages]).replace("<", r"\u003c")   # no "<" inside the app's script, so nothing in the designs can end it early
+            VARIANTS["story-" + key] = (VARIANTS["story"][0] + AI_CSS, VARIANTS["story"][1] + AI_JS.replace("__EMBEDS__", emb))
+            TITLES["story-" + key] = "Cruise-day traffic · " + key.capitalize()
 for name, (css, js) in VARIANTS.items():
-    page = tpl.replace("</style>", COMMON_CSS + (ICON_CSS if name == "story" else "") + css + "</style>", 1)
-    page = page.replace(INIT, COMMON_JS.replace("__VARIANT__", repr(name)) + js, 1)
+    base = "story" if name.startswith("story") else name
+    page = tpl.replace("</style>", COMMON_CSS + (ICON_CSS if base == "story" else "") + css + "</style>", 1)
+    page = page.replace(INIT, COMMON_JS.replace("__VARIANT__", repr(base)) + js, 1)
     page = page.replace("<title>Cruise-day traffic forecast</title>", f"<title>{TITLES[name]}</title>", 1)
     (OUT / f"ui-{name}.html").write_text(page, encoding="utf-8")
     print(name, round(len(page.encode()) / 1e6, 1), "MB")
