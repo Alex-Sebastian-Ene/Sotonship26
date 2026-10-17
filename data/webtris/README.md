@@ -1,16 +1,28 @@
 # M271 15-min speed + flow (WebTRIS)
 
-`m271_speed_15min.csv.gz`, 15-minute average speed and flow for the five M271
-TMU sites on the Western Docks approach. Built for the forecast engine (Seb's
-lane) because the shared WebTRIS cache (`data/cache/`, gitignored) held flow but
-not a committed speed series.
+Two files for the forecast engine (Seb's lane), because the shared WebTRIS cache
+(`data/cache/`, gitignored) held flow but not a committed speed series:
+
+- `m271_speed_15min.csv.gz`, the full 15-min speed+flow series (join on
+  `(site_id, bin_start)`).
+- `m271_speed_profile.csv`, a small weekday × time-of-day **median-speed prior**
+  (use when you want a smooth speed-by-bin baseline instead of the sparse series).
+  Derived from the series by `build_profile.py` here: group by
+  `(site_id, road, direction, local weekday, 15-min-of-day)` then median & 15th-pct
+  mph, median flow, count. The grain/stats are a **default**, not a spec: edit
+  `AGG`/keys in that script and re-run to re-cut (mean, another quantile, term split).
+
+For the five M271 TMU sites on the Western Docks approach.
 
 ## Source & licence
 
 - **National Highways WebTRIS** (`webtris.nationalhighways.co.uk`), reports/daily.
 - **Open Government Licence v3.0**, redistribution permitted with attribution.
+  WebTRIS has no licence page itself; the governing data.gov.uk record is
+  "Highways England network journey time and traffic flow data"
+  (data.gov.uk/dataset/9562c512-4a0b-45ee-b6ad-afc0f99b841f), licensed OGL v3.0.
 - Retrieved Oct 2026 via the WebTRIS API and cached under `data/raw/webtris/`
-  (gitignored); this file is the parsed extract of that cache.
+  (gitignored); these files are the parsed extract of that cache.
 - Parsed by `src/sotonship26/data/observed.py::rows_to_frame` (same code the
   flow pipeline uses), so `mph`/`flow_veh` match the live loader exactly.
 
