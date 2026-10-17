@@ -20,7 +20,7 @@
   --cruise: #6A3FC4; --queue: #D8432F;
   --ra: #1F57A4; --rb: #B4458F; --rc: #C77A12;
   --g-through: #8C9BA5; --g-county: #2F7EA6; --g-outbound: #7FB8D8; --g-internal: #8DB86A;
-  --g-visitors: #E3B04B; --g-match: #C2553A; --g-cruise: #6A3FC4; --g-freight: #8A6A4F;
+  --g-visitors: #E3B04B; --g-match: #C2553A; --g-cruise: #6A3FC4; --g-freight: #8A6A4F; --g-school: #C77A12; --g-bus: #11202A;
   --font-display: Arial, "Helvetica Neue", Helvetica, sans-serif;
   --font-body: Arial, "Helvetica Neue", Helvetica, sans-serif;
   --font-data: Arial, "Helvetica Neue", Helvetica, sans-serif;
@@ -43,7 +43,7 @@
     --cruise: #B894FF; --queue: #FF5A45;
     --ra: #86B2EA; --rb: #E681C9; --rc: #F0B04B;
     --g-through: #6E7F8B; --g-county: #4FA3CF; --g-outbound: #9CCDE8; --g-internal: #9CCB78;
-    --g-visitors: #F0C25E; --g-match: #E07058; --g-cruise: #B894FF; --g-freight: #B89878;
+    --g-visitors: #F0C25E; --g-match: #E07058; --g-cruise: #B894FF; --g-freight: #B89878; --g-school: #F0B04B; --g-bus: #E2E9EE;
     color-scheme: dark;
   }
 }
@@ -62,7 +62,7 @@
   --cruise: #B894FF; --queue: #FF5A45;
   --ra: #86B2EA; --rb: #E681C9; --rc: #F0B04B;
   --g-through: #6E7F8B; --g-county: #4FA3CF; --g-outbound: #9CCDE8; --g-internal: #9CCB78;
-  --g-visitors: #F0C25E; --g-match: #E07058; --g-cruise: #B894FF; --g-freight: #B89878;
+  --g-visitors: #F0C25E; --g-match: #E07058; --g-cruise: #B894FF; --g-freight: #B89878; --g-school: #F0B04B; --g-bus: #E2E9EE;
   color-scheme: dark;
 }
 
@@ -312,6 +312,29 @@ details.fold > summary .sum-note { font-family: var(--font-body); font-weight: 4
 .prose { display: grid; gap: 10px; max-width: 74ch; }
 footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid var(--line); padding-top: 14px; display: grid; gap: 4px; }
 
+[hidden] { display: none !important; }
+/* Vehicles (agents), buses, learned policy */
+.agent-canvas { position: absolute; inset: 0; pointer-events: none; }
+#ppo-test .fold-body, #bus-card .fold-body, #ppo-card, #row-vehicles > .block { grid-template-columns: minmax(0, 1fr); }
+.veh-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 16px; border-top: 1px solid var(--line); }
+.veh-row[hidden] { display: none; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 2px 10px; cursor: pointer; font-size: var(--step--1); }
+.chip:hover { border-color: var(--ink); }
+.veh-legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 4px 14px; font-size: var(--step--1); }
+.veh-legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+.journey { display: grid; gap: 6px; font-size: var(--step--1); }
+.journey dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0; }
+.journey dt { color: var(--muted); }
+.journey dd { margin: 0; }
+.check-l { fill: none; stroke: var(--ink); stroke-width: 1.4; }
+.check-b { fill: var(--accent); opacity: 0.45; }
+.ppo-act { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 14px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); }
+.ppo-act[data-state="approved"] { border-color: var(--accent); background: var(--accent-soft); }
+.ppo-act[data-state="declined"] { opacity: 0.55; }
+.owner { font-size: var(--step--1); color: var(--warn-ink); }
+.curve svg { display: block; width: 100%; height: auto; }
+
 @media (max-width: 900px) { .grid2, .sure { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 640px) {
   .cell { min-height: 54px; padding: 5px; }
@@ -368,12 +391,14 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
             <button data-layer="load" aria-pressed="true">How full</button>
             <button data-layer="cruise" aria-pressed="false">Cruise traffic</button>
             <button data-layer="queue" aria-pressed="false">Queues</button>
+            <button data-layer="agents" aria-pressed="false" id="layer-agents" hidden>Vehicles</button>
           </div>
           <label class="foot-note" for="scenario">Plan</label>
           <select id="scenario"></select>
         </div>
         <div class="map-box" id="map-box">
           <svg id="map-svg" role="img" aria-label="Map of Southampton with main roads coloured by how full they are"><g id="zoom"><g id="world"></g></g><g id="ui"></g></svg>
+          <canvas class="agent-canvas" id="agent-canvas" aria-hidden="true"></canvas>
           <div class="map-tip" id="map-tip" hidden></div>
           <div class="map-ctl">
             <button id="z-in" aria-label="Zoom in">+</button>
@@ -389,6 +414,24 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
           <input type="range" id="slider" min="0" max="59" step="1" value="24" aria-label="Time of day">
           <span class="delta" id="delta"></span>
         </div>
+        <div class="veh-row" id="veh-row" hidden>
+          <button class="btn" id="veh-play">Play vehicles</button>
+          <label class="foot-note" for="veh-speed">Speed</label>
+          <select id="veh-speed"><option value="2">2 min a second</option><option value="5" selected>5 min a second</option><option value="15">15 min a second</option></select>
+          <span class="clock" id="veh-clock"></span>
+          <span class="foot-note" id="veh-count"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid2" id="row-vehicles" hidden>
+      <div class="block">
+        <div class="block-head"><h3>Vehicles, one by one</h3><span class="foot-note" id="veh-note"></span></div>
+        <div id="veh-body"></div>
+      </div>
+      <div class="block">
+        <div class="block-head"><h3>One journey</h3><span class="foot-note">Click a dot or bus on the map</span></div>
+        <div class="journey" id="journey"></div>
       </div>
     </div>
 
@@ -411,6 +454,11 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       <div id="ships"></div>
       <div class="timing" id="timing"></div>
       <p class="foot-note">Arrivals are fixed by tides and pilots. Disembarkation and check-in can move, so these are requests to the cruise line and port.</p>
+    </div>
+
+    <div class="block" id="ppo-card" hidden>
+      <div class="block-head"><h3>Plan from the learned policy</h3><span class="foot-note">Each step needs approval from whoever owns it.</span></div>
+      <div id="ppo-body"></div>
     </div>
 
     <div class="folds">
@@ -439,6 +487,10 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
             <div class="gw-list" id="gw-list"></div>
           </div>
         </div>
+      </details>
+      <details class="fold" id="bus-card" hidden>
+        <summary>Buses on the same roads <span class="sum-note" id="bus-src"></span></summary>
+        <div class="fold-body"><div id="bus-body"></div></div>
       </details>
       <details class="fold" id="gates-card">
         <summary>Dock gates <span class="sum-note">Cruise vehicles per hour; a coach counts as 2</span></summary>
@@ -508,6 +560,10 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
           <div class="table-scroll"><table id="calib-freight"></table></div>
         </div>
       </details>
+      <details class="fold" id="ppo-test" hidden>
+        <summary>Learned policy tested against simpler ones <span class="sum-note">PPO, the advisor and a rule on held-out days</span></summary>
+        <div class="fold-body"><div id="ppo-test-body"></div></div>
+      </details>
       <details class="fold">
         <summary>Not modelled yet</summary>
         <div class="fold-body">
@@ -515,7 +571,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
             <li>Queues blocking junctions upstream (queues wait at the bottleneck only)</li>
             <li>School locations: school trips follow where people live for now</li>
             <li>Signal timings at individual junctions</li>
-            <li>Buses, rail, and people switching mode when roads are busy</li>
+            <li>Rail, and people switching mode when roads are busy (buses run on the modelled roads in the Vehicles view but do not add to the traffic)</li>
             <li>Traffic inside the port</li>
             <li>The Itchen Bridge toll</li>
             <li>Commuters' routes outside the area (each picks a gateway by a straight-line estimate)</li>
@@ -530,6 +586,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
 </div>
 
 <script id="demo-data" type="application/json">__DEMO_DATA__</script>
+<script id="extra-data" type="application/json">__EXTRA_DATA__</script>
 <script>
 (() => {
   const DATA = JSON.parse(document.getElementById('demo-data').textContent);
@@ -589,6 +646,9 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       load: [0, 1, 2, 3, 4, 5].map(i => rgb(cs.getPropertyValue(`--l${i}`))),
       quiet: cs.getPropertyValue('--road-quiet').trim(),
       groups: Object.fromEntries(GROUP_ORDER.map(g => [g, cs.getPropertyValue(`--g-${g}`).trim()])),
+      school: cs.getPropertyValue('--g-school').trim(), bus: cs.getPropertyValue('--g-bus').trim(),
+      casing: cs.getPropertyValue('--casing').trim(), accent: cs.getPropertyValue('--accent').trim(),
+      ink: cs.getPropertyValue('--ink').trim(),
     };
   }
   function ramp(stops, x) {
@@ -808,7 +868,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
   }
 
   function placeUI() {
-    if (!state.date || BY_DATE[state.date].beyond) { $('#ui').innerHTML = ''; return; }
+    if (!state.date || BY_DATE[state.date].beyond) { $('#ui').innerHTML = ''; drawAgents(); return; }
     const d = day(), parts = [], k = T.k * fit.s, named = new Set();
     const showMinor = k > 0.11, showSub = k > 0.05;
     for (const p of MAP.places) {
@@ -864,6 +924,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       parts.push(`<rect class="mk-gate" x="${x - 5}" y="${y - 5}" width="10" height="10" rx="2"/><text class="mk-label" x="${x + 8}" y="${y + 13}">${esc(g.name)}</text>`);
     }
     $('#ui').innerHTML = parts.join('');
+    drawAgents();
   }
   function centerOf(i) {
     if (segCenters[i]) return segCenters[i];
@@ -877,9 +938,11 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     const h = Math.floor(state.bin / 2);
     const roads = $('#roads').children;
     const cruiseMode = state.layer === 'cruise';
+    const own = state.layer === 'agents' ? agentDay() : null;
     for (const el of roads) {
       const i = +el.dataset.s;
-      el.style.stroke = cruiseMode ? PAL.quiet : loadColor(segLevel(d, i, h) * 0.05);
+      const lv = own ? CH.indexOf(own.D.seg[i * HALF + h]) : segLevel(d, i, h);
+      el.style.stroke = cruiseMode ? PAL.quiet : loadColor(lv * 0.05);
     }
     let cr = '';
     if (cruiseMode) {
@@ -908,6 +971,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     if (L === 'cruise') html = `<span><svg width="44" height="10" aria-hidden="true"><line x1="2" y1="5" x2="42" y2="5" stroke="var(--cruise)" stroke-width="2"/></svg> 50</span><span><svg width="44" height="12" aria-hidden="true"><line x1="3" y1="6" x2="41" y2="6" stroke="var(--cruise)" stroke-width="6" stroke-linecap="round"/></svg> 200 cruise vehicles per hour</span>`;
     else html = `<span class="ramp">${[0.3, 0.6, 0.78, 0.92, 1.1, 1.3].map(x => `<i style="background:${loadColor(x)}"></i>`).join('')}</span><span>How full: under 50%, 70%, 85%, full, over capacity</span>`;
     if (L === 'queue') html += '<span><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="5" class="q-dot"/></svg> vehicles waiting at a bottleneck</span>';
+    if (L === 'agents') html += `<span><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="3.5" fill="${PAL.groups.internal}"/></svg> one vehicle agent, coloured by kind of trip (below the map)</span><span><svg width="14" height="14" aria-hidden="true"><rect x="2" y="2" width="10" height="10" fill="${PAL.bus}"/></svg> bus</span><span>Roads: this one simulated day</span>`;
     html += '<span><svg width="12" height="12" aria-hidden="true"><rect x="1" y="1" width="10" height="10" rx="2" class="mk-gate"/></svg> dock gate</span><span><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="5" class="mk-gw"/></svg> county gateway, vehicles per hour coming in</span>';
     html += '<span class="muted">Drag to move. Pinch, Ctrl + scroll or the buttons to zoom.</span>';
     $('#map-legend').innerHTML = html;
@@ -1300,6 +1364,324 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     ].join('');
   }
 
+  /* ---------- vehicles (agents), buses and the learned policy ---------- */
+  const EXTRA = (() => {
+    const el = document.getElementById('extra-data'), t = el ? el.textContent.trim() : '';
+    if (!t || t.startsWith('__')) return null;
+    try { return JSON.parse(t); } catch (err) { console.warn('extra data unreadable', err); return null; }
+  })();
+  const AG = EXTRA && EXTRA.agents, PPO = EXTRA && EXTRA.ppo;
+  const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_', B64I = {};
+  [...B64].forEach((c, i) => { B64I[c] = i; });
+  function dec(s) {
+    const out = []; let z = 0, mul = 1;
+    for (let i = 0; i < s.length; i++) {
+      const c = B64I[s[i]]; z += (c & 31) * mul;
+      if (c & 32) mul *= 32; else { out.push(z % 2 ? -(z + 1) / 2 : z / 2); z = 0; mul = 1; }
+    }
+    return out;
+  }
+  const geomCache = new Map();
+  function geom(kind, i) {
+    const key = kind + i; if (geomCache.has(key)) return geomCache.get(key);
+    const P = kind === 'a' ? AG.paths[i] : AG.bus.patterns[i];
+    const g = dec(P.g), xs = [g[0]], ys = [g[1]];
+    for (let k = 2; k < g.length; k += 2) { xs.push(xs[xs.length - 1] + g[k]); ys.push(ys[ys.length - 1] + g[k + 1]); }
+    const cum = [0];
+    for (let k = 1; k < xs.length; k++) cum.push(cum[k - 1] + Math.hypot(xs[k] - xs[k - 1], ys[k] - ys[k - 1]));
+    const bv = []; dec(P.b).forEach((d, k) => bv.push(k ? bv[k - 1] + d : d));
+    const out = { xs, ys, cum, bv }; geomCache.set(key, out); return out;
+  }
+  function readTimes(ints, pos, n) {
+    const t = new Float64Array(n); let s = ints[pos];
+    t[0] = 300 + s / 60;
+    for (let k = 1; k < n; k++) { s += ints[pos + k]; t[k] = 300 + s / 60; }
+    return t;
+  }
+  const dayCache = new Map();
+  function agentDay(iso) {
+    iso = iso || state.date;
+    if (!AG || !AG.days[iso]) return null;
+    if (dayCache.has(iso)) return dayCache.get(iso);
+    const D = AG.days[iso], A = D.agents, ints = dec(A.t), list = [];
+    let p = 0;
+    for (let i = 0; i < A.n; i++) {
+      const n = geom('a', A.p[i]).bv.length, t = readTimes(ints, p, n); p += n;
+      list.push({ i, k: A.k[i], o: A.o[i], d: A.d[i], p: A.p[i], q: A.q[i] / 10, c: A.c[i], t, dep: t[0], arr: t[n - 1] });
+    }
+    const buses = [];
+    if (D.buses) {
+      const B = D.buses.trips, bi = dec(B.t); let q = 0;
+      for (let i = 0; i < B.n; i++) {
+        const n = geom('b', B.p[i]).bv.length, t = readTimes(bi, q, n); q += n;
+        buses.push({ i, p: B.p[i], r: B.r[i], dep: B.dep[i] / 10, late: B.late[i] / 10, x: B.x[i] / 10,
+          px: B.px[i] == null ? null : B.px[i] / 10, pl: B.pl[i] == null ? null : B.pl[i] / 10, t, start: t[0], end: t[n - 1] });
+      }
+    }
+    const out = { D, list, buses }; dayCache.set(iso, out); return out;
+  }
+  function posAt(G, t, now) {
+    const n = t.length;
+    let lo = 0, hi = n - 1;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (t[mid] <= now) lo = mid; else hi = mid; }
+    const f = t[hi] > t[lo] ? Math.max(0, Math.min(1, (now - t[lo]) / (t[hi] - t[lo]))) : 1;
+    const a = G.bv[lo], b = G.bv[hi], d = G.cum[a] + f * (G.cum[b] - G.cum[a]);
+    let s = a;
+    while (s < b - 1 && G.cum[s + 1] < d) s++;
+    if (s >= G.xs.length - 1) return [G.xs[G.xs.length - 1], G.ys[G.ys.length - 1]];
+    const seg = G.cum[s + 1] - G.cum[s], g = seg > 0 ? Math.max(0, Math.min(1, (d - G.cum[s]) / seg)) : 0;
+    return [G.xs[s] + g * (G.xs[s + 1] - G.xs[s]), G.ys[s] + g * (G.ys[s + 1] - G.ys[s])];
+  }
+  const cvs = $('#agent-canvas'), cx2 = cvs.getContext('2d');
+  let drawn = [], selected = null, vehAnim = null;
+  state.minute = 300 + 24 * 15 + 7.5;
+  function sizeCanvas() {
+    const w = svg.clientWidth || 800, h = svg.clientHeight || 500, r = window.devicePixelRatio || 1;
+    if (cvs.width !== Math.round(w * r) || cvs.height !== Math.round(h * r)) { cvs.width = Math.round(w * r); cvs.height = Math.round(h * r); }
+    cx2.setTransform(r, 0, 0, r, 0, 0);
+    return [w, h];
+  }
+  const agentColor = k => PAL.groups[AG.purposes[k].group] || PAL.school;
+  function tracePath(G) {
+    cx2.beginPath();
+    for (let k = 0; k < G.xs.length; k++) { const [x, y] = screen(G.xs[k], G.ys[k]); if (k) cx2.lineTo(x, y); else cx2.moveTo(x, y); }
+    cx2.stroke();
+  }
+  function drawAgents() {
+    const [w, h] = sizeCanvas();
+    cx2.clearRect(0, 0, w, h); drawn = [];
+    const A = state.layer === 'agents' ? agentDay() : null;
+    if (!A) return;
+    const now = state.minute, rad = Math.max(1.8, Math.min(4.5, 1.4 + Math.log2(Math.max(1, T.k))));
+    if (selected) {
+      const G = selected.type === 'a' ? geom('a', A.list[selected.i].p) : geom('b', A.buses[selected.i].p);
+      cx2.lineCap = 'round'; cx2.lineJoin = 'round';
+      cx2.strokeStyle = PAL.casing; cx2.lineWidth = 6; tracePath(G);
+      cx2.strokeStyle = PAL.accent; cx2.lineWidth = 3; tracePath(G);
+    }
+    let na = 0, nb = 0;
+    for (const a of A.list) {
+      if (a.dep > now || a.arr < now) continue;
+      na++;
+      const [x, y] = screen(...posAt(geom('a', a.p), a.t, now));
+      if (x < -6 || y < -6 || x > w + 6 || y > h + 6) continue;
+      const P = AG.purposes[a.k];
+      cx2.fillStyle = agentColor(a.k);
+      if (P.key === 'cruise_coach') cx2.fillRect(x - rad - 1, y - rad - 1, 2 * rad + 2, 2 * rad + 2);
+      else { cx2.beginPath(); cx2.arc(x, y, P.cruise ? rad + 0.8 : rad, 0, 2 * Math.PI); cx2.fill(); }
+      drawn.push([x, y, 'a', a.i]);
+    }
+    for (const b of A.buses) {
+      if (b.start > now || b.end < now) continue;
+      nb++;
+      const [x, y] = screen(...posAt(geom('b', b.p), b.t, now));
+      if (x < -8 || y < -8 || x > w + 8 || y > h + 8) continue;
+      const s = rad + 2.5;
+      cx2.fillStyle = PAL.casing; cx2.fillRect(x - s - 1, y - s - 1, 2 * s + 2, 2 * s + 2);
+      cx2.fillStyle = PAL.bus; cx2.fillRect(x - s, y - s, 2 * s, 2 * s);
+      drawn.push([x, y, 'b', b.i]);
+    }
+    if (selected) {
+      const it = selected.type === 'a' ? A.list[selected.i] : A.buses[selected.i];
+      const t0 = selected.type === 'a' ? it.dep : it.start, t1 = selected.type === 'a' ? it.arr : it.end;
+      if (now >= t0 && now <= t1) {
+        const [x, y] = screen(...posAt(geom(selected.type, it.p), it.t, now));
+        cx2.strokeStyle = PAL.ink; cx2.lineWidth = 2; cx2.beginPath(); cx2.arc(x, y, rad + 5, 0, 2 * Math.PI); cx2.stroke();
+      }
+    }
+    $('#veh-clock').textContent = hhmm(now);
+    $('#veh-count').textContent = `${int(na)} agents${A.buses.length ? ` and ${int(nb)} buses` : ''} on the road`;
+  }
+  svg.addEventListener('click', e => {
+    if (state.layer !== 'agents' || !agentDay()) return;
+    const r = svg.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    let best = null, bd = 110;
+    for (const p of drawn) { const d = (p[0] - x) ** 2 + (p[1] - y) ** 2; if (d < bd) { bd = d; best = p; } }
+    if (!best) return;
+    e.stopPropagation();
+    selected = { type: best[2], i: best[3] };
+    renderJourney(); drawAgents();
+  }, true);
+  function place(c) {
+    const [name, kind, hint] = AG.centroids[c];
+    const what = { gateway: `county gateway${hint ? ` (${hint})` : ''}`, gate: 'dock gate', station: 'station', stadium: 'stadium', zone: 'zone' }[kind] || kind;
+    return `<strong>${esc(name)}</strong> <span class="muted">${esc(what)}</span>`;
+  }
+  const mins = x => `${fmt1(x)} min`;
+  function renderJourney() {
+    const A = agentDay(), el = $('#journey');
+    if (!A || !selected) { el.innerHTML = '<p class="muted">Turn on the Vehicles layer and click a dot to follow one vehicle: where it came from and is going, its route, when it left and arrived, and how long it queued.</p>'; return; }
+    if (selected.type === 'a') {
+      const a = A.list[selected.i], P = AG.purposes[a.k], path = AG.paths[a.p];
+      const ff = path.ff / 10, total = a.arr - a.dep, slow = Math.max(0, total - ff - a.q);
+      const call = a.c >= 0 ? A.D.calls[a.c] : null;
+      const w = P.cruise ? A.D.weights.cruise : A.D.weights.everyday;
+      el.innerHTML = `<p><span class="sw" style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;background:${agentColor(a.k)}"></span><strong>${esc(P.label)}</strong>${call ? `, ${esc(call.ship)} at ${esc(call.terminal)}` : ''}</p>
+        <dl><dt>From</dt><dd>${place(a.o)}</dd><dt>To</dt><dd>${place(a.d)}</dd>
+        <dt>Route</dt><dd>${path.v.length ? esc(path.v.map(i => AG.names[i]).join(' → ')) : 'local roads'}</dd>
+        <dt>Leaves</dt><dd class="mono">${hhmm(a.dep)}</dd><dt>Arrives</dt><dd class="mono">${hhmm(a.arr)} (${mins(total)})</dd>
+        <dt>On empty roads</dt><dd class="mono">${mins(ff)}</dd><dt>Slow traffic</dt><dd class="mono">+${mins(slow)}</dd>
+        <dt>Queuing</dt><dd class="mono">+${mins(a.q)}</dd><dt>Stands for</dt><dd>about ${int(w)} vehicles like it</dd></dl>
+        <p class="foot-note">One sampled day. The route is one of the model's up to three routes for this trip, drawn with the shares the model gave it at ${binTime(Math.max(0, Math.min(59, Math.floor((a.dep - 300) / 15))))}; queuing follows the model's 15-minute queue carry-over.</p>`;
+    } else {
+      const b = A.buses[selected.i], R = AG.bus.routes[b.r], pat = AG.bus.patterns[b.p];
+      const stops = pat.s.map(i => AG.names[i]);
+      const timed = AG.bus.timetable === 'gtfs';
+      el.innerHTML = `<p><span class="sw" style="display:inline-block;width:10px;height:10px;margin-right:6px;background:${PAL.bus}"></span><strong>${esc(R.operator)} ${esc(R.name)}</strong> <span class="muted">${esc(R.long)}</span></p>
+        <dl><dt>From</dt><dd>${esc(stops[0] || '')}</dd><dt>To</dt><dd>${esc(stops[stops.length - 1] || '')} (${stops.length} stops in the area)</dd>
+        <dt>Route</dt><dd>${pat.v.length ? esc(pat.v.map(i => AG.names[i]).join(' → ')) : ''}</dd>
+        <dt>${timed ? 'Timetabled' : 'Assumed'} start</dt><dd class="mono">${hhmm(b.dep)}</dd><dt>Modelled end</dt><dd class="mono">${hhmm(b.end)}</dd>
+        <dt>Behind ${timed ? 'timetable' : 'free flow'}</dt><dd class="mono">${b.late >= 0 ? '+' : '−'}${mins(Math.abs(b.late))} at the last stop</dd>
+        <dt>Extra from traffic</dt><dd class="mono">+${mins(b.x)}</dd>
+        ${b.px != null ? `<dt>Portswood Road</dt><dd class="mono">+${mins(b.px)} from traffic, ${fmt1(b.pl)} min behind at the next stop</dd>` : ''}</dl>`;
+    }
+  }
+  function chips(dates) { return `<span class="chips">${dates.map(x => `<button class="chip" data-goto="${x}">${esc(shortDate(x))}</button>`).join('')}</span>`; }
+  function wireChips(el) { el.querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => selectDay(b.dataset.goto, true))); }
+  function renderVehicles() {
+    if (!AG) return;
+    const A = agentDay(), btn = $('#layer-agents');
+    btn.hidden = false; btn.disabled = !A;
+    btn.title = A ? '' : 'Vehicles are simulated for a few days only';
+    if (!A && state.layer === 'agents') {
+      state.layer = 'load';
+      document.querySelectorAll('[data-layer]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.layer === 'load')));
+    }
+    $('#row-vehicles').hidden = false;
+    $('#veh-row').hidden = state.layer !== 'agents';
+    const days = Object.keys(AG.days);
+    if (!A) {
+      $('#veh-note').textContent = '';
+      $('#veh-body').innerHTML = `<p>Individual vehicles and buses are simulated for ${days.length} days: ${chips(days)}</p>`;
+      wireChips($('#veh-body')); renderJourney(); return;
+    }
+    const D = A.D, counts = {};
+    for (const a of A.list) counts[a.k] = (counts[a.k] || 0) + 1;
+    const vehicles = D.vehicles.everyday + D.vehicles.cruise;
+    const groups = Object.keys(D.check), tot = k => new Array(N_BINS).fill(0).map((_, b) => groups.reduce((s, g) => s + D.check[g][k][b], 0));
+    const mod = tot('model'), ag = tot('agents'), ymax = Math.max(...mod, ...ag, 1) * 1.05;
+    const X0 = 40, X1 = 314, Y0 = 6, Y1 = 92, x = b => X0 + (b + 0.5) * (X1 - X0) / N_BINS, y = v => Y1 - v / ymax * (Y1 - Y0), bw = (X1 - X0) / N_BINS - 1;
+    const bars = ag.map((v, b) => `<rect class="check-b" x="${(x(b) - bw / 2).toFixed(1)}" y="${y(v).toFixed(1)}" width="${bw.toFixed(1)}" height="${(Y1 - y(v)).toFixed(1)}"/>`).join('');
+    const line = `<polyline class="check-l" points="${mod.map((v, b) => `${x(b).toFixed(1)},${y(v).toFixed(1)}`).join(' ')}"/>`;
+    const ticks = [6, 9, 12, 15, 18].map(hh => `<text class="ax" x="${x((hh - 5) * 4)}" y="${Y1 + 11}" text-anchor="middle">${pad(hh)}:00</text>`).join('');
+    const grid = [0, ymax / 2].map(v => `<text class="ax" x="${X0 - 4}" y="${y(v) + 3}" text-anchor="end">${v >= 1000 ? Math.round(v / 1000) + 'k' : Math.round(v)}</text>`).join('');
+    const rows = groups.map(g => { const m = D.check[g].model.reduce((s, v) => s + v, 0) / 4, a = D.check[g].agents.reduce((s, v) => s + v, 0) / 4;
+      return `<tr><td><span class="sw" style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;background:${PAL.groups[g] || PAL.school}"></span>${esc(M.groups[g] || (g === 'school' ? 'School run' : g))}</td><td class="num">${int(m)}</td><td class="num">${int(a)}</td><td class="num">${m ? Math.round((a / m - 1) * 100) + '%' : ''}</td></tr>`; }).join('');
+    $('#veh-note').textContent = `seed ${D.seed.join('-')}`;
+    $('#veh-body').innerHTML = `<p>${int(A.list.length)} agents stand for ${int(vehicles)} vehicle trips on <strong>one sampled day</strong>${D.wet ? ' (wet)' : ''}${D.incident ? ', with an incident on a main road' : ''}. Each everyday agent stands for about ${int(D.weights.everyday)} vehicles and each cruise agent for ${int(D.weights.cruise)}, so cruise traffic is easier to see. In the Vehicles layer the roads are coloured by this same sampled day, so dots and colours are the same traffic; the other layers show the average of ${M.n} sampled days.</p>
+      <div class="veh-legend">${AG.purposes.map((P, k) => counts[k] ? `<span><span class="sw" style="background:${agentColor(k)}"></span>${esc(P.label)} <span class="mono">${int(counts[k])}</span></span>` : '').join('')}${A.buses.length ? `<span><span class="sw" style="border-radius:2px;background:${PAL.bus}"></span>Bus <span class="mono">${int(A.buses.length)}</span></span>` : ''}</div>
+      <h3 style="font-size: var(--step-0)">The agents added up</h3>
+      <div class="chart"><svg viewBox="0 0 320 106" role="img" aria-label="Trips starting per hour: model flows against agents times their weight">${grid}${bars}${line}${ticks}</svg></div>
+      <p class="foot-note">Line: vehicles per hour the model starts on this sampled day. Bars: the agents times the vehicles each stands for. They differ only by sampling.</p>
+      <div class="table-scroll"><table><thead><tr><th>Kind of trip</th><th>Model</th><th>Agents × weight</th><th>Diff</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    renderJourney();
+  }
+  function renderBuses() {
+    const A = agentDay(), B = AG && AG.bus, show = !!(A && A.D.buses && B && A.D.buses.trips.n > 0);
+    $('#bus-card').hidden = !show;
+    if (!show) return;
+    const S = B.source || {}, when = (S.collected || '').slice(0, 10);
+    $('#bus-src').textContent = S.kind === 'bods_gtfs' ? `Bus Open Data Service timetables (GTFS), downloaded ${when}, OGL v3.0` : `OpenStreetMap bus routes, read ${when} (ODbL); no timetable, so buses run at assumed headways`;
+    const rows = A.D.buses.table, ps = [];
+    const cell = (o, k) => o && o[k] != null ? `${o[k] >= 0 ? '+' : '−'}${fmt1(Math.abs(o[k]))}` : '';
+    const pcell = o => o ? `+${fmt1(o.extra)} <span class="muted">(${fmt1(o.late)} late, ${Math.round(o.late5 * 100)}% ≥5)</span>` : '';
+    for (const r of rows) for (const v of Object.values(r.portswood)) ps.push(v.late);
+    const html = rows.slice(0, 18).map(r => `<tr><td><strong>${esc(r.operator)} ${esc(r.name)}</strong><br><span class="muted">${esc(r.long)}</span></td><td class="num">${r.trips}</td>
+      <td class="num">${cell(r.extra, 'am')} / ${cell(r.extra, 'inter')} / ${cell(r.extra, 'pm')}</td><td class="num">${cell(r.late, 'am')} / ${cell(r.late, 'pm')}</td>
+      <td class="num">${pcell(r.portswood.southbound_am)}</td><td class="num">${pcell(r.portswood.southbound_pm)}</td><td class="num">${pcell(r.portswood.northbound_am)}</td><td class="num">${pcell(r.portswood.northbound_pm)}</td></tr>`).join('');
+    const lo = ps.length ? Math.min(...ps) : null, hi = ps.length ? Math.max(...ps) : null;
+    $('#bus-body').innerHTML = `<p>${int(A.buses.length)} bus trips run on this sampled day's link speeds and queues (no bus lanes in the model; a bus covers a link at ${Math.round(B.assumptions.bus_speed * 100)}% of a car's free-flow speed, stops ${B.assumptions.dwell_s} s at each stop and waits if early).${lo != null ? ` On Portswood Road the modelled buses reach the end of the road between <span class="mono">${fmt1(lo)}</span> and <span class="mono">${fmt1(hi)}</span> minutes behind timetable in the peaks, on average per route and direction.` : ''}</p>
+      <p class="foot-note">${esc(B.council)} That count was in July, out of university term${dateOf(A.D.date).getDay() % 6 ? '' : ', and on weekdays; this day is a weekend'}.${day().permits.some(id => PERMIT[id] && PERMIT[id].corridor === 'portswood') ? ' This day also has roadworks with signals on Portswood Road, which the model treats as one lane closed all day.' : ''}</p>
+      <div class="table-scroll"><table><thead><tr><th>Route</th><th>Trips</th><th>Extra min from traffic<br>AM / midday / PM</th><th>Behind at last stop<br>AM / PM</th><th>Portswood SB<br>AM</th><th>Portswood SB<br>PM</th><th>Portswood NB<br>AM</th><th>Portswood NB<br>PM</th></tr></thead><tbody>${html}</tbody></table></div>
+      <p class="foot-note">Peaks 07:00–10:00 and 16:00–19:00 by when the bus enters the section. Portswood cells: extra minutes on the road from traffic (minutes behind timetable at the next stop, share of trips 5 or more minutes late).</p>`;
+  }
+  const PPO_KIND = { meter: 'Meter disembarkation', checkin: 'Check-in time', signs: 'Sign message', marshals: 'Marshals' };
+  function ppoText(a) {
+    if (a.kind === 'meter') return [`Meter disembarkation at ${a.terminal} (${a.ships})`, `${a.from}–${a.to}: let ${Math.round(a.release * 100)}% of the passengers waiting to leave go each 15 minutes; the rest wait in the terminal (never more than ${PPO.levers.max_hold_min} minutes). Their pick-ups, taxis and coaches leave later with them.`];
+    if (a.kind === 'checkin') return [`Open check-in at ${a.terminal} ${Math.abs(a.shift)} minutes ${a.shift < 0 ? 'earlier' : 'later'} (${a.ships})`, `${a.new} instead of ${a.planned}; closing time unchanged, so drop-offs spread over a ${a.shift < 0 ? 'longer' : 'shorter'} window.`];
+    if (a.kind === 'signs') return [`Set signs on the ${SIGNS[a.group] ? SIGNS[a.group].where : a.group}`, `${a.from}–${a.to}, to steer drivers off the ${esc(a.group)} corridors.`];
+    return [`Marshals at ${a.gate}`, `${a.from}–${a.to}, to keep the gate approach moving (assumed +${Math.round((PPO.levers.marshal_cap - 1) * 100)}% capacity, £${int(PPO.costs.marshal_hour)} an hour).`];
+  }
+  function renderPPO() {
+    $('#ppo-card').hidden = !PPO;
+    if (!PPO) return;
+    const R = PPO.days[state.date], el = $('#ppo-body');
+    if (!R) { el.innerHTML = `<p class="muted">The learned plan is worked out for ${chips(Object.keys(PPO.days))}</p>`; wireChips(el); return; }
+    const E = R.effect, acts = R.actions.map((a, i) => {
+      const [title, detail] = ppoText(a), key = `ppo:${state.date}:${i}`, st = decisions[key] || 'open';
+      return `<div class="ppo-act" data-key="${esc(key)}" data-state="${st}"><div class="action-body"><span class="eyebrow action-kind">${esc(PPO_KIND[a.kind])}${st !== 'open' ? ` · ${st === 'approved' ? 'Approved' : 'Declined'}` : ''}</span>
+        <strong>${esc(title)}</strong><span class="foot-note" style="color: var(--ink)">${detail} PPO chose this on ${Math.round(a.share * 100)}% of ${R.k} sampled days.</span>
+        <span class="owner">Needs approval: ${esc(a.owner)}</span>${a.kind === 'signs' && SIGNS[a.group] ? `<div class="vms" aria-label="Suggested sign text">${SIGNS[a.group].lines.map(esc).join('<br>')}</div>` : ''}</div>
+        <div class="action-btns"><button class="btn ${st === 'approved' ? '' : 'btn-primary'}" data-ppo="approved">${st === 'approved' ? 'Undo' : 'Approve'}</button><button class="btn" data-ppo="declined">${st === 'declined' ? 'Undo' : 'Decline'}</button></div></div>`;
+    }).join('');
+    const S = PPO.summary.all;
+    let verdict = '';
+    if (S && S.ppo && S.rule) {
+      const best = S.ppo.cost.diff < Math.min(S.rule.cost.diff, S.advisor ? S.advisor.cost.diff : Infinity);
+      verdict = best ? 'On the test days it had the lowest average cost of the four policies' : '<strong>On the test days it did not beat the simpler policies on average cost</strong>, so treat this plan as one option, not the answer';
+      if (S.advisor && S.ppo.vehicle_hours.diff > S.advisor.vehicle_hours.diff) verdict += ', but the ship-timing advisor cut delay more';
+      verdict += '.';
+      if (PPO.ablation) verdict += ' Most of its saving comes from marshals at the dock gates, whose effect is our assumption.';
+    }
+    el.innerHTML = `${acts || '<p>On most sampled days the learned policy does nothing on this day.</p>'}
+      <p>On ${R.k} sampled days of this date, following the plan changes congested road-hours from <span class="mono">${fmt1(E.corridor_hours.nothing)}</span> to <span class="mono">${fmt1(E.corridor_hours.ppo)}</span>, delay from <span class="mono">${int(E.vehicle_hours.nothing)}</span> to <span class="mono">${int(E.vehicle_hours.ppo)}</span> vehicle-hours, holds passengers for <span class="mono">${int(E.held_pax_hours.ppo)}</span> passenger-hours and uses marshals for <span class="mono">${fmt1(E.marshal_hours.ppo)}</span> gate-hours.</p>
+      <p class="foot-note">The policy was trained by reinforcement learning (PPO) on simulated days and is shown as a suggestion. The port and cruise lines own disembarkation and check-in; the council owns the signs. ${verdict} See "Learned policy tested against simpler ones" below.</p>`;
+    el.querySelectorAll('[data-ppo]').forEach(b => b.addEventListener('click', () => {
+      const key = b.closest('.ppo-act').dataset.key, want = b.dataset.ppo;
+      decisions[key] = decisions[key] === want ? 'open' : want; renderPPO();
+    }));
+  }
+  function renderPPOTest() {
+    if (!PPO || !PPO.summary || !PPO.summary.all) return;
+    $('#ppo-test').hidden = false;
+    const S = PPO.summary.all, ML = { ...PPO.metric_labels, corridor_hours: 'Congested road-hours' }, keys = ['corridor_hours', 'vehicle_hours', 'held_pax_hours', 'marshal_hours', 'cost'];
+    const f = (v, k) => k === 'corridor_hours' || k === 'marshal_hours' ? fmt1(v) : int(v);
+    const rows = ['nothing', 'rule', 'advisor', 'ppo'].filter(p => S[p]).map(p => `<tr><td><strong>${esc(PPO.labels[p])}</strong></td><td class="num">${S[p].n}</td>${keys.map(k => {
+      const v = S[p][k]; return `<td class="num">${f(v.mean, k)} <span class="muted">(${f(v.p10, k)}–${f(v.p90, k)})</span>${p === 'nothing' ? '' : `<br><span class="mono">${v.diff <= 0 ? '−' : '+'}${f(Math.abs(v.diff), k)}</span> <span class="muted">[${f(v.diff_lo, k)}, ${f(v.diff_hi, k)}]</span>`}</td>`; }).join('')}<td class="num">${S[p].better_days == null ? '' : Math.round(S[p].better_days * 100) + '%'}</td></tr>`).join('');
+    const C = PPO.costs, tr = PPO.train || {}, cv = PPO.curve || [];
+    let curve = '';
+    if (cv.length > 1) {
+      const ys = cv.map(c => c.saving), lo = Math.min(0, ...ys), hi = Math.max(1, ...ys);
+      const X0 = 44, X1 = 314, Y0 = 6, Y1 = 70, x = i => X0 + i / (cv.length - 1) * (X1 - X0), y = v => Y1 - (v - lo) / (hi - lo) * (Y1 - Y0);
+      curve = `<div class="curve"><svg viewBox="0 0 320 86" role="img" aria-label="Saving against doing nothing during training"><line class="grid-l" x1="${X0}" x2="${X1}" y1="${y(0)}" y2="${y(0)}"/><polyline class="check-l" points="${ys.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')}"/><text class="ax" x="${X0 - 4}" y="${y(hi) + 3}" text-anchor="end">£${int(hi)}</text><text class="ax" x="${X0 - 4}" y="${y(0) + 3}" text-anchor="end">0</text><text class="ax" x="${X1}" y="82" text-anchor="end">${int(cv[cv.length - 1].days)} training days</text></svg></div><p class="foot-note">Pounds saved per sampled day against doing nothing on the same day, while training.</p>`;
+    }
+    const best = ['rule', 'advisor', 'ppo'].filter(p => S[p]).sort((a, b) => S[a].cost.diff - S[b].cost.diff)[0];
+    const AB = PPO.ablation && PPO.ablation.rows, abl = AB ? (() => {
+      const names = { ppo: 'PPO, all levers', ppo_no_meter: 'without metering', ppo_no_checkin: 'without its check-in move', ppo_no_signs: 'without signs', ppo_no_marshals: 'without marshals', marshal_rule: 'Marshals-only rule (no PPO)' };
+      const cell = (r, k) => `${r[k].mean <= 0 ? '−' : '+'}${f(Math.abs(r[k].mean), k)}`;
+      const rows = Object.keys(names).filter(k => AB[k]).map(k => `<tr><td>${esc(names[k])}</td><td class="num">${cell(AB[k], 'corridor_hours')}</td><td class="num">${cell(AB[k], 'vehicle_hours')}</td><td class="num">${cell(AB[k], 'marshal_hours')}</td><td class="num">${cell(AB[k], 'cost')}</td></tr>`).join('');
+      return `<h3 style="font-size: var(--step-0)">Where PPO's saving comes from</h3><p class="foot-note">The same test days with one lever switched off at a time; differences from doing nothing per day.</p><div class="table-scroll"><table><thead><tr><th></th><th>Congested road-hours</th><th>Delay (veh-h)</th><th>Marshal hours</th><th>Cost</th></tr></thead><tbody>${rows}</tbody></table></div><p class="foot-note">Most of the saving comes from putting marshals at the dock gates, whose effect (25% more gate capacity) is our assumption, not a measurement. Signs move traffic off the busiest corridors at the price of longer routes.</p>`;
+    })() : '';
+    $('#ppo-test-body').innerHTML = `<p class="foot-note">Each policy plays the same ${S.nothing.n} sampled days (${PPO.dates.test.length} dates held out of training and ${PPO.dates.seen.length} training dates, with new random draws), so the differences are paired. Mean per day (10th–90th percentile); below it, the difference from doing nothing [95% bootstrap interval]. The rule sets signs where a road went over 85% full in the last 15 minutes and marshals where a gate approach did. The advisor is this page's ship-timing advice, planned from ${PPO.n_advise} of the forecast's own samples per date.</p>
+      <div class="table-scroll"><table><thead><tr><th>Policy</th><th>Days</th>${keys.map(k => `<th>${esc(ML[k])}</th>`).join('')}<th>Days cheaper than nothing</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <p>Lowest average cost on these days: <strong>${esc(PPO.labels[best])}</strong>.${best !== 'ppo' ? ' PPO does not beat it here.' : ''}</p>
+      ${abl}<p class="foot-note">Costs: £${int(C.corridor_hour)} per congested road-hour (one road over 85% full for an hour; a weight for the risk of a road locking up, set by us, not measured), £${int(C.vehicle_hour)} per vehicle-hour of delay (vehicles queuing into the next 15 minutes, plus slow running), £${int(C.held_pax_hour)} per passenger-hour held in a terminal, £${int(C.marshal_hour)} per gate-hour of marshals${C.sign_hour ? `, £${int(C.sign_hour)} per sign location-hour` : ''}. ${C.sign_hour ? 'Check-in moves have' : 'Signs and check-in moves have'} no cost of their own. ${tr.timesteps ? `Trained on ${int(tr.days)} sampled days (${int(tr.timesteps)} steps of 15 minutes) on ${esc(tr.gpu || tr.device)}.` : ''}</p>${curve}`;
+  }
+
+  const hhmm = m => { const r = Math.round(m); return `${pad(Math.floor(r / 60))}:${pad(r % 60)}`; };
+  function stopVehicles() { if (vehAnim) cancelAnimationFrame(vehAnim); vehAnim = null; $('#veh-play').textContent = 'Play vehicles'; }
+  $('#veh-play').addEventListener('click', () => {
+    if (vehAnim) return stopVehicles();
+    stopPlay();
+    if (state.minute >= 1199) state.minute = 300;
+    $('#veh-play').textContent = 'Pause';
+    let last = performance.now();
+    const tick = now => {
+      const dt = Math.min(0.1, (now - last) / 1000); last = now;
+      state.minute = Math.min(1200, state.minute + dt * +$('#veh-speed').value);
+      const b = Math.min(N_BINS - 1, Math.floor((state.minute - 300) / 15));
+      if (b !== state.bin) setBin(b, true); else drawAgents();
+      if (state.minute >= 1200) { stopVehicles(); return; }
+      vehAnim = requestAnimationFrame(tick);
+    };
+    vehAnim = requestAnimationFrame(tick);
+  });
+  document.querySelectorAll('[data-layer]').forEach(b => b.addEventListener('click', () => {
+    $('#veh-row').hidden = state.layer !== 'agents';
+    if (state.layer !== 'agents') stopVehicles();
+    drawAgents();
+  }));
+
   /* ---------- day ---------- */
   function schedSrc() {
     const sc = (M.sources || {}).schedule;
@@ -1317,13 +1699,14 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     return t + 'Roads next to the docks have no public counts to check against.';
   }
   function selectDay(iso, scroll) {
-    stopPlay();
+    stopPlay(); stopVehicles(); selected = null;
     state.date = iso; state.scenario = 'base'; state.od = 0; state.showRoutes = false;
     const d = BY_DATE[iso];
     if (!d.beyond) {
       let best = -1, bb = 24;
       for (let b = 0; b < N_BINS; b++) { let s = 0; for (const c of DATA.corridors) s += d.p85[c.id][b]; if (s > best) { best = s; bb = b; } }
       state.bin = best > 0 ? bb : 24;
+      state.minute = 300 + state.bin * 15 + 7.5;
       let top = DATA.corridors[0].id, tp = -1;
       for (const c of DATA.corridors) if (d.p85[c.id][state.bin] > tp) { tp = d.p85[c.id][state.bin]; top = c.id; }
       state.corr = top;
@@ -1335,6 +1718,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     const d = day();
     const show = !d.beyond;
     ['#day-head', '#day-body', '#row-actions', '#ships-block', '#row-model', '#heat-card', '#gates-card', '#tl-card', '#sure-card'].forEach(s => { $(s).hidden = !show; });
+    if (d.beyond) ['#row-vehicles', '#bus-card', '#ppo-card'].forEach(s => { $(s).hidden = true; });
     if (d.beyond) {
       $('#day-head').innerHTML = '';
       $('#notices').innerHTML = `<div class="card refusal"><p class="eyebrow">Outside coverage</p><h2>No forecast for ${esc(longDate(d.date))}</h2>
@@ -1374,7 +1758,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     $('#scenario').innerHTML = opts.map(k => `<option value="${k}"${k === state.scenario ? ' selected' : ''}>${esc(scenLabel(d, k))}</option>`).join('');
     $('#slider').value = state.bin;
     segCenters = {};
-    renderTiming(); renderActions(); renderRoutesCard(); renderSure(); renderVisuals();
+    renderTiming(); renderActions(); renderRoutesCard(); renderSure(); renderVehicles(); renderBuses(); renderPPO(); renderVisuals();
   }
   function renderVisuals() {
     const d = day();
@@ -1391,8 +1775,9 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     paintRoads(); placeUI(); renderHeat(); renderInfo(); renderGates(); renderMix(); renderRouteDetail(); renderTimeline();
   }
   function setScenario(key) { state.scenario = key; $('#scenario').value = key; renderVisuals(); }
-  function setBin(b) {
+  function setBin(b, keepMinute) {
     state.bin = Math.max(0, Math.min(N_BINS - 1, b));
+    if (!keepMinute) state.minute = 300 + state.bin * 15 + 7.5;
     if (+$('#slider').value !== state.bin) $('#slider').value = state.bin;
     paintRoads(); placeUI(); renderHeat(); renderInfo(); renderGates(); renderMix(); renderRouteDetail(); renderTimeline();
   }
@@ -1407,6 +1792,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
   $('#slider').addEventListener('input', e => setBin(+e.target.value));
   $('#play').addEventListener('click', () => {
     if (state.playing) return stopPlay();
+    stopVehicles();
     if (state.bin >= N_BINS - 1) state.bin = 0;
     $('#play').textContent = 'Pause';
     state.playing = setInterval(() => { if (state.bin >= N_BINS - 1) return stopPlay(); setBin(state.bin + 1); }, 260);
@@ -1418,7 +1804,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
   new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
   readPalette();
-  renderMeta();
+  renderMeta(); renderPPOTest();
   renderBacktest();
   renderFit();
   buildMap();
