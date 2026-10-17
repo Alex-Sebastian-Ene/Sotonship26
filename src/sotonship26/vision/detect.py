@@ -176,12 +176,21 @@ def detect(
     conf: float = 0.25,
     tile: int = TILE,
     overlap: int = OVERLAP,
+    upsample: float = 1.0,
 ) -> pd.DataFrame:
     """All counted detections in the image: columns cx, cy (image pixels), kind, conf.
 
     ``kind`` is "cars" or "large_vehicles"; other classes are dropped. Aerial images are tiled
-    (see module docstring); street stills go through in one pass.
+    (see module docstring); street stills go through in one pass. ``upsample`` > 1 enlarges the
+    image (bicubic) before detection, for imagery coarser than the model was trained on (DOTA is
+    roughly 10-30 cm a pixel, so 25 cm car parks gain from 2-4); cx, cy stay in the original
+    image's pixels.
     """
+    if upsample <= 0:
+        raise ValueError(f"upsample must be > 0, not {upsample}")
+    if upsample != 1:
+        det = detect(_resize(rgb, upsample), model, mode, conf=conf, tile=tile, overlap=overlap)
+        return det.assign(cx=det["cx"] / upsample, cy=det["cy"] / upsample)
     height, width = rgb.shape[:2]
     if mode == "aerial":
         xs, ys = _axis_starts(width, tile, overlap), _axis_starts(height, tile, overlap)
@@ -200,6 +209,15 @@ def detect(
     det = pd.concat(frames, ignore_index=True)
     det["kind"] = det["name"].astype(str).str.replace("-", " ").map(CLASS_MAP[mode])
     return det.dropna(subset=["kind"])[["cx", "cy", "kind", "conf"]].reset_index(drop=True)
+
+
+def _resize(rgb: np.ndarray, factor: float) -> np.ndarray:
+    """``rgb`` scaled by ``factor`` with bicubic resampling (at least 1 px each way)."""
+    from PIL import Image
+
+    height, width = rgb.shape[:2]
+    size = (max(1, round(width * factor)), max(1, round(height * factor)))
+    return np.asarray(Image.fromarray(rgb).resize(size, Image.Resampling.BICUBIC))
 
 
 def _polygon_items(polygons: Any) -> list[tuple[str, Any]]:
@@ -261,17 +279,19 @@ def count_vehicles(
     weights: str | None = None,
     tile: int = TILE,
     overlap: int = OVERLAP,
+    upsample: float = 1.0,
 ) -> pd.DataFrame:
     """Cars and large vehicles in ``image``, one row per polygon (see module docstring).
 
     ``image`` is a path (JPEG/PNG, or a GeoTIFF for aerial) or an HxWx3 RGB array. ``polygons``
     is None (one "all" row), a dict id -> polygon, or a list of polygons. ``model`` overrides the
     cached Ultralytics model (tests pass a stub); ``weights`` picks another weights file.
+    ``upsample`` enlarges the image before detection (see ``detect``).
     """
     if mode not in WEIGHTS:
         raise ValueError(f"mode must be one of {sorted(WEIGHTS)}, not {mode!r}")
     weights = weights or WEIGHTS[mode]
     model = model if model is not None else load_model(weights)
     rgb, transform = read_image(image)
-    det = detect(rgb, model, mode, conf=conf, tile=tile, overlap=overlap)
+    det = detect(rgb, model, mode, conf=conf, tile=tile, overlap=overlap, upsample=upsample)
     return count_in_polygons(det, polygons, transform, model_name=weights)
