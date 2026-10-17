@@ -19,7 +19,6 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from sotonship26.imagery.carparks import CarPark, load_carparks
