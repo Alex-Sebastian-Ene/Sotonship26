@@ -320,7 +320,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     </dl>
   </header>
 
-  <p class="synthetic" role="note"><strong>Real map, synthetic traffic</strong><span id="m-banner">Roads, junctions, lanes, speed limits and land use come from OpenStreetMap. The cruise schedule, ship names, trip totals, roadworks permits and match fixtures are invented, and nothing on this page is observed traffic.</span></p>
+  <p class="synthetic" role="note"><strong id="m-banner-label">Real map, synthetic traffic</strong><span id="m-banner">Roads, junctions, lanes, speed limits and land use come from OpenStreetMap. The cruise schedule, ship names, trip totals, roadworks permits and match fixtures are invented, and nothing on this page is observed traffic.</span></p>
 
   <section class="sec" aria-labelledby="cal-h">
     <div class="sec-head"><h2 id="cal-h">Next six weeks</h2><p class="muted">Pick a day to see when and where its roads are at risk.</p></div>
@@ -434,10 +434,14 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
           <li><strong>Many sampled days.</strong> Ship delays, loads, travel choices and background traffic vary across <span id="m-n2"></span> samples. A road's chance of being at risk is the share of samples where it goes above 85% of capacity. Each sample is also run without the ships, so the cruise effect is measured on the same day.</li>
         </ol>
       </div>
-      <div class="card status">
+      <div class="card status" id="backtest-card">
         <p class="eyebrow" style="color: inherit">Backtest: not run yet</p>
         <p>The demo is fitted to annual and July counts but has no observed cruise days, so it cannot show accuracy. County commuters already come from Census 2021 travel-to-work flows and county traffic is fitted to DfT annual counts. The product also learns the cruise travel assumptions from 15-minute counts on past cruise days (lead candidate: National Highways WebTRIS on the M271), and tests on later days it has not seen.</p>
         <p>It reports average error, Brier score and how often observations fall inside the 80% range, against three baselines: the last comparable cruise day, a model using passenger numbers only, and no cruise effect.</p>
+      </div>
+      <div class="card" id="fit-card" hidden style="grid-column: 1 / -1">
+        <h3>Cruise assumptions learned from the M271</h3>
+        <div class="sure"><div class="chart" id="fit-chart"></div><div id="fit-text" class="foot-note"></div></div>
       </div>
       <div class="card">
         <h3>Trip totals in this demo</h3>
@@ -602,6 +606,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     if (S.terms) real.push('school holidays from Southampton City Council');
     const list = a => a.length < 2 ? a.join('') : `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}`;
     const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
+    $('#m-banner-label').textContent = sc.synthetic ? 'Real map, synthetic traffic' : 'Real map and inputs, modelled traffic';
     $('#m-banner').textContent = 'Roads, junctions, lanes, speed limits and land use come from OpenStreetMap.'
       + (real.length ? ` ${cap(list(real))}.` : '')
       + ` ${cap(list(made))} are invented, and nothing on this page is observed traffic.`;
@@ -1145,6 +1150,58 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       <p class="foot-note">Numbers after each option are corridor-hours at risk for the whole day with that change (same sampled days for every option).</p>`;
   }
 
+  /* ---------- backtest ---------- */
+  function renderBacktest() {
+    const B = DATA.backtest, el = $('#backtest-card');
+    if (!B || !B.card) return;
+    el.classList.remove('status');
+    const R = B.results.per_day, rows = ['model', 'last_comparable', 'pax_only', 'no_cruise', 'ablation'];
+    const best = Math.min(...rows.map(k => R[k].mae));
+    const table = `<div class="table-scroll"><table><thead><tr><th>Forecast</th><th>Error a day</th><th>Brier, day over ${int(B.thresholds.per_day)}</th><th>In 80% band</th></tr></thead><tbody>${rows.map(k => `<tr${k === 'model' ? ' style="font-weight:600"' : ''}><td>${esc(B.models[k])}</td><td class="num">${int(R[k].mae)}</td><td class="num">${R[k].brier.toFixed(3)}</td><td class="num">${Math.round(R[k].coverage80 * 100)}%</td></tr>`).join('')}</tbody></table></div>`;
+    const sat = (B.effect && B.effect.daily && B.effect.daily.saturday) || [];
+    let chart = '';
+    if (sat.length) {
+      const X0 = 40, X1 = 310, Y0 = 8, Y1 = 92;
+      const pmax = Math.max(...sat.map(r => r.passengers)), vmax = Math.max(...sat.map(r => r.band80[1])), vmin = Math.min(0, ...sat.map(r => r.band80[0]));
+      const x = v => X0 + v / pmax * (X1 - X0), y = v => Y1 - (v - vmin) / (vmax - vmin) * (Y1 - Y0);
+      const band = sat.map(r => `${x(r.passengers).toFixed(1)},${y(r.band80[1]).toFixed(1)}`).concat(sat.slice().reverse().map(r => `${x(r.passengers).toFixed(1)},${y(r.band80[0]).toFixed(1)}`)).join(' ');
+      const line = sat.map(r => `${x(r.passengers).toFixed(1)},${y(r.cruise_part).toFixed(1)}`).join(' ');
+      const ticks = sat.filter((_, i) => i % 2 === 0).map(r => `<text class="ax" x="${x(r.passengers)}" y="${Y1 + 12}" text-anchor="middle">${r.passengers >= 1000 ? r.passengers / 1000 + 'k' : r.passengers}</text>`).join('');
+      const grid = [vmin, 0, vmax].filter((v, i, a) => a.indexOf(v) === i).map(v => `<line class="grid-l" x1="${X0}" x2="${X1}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${X0 - 4}" y="${y(v) + 3}" text-anchor="end">${int(v)}</text>`).join('');
+      chart = `<div class="chart"><svg viewBox="0 0 320 112" role="img" aria-label="Learned extra vehicles a day on the M271 northbound by turnaround passengers on an October Saturday">${grid}<polygon class="gate-band" points="${band}"/><polyline class="gate-mean" points="${line}"/>${ticks}</svg>
+        <p class="foot-note">Learned extra vehicles a day on the M271 northbound by turnaround passengers (thousands), ${esc(B.effect.context)}. Line: the ships' part; band: 80% range for the whole day.</p></div>`;
+    }
+    el.innerHTML = `<p class="eyebrow">${esc(B.card.eyebrow)}</p>
+      <p><strong>${esc(B.card.headline)}</strong></p>
+      <p>${esc(B.card.caveat)}</p>
+      ${table}
+      ${chart}
+      <p class="foot-note">${esc(B.card.where)} ${esc(B.card.coverage80)} Rolling origin: refit at the start of each test month on every earlier day. Details: <a href="https://github.com/Alex-Sebastian-Ene/Sotonship26/blob/main/docs/backtest.md">docs/backtest.md</a>.</p>`;
+  }
+
+  function renderFit() {
+    const F = DATA.cruise_fit; if (!F) return;
+    $('#fit-card').hidden = false;
+    const X0 = 36, X1 = 314, Y0 = 8, Y1 = 92, n = F.learned.length;
+    const all = F.learned.concat(F.fitted, F.before);
+    const vmax = Math.max(...all, 10), vmin = Math.min(0, ...all);
+    const x = i => X0 + (i + 0.5) * (X1 - X0) / n, y = v => Y1 - (v - vmin) / (vmax - vmin) * (Y1 - Y0);
+    const line = (a, cls, dash) => `<polyline points="${a.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')}" style="fill:none;stroke:var(${cls});stroke-width:1.8${dash ? ';stroke-dasharray:' + dash : ''}"/>`;
+    const ticks = [6, 9, 12, 15, 18].map(h => `<text class="ax" x="${x((h - 5) * 4)}" y="${Y1 + 12}" text-anchor="middle">${pad(h)}:00</text>`).join('');
+    const grid = [vmin, 0, vmax].filter((v, i, a) => a.indexOf(v) === i).map(v => `<line class="grid-l" x1="${X0}" x2="${X1}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${X0 - 4}" y="${y(v) + 3}" text-anchor="end">${Math.round(v)}</text>`).join('');
+    $('#fit-chart').innerHTML = `<svg viewBox="0 0 320 108" role="img" aria-label="Extra vehicles per 15 minutes on the M271 northbound from ships: learned from counts, simulated before and after fitting">${grid}${line(F.before, '--muted', '3 3')}${line(F.learned, '--g-cruise')}${line(F.fitted, '--accent')}${ticks}</svg>
+      <p class="foot-note"><span style="color: var(--g-cruise)">■</span> learned from WebTRIS counts · <span style="color: var(--accent)">■</span> simulator after fitting · <span class="muted">dashed: simulator before</span>. Extra vehicles per 15 minutes on the M271 northbound (Redbridge to junction 1) on a term-time October Saturday with 5,000 berths at each dock.</p>`;
+    const P = F.params, D = F.default;
+    const sum = a => Math.round(a.reduce((s, v) => s + v, 0));
+    $('#fit-text').innerHTML = `<p>The machine-learned cruise effect now sets the simulator's cruise assumptions. For each combination of the three assumptions below, the simulator ran ${F.n} paired days (with and without the ships) and was compared with what the model learned from counts. The best fit is used for every forecast on this page.</p>
+      <ul class="plain">
+        <li><strong>Passengers by car or taxi:</strong> ×${P.road} the starting split (was ×${D.road})</li>
+        <li><strong>Car and taxi trips from the county</strong> rather than the city: ${Math.round(P.county * 100)}% (was ${Math.round(D.county * 100)}%)</li>
+        <li><strong>Disembarkation traffic leaves</strong> ${P.dis_shift ? `${P.dis_shift} minutes later` : 'at the starting time'} (was +${D.dis_shift} min)</li>
+      </ul>
+      <p>Error per 15 minutes: <span class="mono">${F.rmse_before}</span> → <span class="mono">${F.rmse}</span> vehicles. Extra vehicles 05:00–20:00: learned <span class="mono">${sum(F.learned)}</span>, simulated <span class="mono">${sum(F.fitted)}</span> (was <span class="mono">${sum(F.before)}</span>). The sensor sees only northbound traffic 4–7 km from the terminals, so roads nearer the docks are still modelled, not measured.</p>`;
+  }
+
   /* ---------- uncertainty ---------- */
   function renderSure() {
     const d = day(), R = d.range;
@@ -1266,6 +1323,8 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
 
   readPalette();
   renderMeta();
+  renderBacktest();
+  renderFit();
   buildMap();
   selectDay(BY_DATE['2026-10-24'] ? '2026-10-24' : DATA.days[0].date, false);
   requestAnimationFrame(() => { layout(); zoomTo('docks', false); });

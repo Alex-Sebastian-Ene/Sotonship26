@@ -139,6 +139,11 @@ data improves it by about 4% a day (not significant) and 2% per 15 minutes.
 - **AI-generated (backtest):** `demo/webtris_backtest.py` (data loading, the gradient-boosted
   uplift model, baselines and backtest) and `docs/backtest.md` were written with Claude Code on
   Fri 16 to Sat 17 Oct 2026, following the data choices in `notes/data-spike.md`.
+- **AI-generated (ML-fitted cruise assumptions):** the fit of the simulator's cruise assumptions
+  to the learned M271 uplift (`cruise_sets`, `m271_probe`, `cruise_fit_tasks` and the fit step in
+  `demo/synthetic_demo.py`), the ships-only profiles exported by `demo/webtris_backtest.py`, the
+  page panel showing the fit, and `cluster/iridis/forecast.slurm` were written with Claude Code
+  on Sat 17 Oct 2026.
 - **AI-generated:** `demo/external_data.py`, the census commuter gateways (`census_od`), through
   traffic and other county trips from DfT gateway counts (`cordon_od`), the DfT count fit
   (`calibrate_external`) and the motorway repairs (`repair_motorways`) in `demo/traffic_model.py`

@@ -761,7 +761,18 @@ def effect_grid(table: pd.DataFrame) -> dict:
     profile = [{"hour": h, "q10": round(float(q[4 * h:4 * h + 4, 1].mean()), 1),
                 "q50": round(float(q[4 * h:4 * h + 4, 3].mean()), 1),
                 "q90": round(float(q[4 * h:4 * h + 4, 5].mean()), 1)} for h in range(24)]
+    profiles = {}
+    for dow, label in ((5, "saturday"), (6, "sunday"), (2, "wednesday")):
+        base_q = model.point(day(dow, 0, 0))
+        profiles[label] = {key: [round(float(v), 1) for v in model.point(day(dow, e, w)) - base_q]
+                           for key, e, w in (("east_5k", 5, 0), ("west_5k", 0, 5),
+                                             ("both_10k", 5, 5))}
     return {"fitted_on_days": int(table["date"].nunique()),
+            "cruise_profiles": {
+                "unit": "extra vehicles per 15 minutes from the ships (median model, with ships "
+                        "minus without), M271 northbound, from 00:00",
+                "context": "October, school term, no bank holiday or home match",
+                "profiles": profiles},
             "context": "an October Saturday or Sunday in school term, with no bank holiday or "
                        "home match",
             "daily": grid,

@@ -351,15 +351,46 @@ def minutes(t: datetime) -> float:
     return t.hour * 60 + t.minute
 
 
-def sample_cruise(ctx: Ctx, calls, rng, p: TurnaroundParams, shifts=None) -> np.ndarray:
+CRUISE_DEFAULT = {"road": 1.0, "county": 0.8, "dis_shift": 0.0}
+# Grid the M271 fit searches: road = multiplier on the car, park and taxi shares (coach and other
+# take the rest); county = share of car and taxi trips from the county gateways rather than the
+# city's zones; dis_shift = minutes added to when disembarkation traffic starts leaving.
+CRUISE_GRID = {"road": (0.7, 0.85, 1.0, 1.15), "county": (0.6, 0.8, 0.95),
+               "dis_shift": (0.0, 30.0, 60.0, 90.0)}
+
+
+def cruise_sets(ctx: Ctx, county: float) -> dict:
+    """Origin sets for cruise cars and taxis with ``county`` of them from the county gateways."""
+    m, n_gw = ctx.m, len(ctx.extra["gateways"])
+    out = {}
+    for key, gw_part in (("car_from", 0.8), ("taxi_far", 0.3)):
+        ids, probs = m.sets[key]
+        probs = np.asarray(probs, float).copy()
+        off = len(ids) - len(ctx.extra["gateways"]) - sum(1 for c in m.centroids if c.kind == "zone")
+        g = slice(off, off + n_gw)
+        z = slice(off + n_gw, len(ids))
+        rest = 1.0 - probs[g].sum() - probs[z].sum()  # the station, for taxis
+        local = probs[g].sum() + probs[z].sum()
+        probs[g] *= county * local / max(probs[g].sum(), 1e-12)
+        probs[z] *= (1 - county) * local / max(probs[z].sum(), 1e-12)
+        out[key] = (ids, probs / (probs.sum() if rest >= 0 else 1.0))
+    return out
+
+
+def sample_cruise(ctx: Ctx, calls, rng, p: TurnaroundParams, shifts=None, cruise=None) -> np.ndarray:
     m = ctx.m
     D = np.zeros((N_BINS, m.n_od))
+    cruise = {**CRUISE_DEFAULT, **(cruise or {})}
+    mode_mean = MODE_MEAN.copy()
+    mode_mean[:3] *= cruise["road"]
+    mode_mean[3:] *= (1 - mode_mean[:3].sum()) / mode_mean[3:].sum()
+    sets = {**m.sets, **cruise_sets(ctx, cruise["county"])}
 
     def add(t, key, gate, direction, pcu):
         n = len(t)
         if n == 0:
             return None
-        ids, probs = m.sets[key]
+        ids, probs = sets[key]
         o = rng.choice(len(ids), size=n, p=probs)
         put(t, o, key, gate, direction, pcu)
         return o
@@ -375,12 +406,13 @@ def sample_cruise(ctx: Ctx, calls, rng, p: TurnaroundParams, shifts=None) -> np.
         berths = c.pax if c.pax else rng.uniform(*UNKNOWN_PAX_RANGE)
         arr, dep = minutes(c.arrival), minutes(c.departure)
         dis_shift, emb_shift = shifts[ci] if shifts else (0, 0)
-        start = arr + rng.normal(0.0, p.arrival_delay_sd_min) + p.disembark_start_min + dis_shift
+        start = (arr + rng.normal(0.0, p.arrival_delay_sd_min) + p.disembark_start_min + dis_shift
+                 + cruise["dis_shift"])
         lo = dep - p.embark_open_before_dep_min + emb_shift
         hi = dep - p.embark_close_before_dep_min + emb_shift
         for leg in ("dis", "emb"):
             people = int(round(berths * rng.beta(*p.load_factor_beta)))
-            n_car, n_park, n_taxi, n_coach, _ = rng.multinomial(people, rng.dirichlet(MODE_MEAN * MODE_CONC))
+            n_car, n_park, n_taxi, n_coach, _ = rng.multinomial(people, rng.dirichlet(mode_mean * MODE_CONC))
             cars, parks = round(n_car / PEOPLE_PER["car"]), round(n_park / PEOPLE_PER["park"])
             taxis, coaches = round(n_taxi / PEOPLE_PER["taxi"]), math.ceil(n_coach / PEOPLE_PER["coach"])
             if leg == "dis":
@@ -541,7 +573,7 @@ def forecast(task: dict) -> dict:
         Dbg, groups = tm.background(m, dtype, rng, term=term, spread=spread,
                                     mult=day_multipliers(d, wet))
         Dm = tm.match_demand(m, kickoff_hours(kick), rng) if kick else np.zeros_like(Dbg)
-        Dc = sample_cruise(ctx, calls, rng, params, shifts) if calls else np.zeros_like(Dbg)
+        Dc = sample_cruise(ctx, calls, rng, params, shifts, task.get("cruise")) if calls else np.zeros_like(Dbg)
         want = ("x",)
         if full:
             want += ("queue", "held")
@@ -562,6 +594,10 @@ def forecast(task: dict) -> dict:
                 rb, _ = tm.run_day(m, Dbg + Dm, cap, sh0, 3, want=("x",), pre=pre, noise=noise,
                                    events=events)
                 cxb, _ = corridor_stats(rb["x"])
+                if task.get("probe") is not None:  # paired cruise flow on chosen edges, veh/h
+                    pe = np.asarray(task["probe"])
+                    diff = (x[:, pe] - rb["x"][:, pe]) * m.cap[pe]
+                    acc["probe"] = acc["probe"] + diff.mean(axis=1)
             else:
                 cxb = cx
             acc["bg85"] = acc["bg85"] + (cxb > tm.AT_RISK)
@@ -595,6 +631,49 @@ def forecast(task: dict) -> dict:
                         "p90": np.percentile(gs, 90, axis=0)}
     out["date"], out["key"] = task["date"], task["key"]
     return out
+
+
+def m271_probe(m: tm.Model) -> list[int]:
+    """M271 northbound main-carriageway links between the A35 at Redbridge and junction 1, where
+    WebTRIS 19974 counts: the two southernmost northbound links of 200 m or more."""
+    ks = [k for k in range(len(m.t0))
+          if "M271" in m.ref[k].split(";") and m.cls[k] == "motorway" and m.length[k] >= 200
+          and m.coords[k][-1][1] < m.coords[k][0][1]]
+    ks.sort(key=lambda k: -max(c[1] for c in m.coords[k]))
+    return ks[:2]
+
+
+CAL_DATE = "2026-10-24"  # an October term-time Saturday; no home match is needed for the fit
+
+
+def cruise_fit_tasks(probe: list[int], n: int) -> list[dict]:
+    """Paired runs of a calibration Saturday with 5,000 berths at each dock, for every grid point."""
+    calls = [{"ship": "Calibration East", "terminal": "Ocean", "arrival": f"{CAL_DATE}T06:30",
+              "departure": f"{CAL_DATE}T17:00", "pax": 5000},
+             {"ship": "Calibration West", "terminal": "Mayflower", "arrival": f"{CAL_DATE}T06:30",
+              "departure": f"{CAL_DATE}T17:00", "pax": 5000}]
+    tasks = []
+    for road in CRUISE_GRID["road"]:
+        for county in CRUISE_GRID["county"]:
+            for shift in CRUISE_GRID["dis_shift"]:
+                tasks.append({"date": CAL_DATE, "key": f"fit {road} {county} {shift}",
+                              "calls": calls, "full": False, "paired": True, "closed": [],
+                              "match": None, "n": n, "term": True, "probe": probe,
+                              "cruise": {"road": road, "county": county, "dis_shift": shift}})
+    return tasks
+
+
+def learned_target() -> np.ndarray | None:
+    """The learned ships' part on the M271 northbound, Saturday with 5,000 berths at each dock,
+    per 15 minutes from 05:00 to 20:00."""
+    path = HERE / "out" / "backtest.json"
+    if not path.exists():
+        return None
+    prof = json.loads(path.read_text(encoding="utf-8")).get("effect", {}).get("cruise_profiles")
+    if not prof:
+        return None
+    full = np.asarray(prof["profiles"]["saturday"]["both_10k"], float)  # 96 bins from 00:00
+    return full[20:20 + N_BINS]
 
 
 def advise(task: dict) -> dict:
@@ -640,6 +719,20 @@ def ranges(scores) -> dict:
             "samples": sorted(round(float(x), 1) for x in up),
             "wet": [bool(s[2]) for s in scores], "incident": [bool(s[3]) for s in scores],
             "pairs": [[round(float(s[0]), 1), round(float(s[1]), 1)] for s in scores]}
+
+
+def backtest_summary() -> dict | None:
+    """The page's slice of demo/out/backtest.json (written by demo/webtris_backtest.py), if run."""
+    path = HERE / "out" / "backtest.json"
+    if not path.exists():
+        return None
+    bt = json.loads(path.read_text(encoding="utf-8"))
+    keep = ("title", "generated", "observable", "models", "split", "card", "effect", "limits",
+            "sources", "thresholds")
+    out = {k: bt[k] for k in keep if k in bt}
+    out["results"] = {"per_day": bt["results"]["per_day"]["all"],
+                      "per_15min": bt["results"]["per_15min"]["all"]}
+    return out
 
 
 def pct(a) -> list:
@@ -773,6 +866,8 @@ def main(argv=None) -> None:
     parser.add_argument("--n-bg", type=int, default=15, help="sampled days without cruise traffic")
     parser.add_argument("--whatif-days", type=int, default=6)
     parser.add_argument("--advise-days", type=int, default=10)
+    parser.add_argument("--n-fit", type=int, default=8, help="sampled days per grid point in the M271 fit")
+    parser.add_argument("--no-fit", action="store_true", help="skip fitting cruise assumptions")
     parser.add_argument("--n-advise", type=int, default=16)
     parser.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1))
     parser.add_argument("--days", type=int, help="only the first N days (for testing)")
@@ -803,6 +898,33 @@ def main(argv=None) -> None:
         d += timedelta(days=1)
     log(f"forecasting {len(tasks)} days on {args.workers} workers")
     with ProcessPoolExecutor(args.workers, initializer=_init, initargs=(str(ctx_path),)) as pool:
+        cruise_fit = None
+        target = learned_target()
+        if target is not None and not args.no_fit:
+            probe = m271_probe(m)
+            log(f"fitting cruise assumptions to the learned M271 uplift (probe links {probe})")
+            fits = list(pool.map(forecast, cruise_fit_tasks(probe, args.n_fit)))
+            best = None
+            for t, r in zip(cruise_fit_tasks(probe, args.n_fit), fits, strict=True):
+                sim = r["probe"] / 4.0  # vehicles per 15 minutes
+                err = float(np.sqrt(np.mean((sim - target) ** 2)))
+                log(f"  {t['cruise']}: simulated {sim.sum():6.0f} vs learned {target.sum():6.0f} "
+                    f"vehicles 05-20, RMSE {err:5.1f} per 15 min")
+                if best is None or err < best[0]:
+                    best = (err, t["cruise"], sim)
+            default = next(r for t, r in zip(cruise_fit_tasks(probe, args.n_fit), fits, strict=True)
+                           if t["cruise"] == {"road": 1.0, "county": 0.8, "dis_shift": 0.0})
+            d_sim = default["probe"] / 4.0
+            cruise_fit = {"params": best[1], "rmse": round(best[0], 1),
+                          "rmse_before": round(float(np.sqrt(np.mean((d_sim - target) ** 2))), 1),
+                          "learned": np.round(target, 1).tolist(),
+                          "fitted": np.round(best[2], 1).tolist(),
+                          "before": np.round(d_sim, 1).tolist(),
+                          "grid": CRUISE_GRID, "default": CRUISE_DEFAULT, "date": CAL_DATE,
+                          "n": args.n_fit}
+            log(f"chose {best[1]} (RMSE {best[0]:.1f} per 15 min, was {cruise_fit['rmse_before']})")
+            for t in tasks:
+                t["cruise"] = best[1]
         results = {}
         for r in pool.map(forecast, tasks):
             results[r["date"]] = r
@@ -987,6 +1109,8 @@ def main(argv=None) -> None:
         "terminal_gate": {t: m.centroids[g].name for t, g in ctx.terminal_gate.items()},
         "paths": {str(k): v for k, v in paths_out.items()},
         "permits": PERMITS, "matches": MATCHES, "days": days,
+        "backtest": backtest_summary(),
+        "cruise_fit": cruise_fit,
     }
     payload = json.dumps(data, separators=(",", ":"),
                          default=lambda o: o.item() if hasattr(o, "item") else str(o))
