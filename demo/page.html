@@ -350,7 +350,8 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
 .viz-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
 .viz-tile { display: grid; gap: 2px; align-content: start; border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
 .viz-tile .big { font-size: var(--step-2); font-weight: 650; }
-.viz-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 18px 28px; }
+.viz-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px 28px; }
+.viz-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 #ppo-viz-body .lbl { font-family: var(--font-body); font-size: 12px; fill: var(--ink); }
 #ppo-viz-body .lbl-m { font-family: var(--font-body); font-size: 11px; fill: var(--muted); }
 #ppo-viz-body .zero { stroke: var(--line-strong); stroke-width: 1.5; stroke-dasharray: 4 3; }
@@ -1935,7 +1936,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     const span = (m, v) => (m === 'cost' ? `£${int(v)}` : fmt1(v));
     const metrics = ['cost', 'corridor_hours', 'vehicle_hours', 'marshal_hours'].filter(m => SUM.ppo && SUM.ppo[m]);
     parts.push(sec('Change against doing nothing, per day', `Mean of the paired differences on ${SUM.nothing ? SUM.nothing.n : ''} sampled days; the bar is the 95% bootstrap interval. Left of the dashed line means less than doing nothing.`,
-      `<div class="viz-grid">${metrics.map(m => `<div><div class="eyebrow">${VNAME[m]}</div>${dotRows(pols.map(p => {
+      `<div class="viz-grid${half < W ? ' two' : ''}">${metrics.map(m => `<div><div class="eyebrow">${VNAME[m]}</div>${dotRows(pols.map(p => {
         const v = SUM[p][m];
         return { label: shortPol(p), cls: p, v: v.diff, lo: v.diff_lo, hi: v.diff_hi, tip: `<strong>${esc(PPO.labels[p])}</strong><br>${VNAME[m]}: <span class="mono">${VFMT[m](v.diff)}</span> a day against doing nothing<br><span class="muted">95% interval ${VFMT[m](v.diff_lo)} to ${VFMT[m](v.diff_hi)}<br>With the policy: ${span(m, v.mean)} a day (10–90%: ${span(m, v.p10)} to ${span(m, v.p90)})</span>` };
       }), { W: half, fmt: VFMT[m], title: VNAME[m] })}</div>`).join('')}</div>`));
@@ -1944,7 +1945,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     if (S.curve && S.curve.length > 1) {
       parts.push(sec('Learning curve', 'Pounds saved per simulated training day against doing nothing on the same day: the mean of each block of days, with the 10–90% range shaded. Across: simulated training days.', lineChart(S.curve, 'mean', { W, band: true, unit: '£', title: 'Saving per day' })));
       const lev = [['marshal_hours', 'Marshal gate-hours per day'], ['sign_hours', 'Sign location-hours per day'], ['held_pax_hours', 'Passenger-hours held per day'], ['corridor_hours', 'Congested road-hours per day']].filter(([k]) => S.curve[0][k] != null);
-      if (lev.length) parts.push(sec('What it learned to use', 'The levers PPO pulled per training day, averaged over each block of days. Each chart has its own scale; across: simulated training days.', `<div class="viz-grid">${lev.map(([k, t]) => `<div><div class="eyebrow">${t}</div>${lineChart(S.curve, k, { W: half, H: 140, title: t })}</div>`).join('')}</div>`));
+      if (lev.length) parts.push(sec('What it learned to use', 'The levers PPO pulled per training day, averaged over each block of days. Each chart has its own scale; across: simulated training days.', `<div class="viz-grid${half < W ? ' two' : ''}">${lev.map(([k, t]) => `<div><div class="eyebrow">${t}</div>${lineChart(S.curve, k, { W: half, H: 140, title: t })}</div>`).join('')}</div>`));
     } else if ((PPO.curve || []).length > 1) {
       parts.push(sec('Learning curve', 'Pounds saved per simulated training day against doing nothing on the same day.', lineChart(PPO.curve.map(c => ({ ...c, mean: c.saving })), 'mean', { W, unit: '£', title: 'Saving per day' })));
     }
