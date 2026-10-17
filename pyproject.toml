@@ -29,6 +29,13 @@ rocm = [
     "torch>=2.14.1,<2.15 ; sys_platform == 'linux'",
     "triton-rocm ; sys_platform == 'linux'",
 ]
+# Vehicle counting from camera stills and aerial tiles (src/sotonship26/vision/). Ultralytics is
+# AGPL-3.0; the weights it downloads are cached under data/cache/models/ (gitignored).
+vision = [
+    "rasterio>=1.5.1",
+    "shapely>=2.1.2",
+    "ultralytics>=8.4.171",
+]
 
 [project.scripts]
 sotonship-train = "sotonship26.train:main"
