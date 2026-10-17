@@ -241,7 +241,8 @@ data improves it by about 4% a day (not significant) and 2% per 15 minutes.
   (`MISSING_LINKS`, `LANE_FIXES`), the count-point link choice at the A33 Redbridge Road, the
   refitted through share and other-trip decay, the alternating DfT and council fits in
   `build_ctx`, the lorry fit's limit of 95% port lorries at any HGV count point
-  (`FREIGHT_HGV_LIMIT`), and `docs/west-side-counts.md` were written with Claude Code on
-  Sat 17 Oct 2026.
+  (`FREIGHT_HGV_LIMIT`), the refit of `COUNT_HEADROOM` and the `anchor_counts` skip rule after
+  it (scan by the queues session), and `docs/west-side-counts.md` were written with Claude Code
+  on Sat 17 Oct 2026.
 - **Existed before the event:** TODO, confirm with the organisers.
 - **Who helped:** TODO.

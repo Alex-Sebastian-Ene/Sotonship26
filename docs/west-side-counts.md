@@ -119,7 +119,11 @@ real); port freight was added after the over-prediction already existed (+58% on
 - M271 cruise fit: RMSE 13.7 vehicles per 15 minutes (was 14.1). It now picks the default cruise
   assumptions (car and taxi x1.0, 80% from the county, no shift) instead of x1.15 and 60%.
 - The forecast shows more congestion: corridor-hours at risk per day average 106.4 over the 44
-  days (was 76.6), maximum 154.0 (was 135.1). The model now carries traffic volumes that match the
+  days (was 76.6), maximum 154.0 (was 135.1). After main's queue calibration and its refit for
+  this branch (COUNT_HEADROOM 1.3, no capacity anchor where the zones already fill a road; see
+  "Refit after SOT-27" in docs/queues.md) it is 91.8 with ships (Iridis job 1891089), against
+  71.5 on main. The Portswood bus check is then 1.20 minutes off the council's July figures
+  without Bluestar 20 northbound (main 1.72 with it), and 2.88 with it. The model now carries traffic volumes that match the
   counts when each vehicle is counted once, while the risk measure (demand over capacity) still
   includes queued traffic on the links before its bottleneck (see below).
 

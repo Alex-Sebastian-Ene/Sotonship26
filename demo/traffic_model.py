@@ -1473,8 +1473,9 @@ UNI_TERM = 1.2  # assumed: July counts miss university term traffic around Highf
 # and buses on Portswood Road ran 0:24 to 4:22 behind timetable in the peaks (Table 3-5), which a
 # road at its limit for three hours would not show. Capacity is the counted peak hour times
 # COUNT_HEADROOM, chosen so modelled bus run times on a July-like weekday match Table 3-5
-# (demo/bus_check.py, docs/queues.md).
-COUNT_HEADROOM = 1.15  # the July peak hour then runs at about 92% of capacity
+# (demo/bus_check.py, docs/queues.md). Refitted to 1.3 (was 1.15) after SOT-27 raised the zone
+# traffic on these roads ("Refit after SOT-27" in docs/queues.md).
+COUNT_HEADROOM = 1.3  # the July peak hour then runs at about 81% of capacity
 
 
 def heading_north(m: Model, k: int) -> bool:
@@ -1487,8 +1488,8 @@ def anchor_counts(m: Model, sites: list[dict], fit_rows: list[dict], log=print) 
 
     1. Capacity: the busier peak hour per direction (floor MIN_CAP) times COUNT_HEADROOM, since the
        counts show what the road carried in July, below its limit. It replaces the road-class
-       value only where lower. Skipped where the zones alone already put far more traffic on the
-       road than was counted, since a lower capacity there would only create a false jam.
+       value only where lower. Skipped where the zones alone already put at least the counted
+       traffic on the road, since a lower capacity there would only create a false jam.
     2. Local traffic: traffic the zones do not generate (side streets, short hops) is added to
        each link of the counted roads that carries less than the count, up to the count, raised by
        UNI_TERM for university term. Links that already carry more get none.
@@ -1502,7 +1503,7 @@ def anchor_counts(m: Model, sites: list[dict], fit_rows: list[dict], log=print) 
         edges = road_edges(m, s_["names"])
         if not edges:
             continue
-        if over.get(s_["label"], 0.0) > 1.5:
+        if over.get(s_["label"], 0.0) > 1.0:
             log(f"capacity {s_['label']}: left at road-class value (model already over the counts)")
             continue
         for d, north in ((0, True), (1, False)):
