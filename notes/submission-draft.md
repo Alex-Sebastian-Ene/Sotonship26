@@ -19,12 +19,20 @@ shows on Sunday morning.
 
 Word count: `sed -n '/^> /p' notes/submission-draft.md | wc -w`, less the `>` markers.
 
-**Last sentence depends on a human decision (Sat 17 Oct 08:00).** Seb's `docs/backtest.md` (main)
-backtests the cruise effect on the M271 using archived VTS schedule pages. If the humans decide we
-may use those pages, replace "We cannot yet measure ... exists." with something like: "From
-archived port schedules, adding the ship list improves our M271 forecast by about 2% per 15
-minutes; most of the gain is still the calendar." Check that 2% first: its interval comes from
-resampling single days, and a week-block resample may put it across zero (raised on SOT-10).
+**Replace the last sentence (Sat 17 Oct 08:30).** The team decided to use archived VTS schedule
+pages (SOT-21, option a), and Seb's `docs/backtest.md` (main) backtests the cruise effect on the
+M271 with them. Replace "We cannot yet measure ... exists." with something like: "On archived port
+schedules, adding the ship list improves our M271 cruise forecast by 2% per 15 minutes; the
+calendar does most of the work." (+10 words, so trim elsewhere.)
+
+Checked by keanu-claude (results on SOT-10):
+
+- The 2% survives a week-block bootstrap (90% CI of the MAE gap −0.7 to −0.3 vehicles per 15 min,
+  27 weeks). Per day the gain is 4% and **not** significant, so say "per 15 minutes".
+- With WebTRIS's 105-day publication lag the model's MAE rises 3% (24.0 → 24.7) and the
+  last-comparable-day baseline's 19% (31.1 → 36.9), so the lead over the brief's baseline holds
+  in a deployable test.
+- The learned model's 80% band covers 74% of 15-minute intervals. Don't call it calibrated.
 
 ## Numbers the video and README may quote
 
@@ -54,12 +62,12 @@ Pick one; all three are real and reproducible from the repo.
 1. **The model loses where history is thin.** At M271 site 19974 the five-week year-ago median
    beats ridge (MAE 25.6 vs 33.3, 17 days). Show the row. The app does not yet
    fall back to the planner rule there; say so, or build that fallback before Sunday 11:00.
-2. **We cannot measure the cruise effect yet** (only if the humans reject the archived VTS pages;
-   otherwise use the honest version from `docs/backtest.md`: ship data adds 4% a day, not
-   significant). `python -m sotonship26.run_backtest` on real data
-   exits and points to SOT-21: no permitted open source of historic cruise calls exists (see
-   `notes/cruise-history.md`). The uplift pipeline is tested on synthetic data with a known effect,
-   labelled synthetic. The ask to ABP / southamptonships.org is in SOT-21 for the humans to send.
+2. **The ships barely beat the calendar.** In `docs/backtest.md` (Seb, main) the learned
+   cruise model with ship data scores MAE 873 vehicles a day against 910 for the same model
+   without it: 4%, and the 90% interval includes zero. Per 15 minutes the gain is 2% and clears
+   zero. The honest message: the turnaround day is mostly predictable from the calendar, and the
+   ship list adds a small, real refinement. Regenerate with `python demo/webtris_backtest.py`
+   (about 7 minutes; needs the archived pages, which stay out of git).
 3. **Holidays forecast too low.** For 08:30 on Christmas Day 2026 at M3 J14 the forecast is 0
    vehicles (80% range 0–47); past Christmas Days had 64–77. The linear model stacks the holiday
    effects below zero, and the code clips them at 0. `python -m sotonship26.flow_forecast
