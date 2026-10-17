@@ -60,8 +60,11 @@ IMGSZ = {"street": 640, "aerial": 1024}
 
 TILE = 1024
 OVERLAP = 128
-# Above this bicubic only blurs, and a value like 25 is more likely cm than a factor.
-MAX_UPSAMPLE = 8.0
+# Above this bicubic only blurs, and a value like 25 is more likely cm than a factor. A sweep of
+# yolo11s-obb on DOTA at simulated 12-50 cm (notes/upsample-sweep.md) found F1 plateaus by k~=2-3
+# and k>=6 is harmful (large-vehicle false positives multiply, fine imagery loses recall), so 4 is
+# the ceiling, not 8.
+MAX_UPSAMPLE = 4.0
 GEOTIFF_SUFFIXES = {".tif", ".tiff"}
 
 _MODELS: dict[str, Any] = {}
@@ -185,10 +188,13 @@ def detect(
     ``kind`` is "cars" or "large_vehicles"; other classes are dropped. Aerial images are tiled
     (see module docstring); street stills go through in one pass.
 
-    ``upsample`` > 1 is for imagery coarser than the model was trained on (DOTA is roughly
-    10-30 cm a pixel, so 25 cm car parks gain from 2-4). Each crop is cut from the original at
-    ``tile / upsample`` px and enlarged (bicubic) to about ``tile`` px just before detection, so
-    memory stays at one crop whatever the image size; run time still grows with ``upsample**2``.
+    ``upsample`` > 1 is for imagery coarser than the model was trained on. DOTA is roughly
+    10-30 cm a pixel, so 25 cm imagery is already in range and native scale (upsample 1) is
+    usually best; a measured sweep (notes/upsample-sweep.md) found no gain past ~2-3 and real harm
+    by 6-8, hence the ``MAX_UPSAMPLE`` ceiling. Reach for > 1 only on genuinely coarser (40 cm+)
+    rasters. Each crop is cut from the original at ``tile / upsample`` px and enlarged (bicubic) to
+    about ``tile`` px just before detection, so memory stays at one crop whatever the image size;
+    run time still grows with ``upsample**2``.
     Centres are mapped back with each crop's exact size ratio, so cx, cy are in the original
     image's pixels (pixel-edge convention, as raster transforms use).
     """
