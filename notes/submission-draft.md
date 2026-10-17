@@ -21,7 +21,7 @@ Word count: `sed -n '/^> /p' notes/submission-draft.md | wc -w`, less the `>` ma
 
 ## Numbers the video and README may quote
 
-All from `notes/flow-forecast.md` (regenerate with `python -m sotonship26.flow_forecast`).
+All from `notes/flow-forecast.md`, CIs from resampling whole test weeks (regenerate with `python -m sotonship26.flow_forecast`).
 WebTRIS 15-minute counts, OGL v3.0, collected 16–17 Oct 2026. Daytime bins only.
 Test period 2025-07-01 to 2026-06-29.
 
@@ -32,8 +32,8 @@ Test period 2025-07-01 to 2026-06-29.
 | Where the win comes from: school-holiday weekdays | MAE 39.1 vs 55.7 | 62 days |
 | Ordinary days (the planner rule is slightly better) | MAE 34.1 vs 33.6 | the other 293 days |
 | 80% interval coverage, M3 J14 | 0.84 | 355 days |
-| M271 northbound (19974) vs five-week year-ago median | skill −0.30, which is a **loss** | 17 days only |
-| M271 northbound (19974) vs planner rule (year-ago median, else last four published weeks) | skill 0.087, no CI computed yet | 147 days |
+| M271 northbound (19974) vs five-week year-ago median | skill −0.30 (CI −0.42 to −0.23), a **loss** | 17 days, 1–22 Mar 2026 (4 weeks to resample, so the CI is rough) |
+| M271 northbound (19974) vs planner rule (year-ago median, else last four published weeks) | skill 0.087, 90% CI −0.03 to 0.19: **not clear of zero** | 147 days |
 
 Do not quote:
 
