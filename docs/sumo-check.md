@@ -35,17 +35,22 @@ times) are shown next to both. Nothing in this document feeds the forecast page.
    places.** Over every corridor, direction and 15 minutes from 06:00, the rank correlation of
    delay between the two is 0.37-0.66 (table). When the macro model calls a corridor busy
    (V/C over 0.85), SUMO has it slow (under 70% of free flow) in 60-80% of cases on the weekday
-   at full demand, 51-61% at three-quarter demand, 40-55% on the Saturday, and 29% at half
-   demand. The other way round the macro
-   model catches only 3-45% of SUMO's slow corridor-bins: in SUMO, junctions and signals slow
-   traffic at volumes where a BPR curve adds almost nothing.
+   at full demand, 51-61% at three-quarter demand, 40-55% on the Saturday, and 29-33% at half
+   demand. The other way round the macro model catches only 2-45% of SUMO's slow corridor-bins:
+   in SUMO, junctions and signals slow traffic at volumes where a BPR curve adds almost
+   nothing.
 4. **Full demand: SUMO's delays are bigger than the macro model's, not smaller.** Over the same
    hours SUMO loses 2 to 15 times the macro model's vehicle-hours (2-4 times on the weekday,
    3-15 on the Saturday), so at the forecast's own demand SUMO does not support the bus check's
    reading that the macro point queues are too long. SUMO jams Portswood Road too (4-16 mph in
-   the morning against the council's measured 21). **Half demand:** SUMO's corridor speeds come
-   close to the council's measured ones on Portswood Road, Highfield Lane and St Denys Road
-   (within 1-4 mph; Bevois Hill 5-8 mph too fast), where the macro model shows a flat 22-27 mph.
+   the morning against the council's measured 21). **Half demand:** the mesoscopic run's
+   corridor speeds come close to the council's measured ones on Portswood Road, Highfield Lane
+   and St Denys Road (within 1-4 mph; Bevois Hill 5-8 mph too fast); the microscopic run is
+   slower (Portswood Road 13-16 mph, Highfield Lane 20, St Denys Road 5-12 from a junction that
+   jams in SUMO), so the measured speeds sit between SUMO's two modes. The macro model shows a
+   flat 22-27 mph. At half demand the microscopic run's Bluestar 2 is 3-4 minutes late in the
+   morning, inside the council's range, while its Bluestar 20 southbound is 26 minutes late from
+   that St Denys Road jam.
    **Three-quarter demand:** SUMO's Bluestar buses in the morning peak are 1 minute early to
    5 minutes late past the Portswood Road section, two of four route-directions inside the
    council's 0:24-4:22 and the other two within 1.4 minutes of it; the macro model at the same
@@ -60,8 +65,9 @@ times) are shown next to both. Nothing in this document feeds the forecast page.
    SUMO spreads them over the roads within 250 m of the gate and has no queue there. SUMO's own
    worst spots are junction artefacts of an uncalibrated network: the signalised roundabouts
    (removing their signals cuts SUMO's delay by 10-40% over the same hours, most on the
-   Saturday), St Denys Road at 1-2 mph at full demand, and Civic Centre Road southbound at a
-   quarter of free speed even at half the demand.
+   Saturday), St Denys Road (1-2 mph at full demand, 5-12 mph in the microscopic run even at
+   half demand) and Civic Centre Road southbound (a tenth to a quarter of free speed even at half
+   demand).
 
 What this means for the forecast: the order of the macro model's congestion (which corridors and
 hours are worst) is partly supported, its absolute load is too high in the peaks on the west side,
@@ -85,6 +91,7 @@ cover only the hours they reached, and the macro figures next to them cover the 
 | Mon 16 Nov | 100% | no ring signals | meso | 10:30 | 66,200 | 11,700 | 7,495 | 97,751 / 44,833 |
 | Mon 16 Nov | 75% | no ring signals | micro | 08:30 | 28,100 | 1,000 | 676 | 10,395 / 5,166 |
 | Mon 16 Nov | 75% | no ring signals | meso | 13:15 | 38,100 | 3,300 | 8,091 | 100,763 / 15,732 |
+| Mon 16 Nov | 50% | no ring signals | micro | 22:00 (done) | 10,000 | 150 | 921 | 19,880 / 2,076 |
 | Mon 16 Nov | 50% | no ring signals | meso | 22:00 (done) | 7,500 | 39 | 248 | 11,797 / 2,076 |
 | Sat 7 Nov | 100% | original | micro | 12:15 | 31,300 | 1,400 | 2,564 | 39,409 / 5,862 |
 | Sat 7 Nov | 100% | original | meso | 17:30 | 69,400 | 9,700 | 21,439 | 221,961 / 14,766 |
@@ -113,6 +120,7 @@ directions where the corridor has them.
 | 16 Nov 100% no ring signals, meso | 954 | 0.48 | 218 / 88 / 262 / 386 | 144 / 104 / 240 / 466 |
 | 16 Nov 75% no ring signals, micro | 530 | 0.65 | 27 / 17 / 205 / 281 | 15 / 20 / 86 / 409 |
 | 16 Nov 75% no ring signals, meso | 1,537 | 0.49 | 66 / 63 / 502 / 906 | 24 / 68 / 365 / 1,080 |
+| 16 Nov 50% no ring signals, micro | 2,968 | 0.63 | 16 / 32 / 881 / 2,039 | 1 / 27 / 222 / 2,718 |
 | 16 Nov 50% no ring signals, meso | 2,968 | 0.58 | 14 / 34 / 398 / 2,522 | 0 / 28 / 100 / 2,840 |
 | 7 Nov 100% original, micro | 1,325 | 0.57 | 33 / 27 / 636 / 629 | 22 / 15 / 338 / 950 |
 | 7 Nov 100% original, meso | 2,438 | 0.37 | 69 / 65 / 1,036 / 1,268 | 40 / 50 / 838 / 1,510 |
@@ -131,16 +139,16 @@ Observed: median and 10-90% range of the 13 term-time Mondays in September to No
 2026). These are ordinary days with and without ships, not the forecast day. The macro model
 counts lorries as 2.5 car-equivalents; its served flow is capped at the links' capacity.
 
-| hour | observed | macro 100%: served (demand) | SUMO 100% micro, original | macro 50% | SUMO 50% meso |
-| --- | --- | --- | --- | --- | --- |
-| 06:00 | 1,449 (1,321-1,529) | 2,403 (2,403) | 1,041 | 1,076 | 972 |
-| 07:00 | 1,887 (1,602-2,033) | 4,382 (4,468) | 704 | 1,692 | 1,439 |
-| 08:00 | 1,781 (1,567-1,921) | 5,000 (6,636) | 184 | 2,425 | 1,606 |
-| 09:00 | 1,492 (1,300-1,649) | 5,000 (6,169) | - | 1,845 | 1,574 |
-| 12:00 | 1,618 (1,501-1,720) | 3,464 (3,464) | - | 1,104 | 1,104 |
-| 16:00 | 2,131 (1,930-2,268) | 5,000 (5,450) | - | 1,800 | 1,588 |
-| 17:00 | 1,998 (1,867-2,154) | 5,000 (5,859) | - | 1,888 | 1,666 |
-| 19:00 | 967 (883-1,065) | 3,344 (3,344) | - | 905 | 1,302 |
+| hour | observed | macro 100%: served (demand) | SUMO 100% micro, original | macro 50% | SUMO 50% micro | SUMO 50% meso |
+| --- | --- | --- | --- | --- | --- | --- |
+| 06:00 | 1,449 (1,321-1,529) | 2,403 (2,403) | 1,041 | 1,076 | 992 | 972 |
+| 07:00 | 1,887 (1,602-2,033) | 4,382 (4,468) | 704 | 1,692 | 1,433 | 1,439 |
+| 08:00 | 1,781 (1,567-1,921) | 5,000 (6,636) | 184 | 2,425 | 1,334 | 1,606 |
+| 09:00 | 1,492 (1,300-1,649) | 5,000 (6,169) | - | 1,845 | 1,286 | 1,574 |
+| 12:00 | 1,618 (1,501-1,720) | 3,464 (3,464) | - | 1,104 | 1,260 | 1,104 |
+| 16:00 | 2,131 (1,930-2,268) | 5,000 (5,450) | - | 1,800 | 1,552 | 1,588 |
+| 17:00 | 1,998 (1,867-2,154) | 5,000 (5,859) | - | 1,888 | 1,610 | 1,666 |
+| 19:00 | 967 (883-1,065) | 3,344 (3,344) | - | 905 | 1,262 | 1,302 |
 
 ### Portswood Road: speeds and buses
 
@@ -149,23 +157,23 @@ Report, Jan 2025, Tables 3-8/3-9, ATC counts 1-14 July 2024) give mean spot spee
 sites; the models give the mean speed along the whole corridor, so the comparison is loose.
 Macro: running speed, and in brackets with its queue wait.
 
-| road, AM peak | observed mph NB / SB | macro 100% | SUMO 100% micro, original (to 08:30) | macro 50% | SUMO 50% meso |
-| --- | --- | --- | --- | --- | --- |
-| Portswood Road | 21.1 / 21.0 | 19.4 (7.5) / 17.3 (2.7) | 3.8 / 8.7 | 22.4 (22.4) / 22.0 (16.5) | 18.0 / 17.1 |
-| Highfield Lane | 24.5 / 24.9 | 16.3 (9.5) / 16.7 (9.7) | 12.3 / 13.9 | 21.9 / 21.9 | 21.1 / 21.5 |
-| St Denys Road | 18.4 / 21.4 | 26.3 (21.4) / 26.9 | 1.3 / 1.2 | 27.0 / 27.0 | 19.7 / 23.2 |
-| Bevois Hill | 15.8 / 17.2 | 26.8 / 26.8 | 10.1 / 15.3 | 27.0 / 27.0 | 23.3 / 21.9 |
+| road, AM peak | observed mph NB / SB | macro 100% | SUMO 100% micro, original (to 08:30) | macro 50% | SUMO 50% micro | SUMO 50% meso |
+| --- | --- | --- | --- | --- | --- | --- |
+| Portswood Road | 21.1 / 21.0 | 19.4 (7.5) / 17.3 (2.7) | 3.8 / 8.7 | 22.4 (22.4) / 22.0 (16.5) | 12.9 / 16.0 | 18.0 / 17.1 |
+| Highfield Lane | 24.5 / 24.9 | 16.3 (9.5) / 16.7 (9.7) | 12.3 / 13.9 | 21.9 / 21.9 | 19.6 / 19.8 | 21.1 / 21.5 |
+| St Denys Road | 18.4 / 21.4 | 26.3 (21.4) / 26.9 | 1.3 / 1.2 | 27.0 / 27.0 | 5.6 / 5.4 | 19.7 / 23.2 |
+| Bevois Hill | 15.8 / 17.2 | 26.8 / 26.8 | 10.1 / 15.3 | 27.0 / 27.0 | 17.7 / 19.6 | 23.3 / 21.9 |
 
 Buses: minutes late at the first stop past the Portswood Road section, mean per route,
 direction and peak (BODS timetable, Bluestar; buses dwell 20 s per stop and do not leave early).
 The council's July 2024 peak figures are 0:24 to 4:22 behind timetable (Table 3-5).
 
-| route | 75%, AM: SUMO meso (buses) | 75%, AM: macro (buses) | 50%, AM / PM: SUMO meso | 50%, AM / PM: macro |
-| --- | --- | --- | --- | --- |
-| Bluestar 2 NB | 3.0 (13) | 3.7 (13) | -0.1 (13) / -1.1 (8) | -0.4 (13) / -1.1 (8) |
-| Bluestar 2 SB | 1.4 (10) | 40.7 (6) | 0.4 (10) / -0.3 (11) | 8.9 (9) / 4.2 (10) |
-| Bluestar 20 NB | -1.0 (9) | 1.9 (9) | -1.0 (9) / -1.0 (10) | 1.9 (9) / 1.9 (11) |
-| Bluestar 20 SB | 5.3 (11) | 2.1 (11) | 0.3 (11) / -0.5 (12) | -0.6 (11) / -0.7 (12) |
+| route | 75%, AM: SUMO meso (buses) | 75%, AM: macro (buses) | 50%, AM / PM: SUMO micro | 50%, AM / PM: SUMO meso | 50%, AM / PM: macro |
+| --- | --- | --- | --- | --- | --- |
+| Bluestar 2 NB | 3.0 (13) | 3.7 (13) | 3.9 / -0.8 | -0.1 (13) / -1.1 (8) | -0.4 (13) / -1.1 (8) |
+| Bluestar 2 SB | 1.4 (10) | 40.7 (6) | 3.1 / 0.6 | 0.4 (10) / -0.3 (11) | 8.9 (9) / 4.2 (10) |
+| Bluestar 20 NB | -1.0 (9) | 1.9 (9) | 1.0 / -0.9 | -1.0 (9) / -1.0 (10) | 1.9 (9) / 1.9 (11) |
+| Bluestar 20 SB | 5.3 (11) | 2.1 (11) | 26.1 / 9.4 | 0.3 (11) / -0.5 (12) | -0.6 (11) / -0.7 (12) |
 
 At full demand the buses that got past the section before the runs stopped (1-8 per route and
 direction) were between on time and 28 minutes late in SUMO, against the macro model's 2 minutes
