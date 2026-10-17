@@ -445,7 +445,8 @@ def evaluate(args) -> None:
             curve.append({"days": i + len(chunk), "steps": int(chunk[-1]["steps"]),
                           "saving": float(np.mean([float(r["nothing_cost"]) - float(r["cost"])
                                                    for r in chunk]))})
-    data = {"made": datetime.now().isoformat(timespec="minutes"), "costs": pe.COSTS,
+    data = {"made": datetime.now().isoformat(timespec="minutes"), "model": str(args.model),
+            "costs": pe.COSTS,
             "levers": {"meter": pe.METER, "open_shift": pe.OPEN_SHIFT,
                        "sign_factor": pe.SIGN_FACTOR, "marshal_cap": pe.MARSHAL_CAP,
                        "max_hold_min": pe.MAX_HOLD_BINS * daysim.BIN_MIN,
