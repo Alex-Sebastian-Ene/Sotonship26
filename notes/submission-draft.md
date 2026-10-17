@@ -19,6 +19,13 @@ shows on Sunday morning.
 
 Word count: `sed -n '/^> /p' notes/submission-draft.md | wc -w`, less the `>` markers.
 
+**Last sentence depends on a human decision (Sat 17 Oct 08:00).** Seb's `docs/backtest.md` (main)
+backtests the cruise effect on the M271 using archived VTS schedule pages. If the humans decide we
+may use those pages, replace "We cannot yet measure ... exists." with something like: "From
+archived port schedules, adding the ship list improves our M271 forecast by about 2% per 15
+minutes; most of the gain is still the calendar." Check that 2% first: its interval comes from
+resampling single days, and a week-block resample may put it across zero (raised on SOT-10).
+
 ## Numbers the video and README may quote
 
 All from `notes/flow-forecast.md`, CIs from resampling whole test weeks (regenerate with `python -m sotonship26.flow_forecast`).
@@ -47,7 +54,9 @@ Pick one; all three are real and reproducible from the repo.
 1. **The model loses where history is thin.** At M271 site 19974 the five-week year-ago median
    beats ridge (MAE 25.6 vs 33.3, 17 days). Show the row. The app does not yet
    fall back to the planner rule there; say so, or build that fallback before Sunday 11:00.
-2. **We cannot measure the cruise effect yet.** `python -m sotonship26.run_backtest` on real data
+2. **We cannot measure the cruise effect yet** (only if the humans reject the archived VTS pages;
+   otherwise use the honest version from `docs/backtest.md`: ship data adds 4% a day, not
+   significant). `python -m sotonship26.run_backtest` on real data
    exits and points to SOT-21: no permitted open source of historic cruise calls exists (see
    `notes/cruise-history.md`). The uplift pipeline is tested on synthetic data with a known effect,
    labelled synthetic. The ask to ABP / southamptonships.org is in SOT-21 for the humans to send.
