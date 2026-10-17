@@ -320,7 +320,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     </dl>
   </header>
 
-  <p class="synthetic" role="note"><strong>Real map, synthetic traffic</strong>Roads, junctions, lanes, speed limits and land use come from OpenStreetMap. The cruise schedule, ship names, trip totals, roadworks permits and match fixtures are invented, and nothing on this page is observed traffic.</p>
+  <p class="synthetic" role="note"><strong>Real map, synthetic traffic</strong><span id="m-banner">Roads, junctions, lanes, speed limits and land use come from OpenStreetMap. The cruise schedule, ship names, trip totals, roadworks permits and match fixtures are invented, and nothing on this page is observed traffic.</span></p>
 
   <section class="sec" aria-labelledby="cal-h">
     <div class="sec-head"><h2 id="cal-h">Next six weeks</h2><p class="muted">Pick a day to see when and where its roads are at risk.</p></div>
@@ -379,7 +379,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
         <div class="actions" id="actions"></div>
       </div>
       <div class="card">
-        <div class="card-head"><h3>Ships and suggested timings</h3><span class="foot-note">Synthetic schedule</span></div>
+        <div class="card-head"><h3>Ships and suggested timings</h3><span class="foot-note" id="m-sched">Synthetic schedule</span></div>
         <div id="ships"></div>
         <div class="timing" id="timing"></div>
         <p class="foot-note">Arrival times are fixed by tides, pilots and itineraries. What can move is when disembarkation starts and when check-in opens, so these are requests to the cruise line and the port.</p>
@@ -426,7 +426,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
         <ol class="steps">
           <li><strong>The network is Southampton's.</strong> <span id="m-edges"></span> one-way road links from OpenStreetMap, with lanes and speed limits, from motorways down to unclassified roads.</li>
           <li><strong>Zones and gateways come from geography.</strong> <span id="m-zones"></span> zones built from OSM places. Each zone's homes, jobs and shops come from nearby residential, commercial, industrial, port and retail land. <span id="m-gw"></span> county gateways sit where the M27, M3, A35, A33 and other roads cross into the area.</li>
-          <li><strong>General traffic is generated, not assumed.</strong> Commuters from the county to the area's jobs and back, residents working outside, trips between zones (more between big, close zones), through traffic between gateways and county visitors to the shops. Each has its own pattern over the day, different at weekends. The school run adds drop-off and pick-up peaks on term-time weekdays only (assumed half-term 26–30 Oct). Match days add fans to St Mary's.</li>
+          <li><strong>General traffic is generated, not assumed.</strong> Commuters from the county to the area's jobs and back, residents working outside, trips between zones (more between big, close zones), through traffic between gateways and county visitors to the shops. Each has its own pattern over the day, different at weekends. The school run adds drop-off and pick-up peaks on term-time weekdays only (city council half-term 26–30 Oct). Match days add fans to St Mary's.</li>
           <li><strong>Counted roads use the counts.</strong> On Portswood Road, Highfield Lane and Bevois Hill, measured peak speeds of 16–20 mph on 30 mph roads show they are at their limit, so the counted peak-hour flow sets their capacity. Local traffic the zones miss is added so flows match the counts, plus <span id="m-uni"></span> for university term, because the counts were taken in July.</li>
           <li><strong>Cruise traffic is added per ship.</strong> Car drop-offs, park and cruise, taxis and coaches, timed by disembarkation and boarding and sent to the terminal's nearest dock gate.</li>
           <li><strong>Routes are allocated dynamically.</strong> Every 15 minutes each of the <span id="m-ods"></span> origin–destination flows splits over up to three real routes and shifts towards the quickest given everyone's congestion. Traffic that cannot get through a full road waits and joins the next 15 minutes, so queues build and clear.</li>
@@ -582,10 +582,27 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
   const windowsText = ws => ws.map(([a, b]) => binRange(a, b)).join(', ');
 
   /* ---------- header, calendar ---------- */
+  function renderSources() {
+    const S = M.sources || {}, sc = S.schedule || { synthetic: true, label: 'Synthetic schedule', short: 'synthetic' };
+    $('#m-sched').textContent = sc.label;
+    $('#m-horizon').textContent = `to ${shortDate(M.horizon)} (${sc.short})`;
+    const works = S.permits && !S.permits.synthetic, real = [], made = [];
+    if (sc.synthetic) made.push('the cruise schedule', 'ship names');
+    else real.push(`ship calls from the ABP Southampton VTS schedule (${sc.short.replace('VTS, ', '')}) with capacities from the cruise lines`);
+    made.push('trip totals');
+    if (works) real.push(`roadworks from DfT Street Manager (${S.permits.short})`); else made.push('roadworks permits');
+    if (S.matches) real.push('home matches from Southampton FC'); else made.push('match fixtures');
+    if (S.terms) real.push('school holidays from Southampton City Council');
+    const list = a => a.length < 2 ? a.join('') : `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}`;
+    const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
+    $('#m-banner').textContent = 'Roads, junctions, lanes, speed limits and land use come from OpenStreetMap.'
+      + (real.length ? ` ${cap(list(real))}.` : '')
+      + ` ${cap(list(made))} are invented, and nothing on this page is observed traffic.`;
+  }
   function renderMeta() {
     const issued = new Date(M.issued);
     $('#m-issued').textContent = `${issued.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} ${pad(issued.getHours())}:${pad(issued.getMinutes())}`;
-    $('#m-horizon').textContent = `to ${shortDate(M.horizon)} (synthetic)`;
+    renderSources();
     $('#m-n').textContent = M.n; $('#m-n2').textContent = M.n;
     $('#m-model').textContent = M.model; $('#m-seed').textContent = M.seed;
     const c = M.counts;
@@ -1082,7 +1099,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
   function renderTiming() {
     const d = day(), el = $('#timing');
     $('#ships').innerHTML = d.calls.length ? `<div class="table-scroll"><table><thead><tr><th>Ship</th><th>Terminal and gate</th><th>Alongside</th><th>Berths</th></tr></thead><tbody>${d.calls.map(c => `
-      <tr><td>${esc(c.ship)}</td><td>${esc(c.terminal)}<br><span class="muted">${esc(c.gate)}</span></td><td class="num">${c.arr}–${c.dep}</td>
+      <tr><td>${esc(c.ship)}</td><td>${esc(c.terminal)}<br><span class="muted">${esc(c.gate)}</span></td><td class="num">${c.arr}–${c.dep}${c.times && c.times !== 'exact' ? `<br><span class="muted" title="${esc(c.times)}">typical times</span>` : ''}</td>
       <td class="num">${c.pax == null ? '<span class="tag" style="color: var(--warn-ink)">Not published</span>' : int(c.pax)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">None.</p>';
     if (!d.calls.length) { el.innerHTML = ''; return; }
     if (!d.timing) { el.innerHTML = `<p class="foot-note">${uplift(d) < 1 ? 'No timing change needed: cruise traffic adds little risk today.' : 'Timing advice is computed for the busiest days in this demo.'}</p>`; return; }
@@ -1173,11 +1190,12 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     $('#day-head').innerHTML = `<div><p class="eyebrow">Day view</p><h2>${esc(longDate(d.date))}</h2></div>
       <div class="day-stats"><span class="pill lv-${lv.key}">${lv.label}</span><span>Cruise traffic adds <span class="big">${fmt1(uplift(d))}</span> corridor-hours at risk${d.range ? ` <span class="muted">(8 days in 10: ${upRange(d)})</span>` : ''}</span><span class="muted"><span class="mono">${fmt1(d.range ? d.range.score[1] : d.score)}</span> in total, <span class="mono">${fmt1(d.range ? d.range.bg[1] : d.bg_score)}</span> without ships</span></div>`;
     const notes = [];
-    d.permits.forEach(id => { const p = PERMIT[id]; notes.push(`<div class="notice"><span class="tag">Works</span><span><strong>Permit ${id}:</strong> ${esc(p.what)} on ${esc(CORR[p.corridor] ? CORR[p.corridor].name : p.corridor)}, ${esc(shortDate(p.from))} to ${esc(shortDate(p.to))}. Already included: everyone reroutes around it.${d.whatif.move_permit ? ' <button class="linkbtn" data-scenario="move_permit">See it moved</button>' : ''}</span></div>`); });
-    if (d.match) notes.push(`<div class="notice"><span class="tag">Match</span><span>Home match at St Mary's, kick-off ${d.match}. About 9,000 extra car trips arrive in the 2½ hours before kick-off and leave after the final whistle, from the county gateways and the city's zones.</span></div>`);
+    d.permits.forEach(id => { const p = PERMIT[id]; notes.push(`<div class="notice"><span class="tag">Works</span><span><strong>Permit ${id}:</strong> ${esc(p.what)} on ${esc(CORR[p.corridor] ? CORR[p.corridor].name : p.corridor)}, ${esc(shortDate(p.from))} to ${esc(shortDate(p.to))}${p.source ? ` (${esc(p.source)})` : ''}. Already included: everyone reroutes around it.${d.whatif.move_permit ? ' <button class="linkbtn" data-scenario="move_permit">See it moved</button>' : ''}</span></div>`); });
+    const fixture = (DATA.matches || []).find(x => x.date === d.date);
+    if (d.match) notes.push(`<div class="notice"><span class="tag">Match</span><span>Home match at St Mary's${fixture && fixture.opponent ? ` v ${esc(fixture.opponent)}` : ''}, kick-off ${d.match}. About 9,000 extra car trips arrive in the 2½ hours before kick-off and leave after the final whistle, from the county gateways and the city's zones.</span></div>`);
     d.calls.filter(c => c.pax == null).forEach(c => notes.push(`<div class="notice notice-warn"><span class="tag">Missing data</span><span><strong>${esc(c.ship)}</strong> has no published passenger figure. The forecast assumes ${int(M.unknown_pax_range[0])} to ${int(M.unknown_pax_range[1])} passengers, so its gate traffic has a wider range than usual.</span></div>`));
     const wd = dateOf(d.date).getDay();
-    if (wd >= 1 && wd <= 5 && !d.term) notes.push('<div class="notice"><span class="tag">Half-term</span><span>No school run this week (assumed half-term dates), so the 08:15 and 15:00 peaks are lighter.</span></div>');
+    if (wd >= 1 && wd <= 5 && !d.term) notes.push('<div class="notice"><span class="tag">Half-term</span><span>No school run this week (Southampton City Council half-term), so the 08:15 and 15:00 peaks are lighter.</span></div>');
     if (!d.calls.length) notes.push('<div class="notice"><span class="tag">No ships</span><span>No turnarounds today. The map shows everyday traffic only.</span></div>');
     $('#notices').innerHTML = notes.join('');
     $('#notices').querySelectorAll('[data-scenario]').forEach(b => b.addEventListener('click', () => setScenario(b.dataset.scenario)));
