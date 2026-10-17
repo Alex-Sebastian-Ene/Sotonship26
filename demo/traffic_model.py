@@ -95,8 +95,28 @@ GATEWAY_COUNT_DEPTH_M = 1000.0
 THROUGH_SHARE = 0.3
 OTHER_T_S = 900.0  # other county trips: zone weight falls by e for every 15 free-flow minutes
 # Trips these give on an average day (both directions); build() recomputes them and warns.
-CORDON_DAILY = {"through": 57720, "other": 269361}
+CORDON_DAILY = {"through": 57063, "other": 266294}
 CORDON_DAYS = (1.0, 0.8, 0.7)  # assumed weekday, Saturday, Sunday ratio
+
+# Port freight (SOT-24): lorries between the county gateways and the port gates, in car-equivalents
+# (PCU). Daily lorries per direction on a weekday before calibration; calibrate_freight() scales
+# them to DfT HGV counts on the M271 between the A35 and junction 1, which lead only to the
+# Western Docks and Redbridge. Gate shares and the port share of that count are assumptions.
+HGV_PCU = 2.5
+FREIGHT_LORRIES = 2600  # per direction on a weekday, before calibration
+FREIGHT_DAYS = (1.0, 0.55, 0.35)  # weekday, Saturday, Sunday (container terminal works weekends)
+PORT_GATE_SHARE = {"Dock Gate 20": 0.70, "Dock Gate 10": 0.15, "Dock Gate 4": 0.15}
+PORT_SHARE_M271 = 0.85  # share of M271 (A35-J1) lorries going to or from the port
+# Lorries keep to the roads the port signs for them (M27, M271, M3 and the trunk A33/A35): their
+# candidate routes are found, and chosen between, on travel time times these factors (assumed).
+# The Itchen Bridge's lorry toll makes it a last resort.
+LORRY_ROAD = {"motorway": 1.0, "trunk": 1.0, "primary": 1.4, "secondary": 2.5}
+LORRY_ROAD_OTHER = 4.0
+LORRY_TOLL = {"Itchen Bridge": 3.0}
+
+
+def freight_totals() -> tuple[int, int, int]:
+    return tuple(int(round(FREIGHT_LORRIES * HGV_PCU * f, -2)) for f in FREIGHT_DAYS)
 
 
 def commute_totals(group: str) -> tuple[int, int, int]:
@@ -121,7 +141,11 @@ PROFILES = {
     "school_am_back": [0, 0, 0, 0, 0, 0, 0, .2, 8, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     "school_pm": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, .8, 10, .8, 0, 0, 0, 0, 0, 0, 0],
     "school_pm_back": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, .2, 8, 3, .3, 0, 0, 0, 0, 0, 0],
+    # container terminal gate: 24 hours, busiest in working hours (booking slots), quiet at night
+    "freight": [2, 1.6, 1.4, 1.5, 2.2, 3.5, 5.5, 7, 7.6, 7.8, 7.8, 7.6, 7.2, 7.4, 7.5, 7.2, 6.5,
+                5.5, 4.5, 3.8, 3.2, 2.8, 2.5, 2.2],
 }
+FREIGHT_WINDOW_SHARE = sum(PROFILES["freight"][5:20]) / sum(PROFILES["freight"])  # 05:00-20:00
 
 # key, chart group, origins, destinations, daily car trips (weekday, Saturday, Sunday),
 # profile (weekday, weekend). County and outbound totals and origin-destination pairs come from
@@ -144,7 +168,11 @@ PURPOSES = [
     ("school_drop_home", "school", "schools", "homes", (6000, 0, 0), ("school_am_back", "school_am_back")),
     ("school_pick", "school", "homes", "schools", (6000, 0, 0), ("school_pm", "school_pm")),
     ("school_pick_home", "school", "schools", "homes", (9000, 0, 0), ("school_pm_back", "school_pm_back")),
+    # port freight in car-equivalents, county gateways (by DfT lorry counts) to and from the port
+    ("freight_in", "freight", "freight_from", "port", freight_totals(), ("freight", "freight")),
+    ("freight_out", "freight", "port", "freight_from", freight_totals(), ("freight", "freight")),
 ]
+FREIGHT_KEYS = {"freight_in", "freight_out"}
 SCHOOL_KEYS = {"school_drop", "school_drop_home", "school_pick", "school_pick_home"}
 CENSUS_KEYS = {"county_in", "county_home", "out", "out_home"}
 EXTERNAL = {"county", "outbound", "through", "visitors"}
@@ -157,6 +185,7 @@ GROUPS = {
     "visitors": "Visitors and other trips from the county",
     "match": "Match day",
     "cruise": "Cruise traffic",
+    "freight": "Port freight (lorries as car-equivalents)",
 }
 MATCH_FANS_CARS = 9000
 SHORT_TRIP_M = 1200  # internal trips shorter than this mostly use residential streets or walk
@@ -182,7 +211,7 @@ def daytype(weekday: int) -> int:
 @dataclass
 class Centroid:
     name: str
-    kind: str  # zone, gateway, gate, station, stadium
+    kind: str  # zone, gateway, gate, station, stadium, port
     node: int
     xy: tuple[int, int]
     homes: float = 0.0
@@ -215,10 +244,12 @@ class Model:
     col_idx: np.ndarray = field(repr=False)  # edge indices per path, concatenated
     col_ptr: np.ndarray = field(repr=False)
     uniq: np.ndarray = field(default=None, repr=False)  # n_od x ROUTES, False for padded duplicates
+    path_bias: np.ndarray = field(default=None, repr=False)  # per path, lorry time multiplier
     od_zone: np.ndarray = field(default=None, repr=False)  # n_od x 2 zone index of origin/dest, -1 if none
     zone_kernel: np.ndarray = field(default=None, repr=False)  # zones x zones smoothing for zone noise
     scale: float = 1.0  # trips within the area (fitted to council counts)
     scale_ext: float = 1.0  # trips to, from and through the county (fitted to main-road loads)
+    scale_freight: float = 1.0  # port lorries (fitted to DfT HGV counts)
     pre: dict = field(default_factory=dict)  # day type -> (bins, edges) local traffic on counted roads
     size: tuple[int, int] = (0, 0)
     sets: dict = field(default_factory=dict)  # named origin sets for cruise and match demand
@@ -397,7 +428,8 @@ def repair_motorways(g, size, log=print) -> set:
     return cut
 
 
-def build(net_path: Path, gates: dict[str, tuple[int, int]], log=print) -> Model:
+def build(net_path: Path, gates: dict[str, tuple[int, int]], log=print,
+          port_gates: dict[str, tuple[int, int]] | None = None) -> Model:
     with open(net_path, "rb") as f:
         net = pickle.load(f)
     g = net["graph"]
@@ -504,6 +536,10 @@ def build(net_path: Path, gates: dict[str, tuple[int, int]], log=print) -> Model
         specials.append(Centroid("Southampton Central", "station", snap(lm["station"]), tuple(lm["station"])))
     if "stadium" in lm:
         specials.append(Centroid("St Mary's Stadium", "stadium", snap(lm["stadium"]), tuple(lm["stadium"])))
+    for gname, p in (port_gates or {}).items():
+        if gname in PORT_GATE_SHARE:
+            specials.append(Centroid(gname, "port", snap(p), tuple(p),
+                                     weight=PORT_GATE_SHARE[gname]))
     centroids = zones + gateways + specials
     Z = [i for i, c in enumerate(centroids) if c.kind == "zone"]
     G_ = [i for i, c in enumerate(centroids) if c.kind == "gateway"]
@@ -527,7 +563,15 @@ def build(net_path: Path, gates: dict[str, tuple[int, int]], log=print) -> Model
                        norm(jobs + 0.8 * retail + 0.5 * homes), csr, (W, H), log)
     census["summary"]["cordon"] = cordon["summary"]
     sets = {"homes": (Z, homes), "jobs": (Z, jobs), "retail": (Z, retail), "gateway": (G_, gw),
-            "schools": (Z, schools), "county": (G_, census["gw_share"])}
+            "schools": (Z, schools), "county": (G_, census["gw_share"]),
+            "freight_from": (G_, cordon["hgv_share"])}
+    P = [i for i, c in enumerate(centroids) if c.kind == "port"]
+    if P:
+        sets["port"] = (P, norm([centroids[i].weight for i in P]))
+        log("port freight gates: "
+            + ", ".join(f"{centroids[i].name} {centroids[i].weight:.0%}" for i in P)
+            + "; lorries from " + ", ".join(f"{centroids[g].name} {s:.0%}" for g, s in
+                                            zip(G_, cordon["hgv_share"], strict=True) if s >= 0.05))
     zxy = np.array([centroids[i].xy for i in Z], float)
     zdist = np.hypot(*(zxy[:, None, :] - zxy[None, :, :]).transpose(2, 0, 1))
 
@@ -535,6 +579,8 @@ def build(net_path: Path, gates: dict[str, tuple[int, int]], log=print) -> Model
     od_weight: dict[str, dict[tuple[int, int], float]] = {}
     for key, _, o_set, d_set, _, _ in PURPOSES:
         w: dict[tuple[int, int], float] = {}
+        if key in FREIGHT_KEYS and "port" not in sets:
+            continue
         if key in CENSUS_KEYS:
             w = dict(census["od"][key])
         elif key == "internal" or key in SCHOOL_KEYS:
@@ -589,6 +635,8 @@ def build(net_path: Path, gates: dict[str, tuple[int, int]], log=print) -> Model
     od_index = {p: j for j, p in enumerate(pairs)}
     purpose_od = {}
     for key, w in od_weight.items():
+        if not w:
+            continue
         vec = np.zeros(len(pairs))
         for p, v in w.items():
             if p in od_index:
@@ -602,7 +650,7 @@ def build(net_path: Path, gates: dict[str, tuple[int, int]], log=print) -> Model
     total_w = sum(purpose_od.values())
     important[total_w >= np.quantile(total_w, 0.5)] = True
     for p, j in od_index.items():
-        if centroids[p[0]].kind in ("gate", "stadium") or centroids[p[1]].kind in ("gate", "stadium"):
+        if {centroids[p[0]].kind, centroids[p[1]].kind} & {"gate", "stadium", "port"}:
             important[j] = True
 
     def trace(pred, src, dst):
@@ -615,28 +663,42 @@ def build(net_path: Path, gates: dict[str, tuple[int, int]], log=print) -> Model
             v = u
         return out[::-1]
 
+    # lorries to and from the port weigh roads by LORRY_ROAD and LORRY_TOLL
+    tl = t0 * np.array([LORRY_ROAD.get(c.replace("_link", ""), LORRY_ROAD_OTHER) for c in cls])
+    tl *= np.array([LORRY_TOLL.get(nm, 1.0) for nm in name])
+    lorry = {j for (o, d), j in od_index.items()
+             if "port" in (centroids[o].kind, centroids[d].kind)}
     origins = sorted({centroids[o].node for o, _ in pairs})
     _, pred0 = dijkstra(csr, indices=origins, return_predecessors=True)
     row = {o: r for r, o in enumerate(origins)}
+    l_origins = sorted({centroids[pairs[j][0]].node for j in lorry})
+    pred_l = (dijkstra(sp.csr_matrix((tl, (eu, ev)), shape=(n, n)), indices=l_origins,
+                       return_predecessors=True)[1] if l_origins else None)
+    row_l = {o: r for r, o in enumerate(l_origins)}
     paths: list[list[int]] = []
+    path_bias = np.ones(len(pairs) * ROUTES)
     for (o, d), j in od_index.items():
         src, dst = centroids[o].node, centroids[d].node
-        base = trace(pred0[row[src]], src, dst)
+        cost = tl if j in lorry else t0
+        base = trace(pred_l[row_l[src]] if j in lorry else pred0[row[src]], src, dst)
         if base is None:
             raise RuntimeError(f"no route {centroids[o].name} -> {centroids[d].name}")
         found = [base]
         if important[j]:
-            w = t0.copy()
-            limit = 1.5 * t0[base].sum()
+            w = cost.copy()
+            limit = 1.5 * cost[base].sum()
             for _ in range(ROUTES - 1):
                 w[found[-1]] *= 1.6
                 _, pr = dijkstra(sp.csr_matrix((w, (eu, ev)), shape=(n, n)), indices=src,
                                  return_predecessors=True)
                 alt = trace(pr, src, dst)
-                if alt and alt not in found and t0[alt].sum() <= limit:
+                if alt and alt not in found and cost[alt].sum() <= limit:
                     found.append(alt)
         while len(found) < ROUTES:
             found.append(found[0])
+        if j in lorry:
+            for r, pth in enumerate(found):
+                path_bias[j * ROUTES + r] = tl[pth].sum() / max(t0[pth].sum(), 1e-9)
         paths += found
     log(f"candidate routes: {len(paths)} ({important.sum()} pairs with alternatives)")
 
@@ -657,7 +719,8 @@ def build(net_path: Path, gates: dict[str, tuple[int, int]], log=print) -> Model
                  coords=coords, centroids=centroids, ods=pairs, od_index=od_index,
                  purpose_od=purpose_od, paths=paths, A=A, AT=A.T.tocsr(), col_idx=rows,
                  col_ptr=col_ptr, size=(W, H), sets=sets, uniq=uniq, od_zone=od_zone,
-                 zone_kernel=kern, census=census["summary"])
+                 zone_kernel=kern, census=census["summary"],
+                 path_bias=path_bias if lorry else None)
 
 
 def _crosses(p: np.ndarray, q: np.ndarray, a, b) -> np.ndarray:
@@ -811,6 +874,14 @@ def cordon_od(centroids, Z, G_, gw_class, census: dict, cordon: list[dict], attr
         for (o, d), v in w.items():
             crossing[pos[o] if o in pos else pos[d]] += average(key) * v / s
     crossing += (average("visit_in") + average("visit_home")) * census["gw_share"]
+    hgv = np.zeros(len(G_))
+    for gi, c in count.items():
+        hgv[gi] = c.get("hgv") or 0.0
+    hgv_share = hgv / hgv.sum() if hgv.sum() > 0 else np.full(len(G_), 1 / len(G_))
+    # port lorries crossing each gateway (vehicles, both ways, average day) are their own trip type
+    port_lorries = 2 * FREIGHT_LORRIES * sum(
+        w * f for w, f in zip(DAY_WEIGHTS, FREIGHT_DAYS, strict=True))
+    crossing += port_lorries * hgv_share
     rest = np.zeros(len(G_))
     for gi, c in count.items():
         rest[gi] = max(c["aadf"] - crossing[gi], 0.0)
@@ -862,7 +933,7 @@ def cordon_od(centroids, Z, G_, gw_class, census: dict, cordon: list[dict], attr
         if abs(v / max(CORDON_DAILY[k], 1) - 1) > 0.03:
             log(f"cordon: WARNING {k} {v:.0f} trips differ from CORDON_DAILY {CORDON_DAILY[k]}; "
                 "update the constant")
-    return {"od": od, "daily": daily, "summary": summary}
+    return {"od": od, "daily": daily, "summary": summary, "hgv_share": hgv_share}
 
 
 # --- demand ------------------------------------------------------------------------------------
@@ -899,7 +970,11 @@ def background(m: Model, dtype: int, rng: np.random.Generator | None = None, ter
         if key in SCHOOL_KEYS and not (term and dtype == 0):
             continue
         prof = bin_profile(PROFILES[profiles[0 if dtype == 0 else 1]])
-        total = totals[dtype] * (m.scale_ext if group in EXTERNAL else m.scale) * day
+        if key in FREIGHT_KEYS and m.purpose_od.get(key) is None:
+            continue
+        scale = (m.scale_freight if group == "freight" else m.scale_ext if group in EXTERNAL
+                 else m.scale)
+        total = totals[dtype] * scale * day
         if mult:
             total *= mult.get(group, mult.get("all", 1.0))
         if rng is not None:
@@ -942,7 +1017,10 @@ def equilibrium_bin(m: Model, rate: np.ndarray, cap: np.ndarray, shares: np.ndar
         t = m.t0 * (1.0 + 0.15 * (v / cap) ** 4)
         if noise is not None:
             t = t * noise
-        c = (m.AT @ t).reshape(m.n_od, ROUTES)
+        c = m.AT @ t
+        if m.path_bias is not None:
+            c = c * m.path_bias
+        c = c.reshape(m.n_od, ROUTES)
         rel = c / np.maximum(c.min(axis=1, keepdims=True), 30.0)
         w = np.exp(-LOGIT_BETA * (rel - 1.0)) * m.uniq
         y = w / w.sum(axis=1, keepdims=True) * rate[:, None]
@@ -1135,7 +1213,14 @@ def count_point_edges(m: Model, site: dict, radius: float = 250.0) -> list[int]:
             found.append((d, k, head / max(np.hypot(*head), 1e-9)))
     if not found:
         return []
-    found.sort(key=lambda f: f[0])
+    # a count point at a joint between two links of the same road takes the longer one: a short
+    # stub before a junction misses the traffic that left by a slip road just upstream
+    d0, k0, _ = min(found, key=lambda f: f[0])
+
+    def tie(f):
+        return f[0] <= d0 + 25.0 and m.name[f[1]] == m.name[k0]
+
+    found.sort(key=lambda f: (not tie(f), -m.length[f[1]] if tie(f) else f[0]))
     _, k1, h1 = found[0]
     back = [k for _, k, h in found if float(h @ h1) < -0.3]
     return [k1] + back[:1]
@@ -1147,10 +1232,77 @@ def modelled_aadf(m: Model, sites: list[dict], edges: list[list[int]]) -> np.nda
     DAY_WINDOW_SHARE)."""
     out = np.zeros(len(sites))
     for dt, wd in enumerate(DAY_WEIGHTS):
-        v = flows(m, background(m, dt)[0], m.cap, pre=m.pre.get(dt))
-        v = np.minimum(v, m.cap)  # a counter sees what gets through, not queued traffic re-trying
-        out += wd * np.array([v[:, ks].sum() / 4.0 for ks in edges]) / DAY_WINDOW_SHARE
+        D, _ = background(m, dt)
+        Df = freight_demand(m, dt)
+        res, _ = run_day(m, D, m.cap, initial_shares(m), 8, cruise=Df, want=("x", "cruise_edge"),
+                         pre=m.pre.get(dt))
+        v = np.minimum(res["x"] * m.cap, m.cap)  # a counter sees what gets through
+        lorry_pcu = res["cruise_edge"]
+        v = v - lorry_pcu * (1 - 1 / HGV_PCU)  # count a lorry once, not as 2.5 cars
+        daily = np.array([v[:, ks].sum() / 4.0 for ks in edges])
+        lorries = np.array([lorry_pcu[:, ks].sum() / 4.0 / HGV_PCU for ks in edges])
+        out += wd * (daily - lorries) / DAY_WINDOW_SHARE + wd * lorries / FREIGHT_WINDOW_SHARE
     return out
+
+
+def freight_demand(m: Model, dtype: int) -> np.ndarray:
+    """The port-freight part of background(m, dtype) (car-equivalents per bin per OD)."""
+    D = np.zeros((N_BINS, m.n_od))
+    for key, _, _, _, totals, profiles in PURPOSES:
+        if key in FREIGHT_KEYS and m.purpose_od.get(key) is not None:
+            prof = bin_profile(PROFILES[profiles[0 if dtype == 0 else 1]])
+            D += np.outer(prof * totals[dtype] * m.scale_freight, m.purpose_od[key])
+    return D
+
+
+def modelled_lorries(m: Model, edges: list[list[int]]) -> np.ndarray:
+    """Average daily port lorries (both directions, 24 hours) on each set of edges."""
+    out = np.zeros(len(edges))
+    for dt, wd in enumerate(DAY_WEIGHTS):
+        D, _ = background(m, dt)
+        res, _ = run_day(m, D, m.cap, initial_shares(m), 8, cruise=freight_demand(m, dt),
+                         want=("cruise_edge",), pre=m.pre.get(dt))
+        lorries = np.array([res["cruise_edge"][:, ks].sum() / 4.0 / HGV_PCU for ks in edges])
+        out += wd * lorries / FREIGHT_WINDOW_SHARE
+    return out
+
+
+def calibrate_freight(m: Model, sites: list[dict], log=print,
+                      grid=(0.5, 0.7, 0.85, 1.0, 1.2, 1.45, 1.75, 2.1, 2.5)) -> list[dict]:
+    """Scale port lorries so the M271 (A35 to junction 1) carries PORT_SHARE_M271 of its DfT HGV
+    count. The other HGV count points are reported as checks (they also carry non-port lorries)."""
+    if m.purpose_od.get("freight_in") is None:
+        log("calibrate freight: no port gates, skipped")
+        return []
+    edges = [count_point_edges(m, s) for s in sites]
+    use = [i for i, (s, e) in enumerate(zip(sites, edges, strict=True)) if e and s.get("hgv")]
+    target = [i for i in use if "M271" in sites[i]["label"] and "A35" in sites[i]["label"]]
+    if not target:
+        log("calibrate freight: no M271 A35-J1 count point, skipped")
+        return []
+    t = target[0]
+    best = None
+    for g in grid:
+        m.scale_freight = g
+        mod = modelled_lorries(m, [edges[t]])[0]
+        want = PORT_SHARE_M271 * sites[t]["hgv"]
+        err = abs(math.log((mod + 1) / (want + 1)))
+        log(f"calibrate freight: scale {g:.2f} -> M271 port lorries {mod:6.0f} vs {want:6.0f}")
+        if best is None or err < best[0]:
+            best = (err, g)
+    m.scale_freight = best[1]
+    mods = modelled_lorries(m, [edges[i] for i in use])
+    rows = []
+    for i, md in zip(use, mods, strict=True):
+        s = sites[i]
+        rows.append({"road": s["label"], "count_point": s["count_point"], "year": s["year"],
+                     "observed_hgv": s["hgv"], "modelled_port_lorries": round(float(md)),
+                     "fitted": i == t})
+        log(f"  HGV {s['count_point']:6d} {s['label'][:42]:42s} observed {s['hgv']:6d} lorries, "
+            f"modelled port lorries {md:6.0f}" + ("  (fitted)" if i == t else ""))
+    log(f"calibrate freight: chose scale {m.scale_freight:.2f} "
+        f"({m.scale_freight * FREIGHT_LORRIES:.0f} lorries each way on a weekday)")
+    return rows
 
 
 def calibrate_external(m: Model, sites: list[dict], log=print,

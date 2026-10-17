@@ -276,10 +276,11 @@ def build_ctx(log=print) -> tuple[Ctx, dict]:
             gates["Western Docks gate"] = tuple(np.mean(west, axis=0).round().astype(int))
         if east:
             gates["Eastern Docks gate"] = tuple(np.mean(east, axis=0).round().astype(int))
-    m = tm.build(CACHE / "network.pkl", gates, log=log)
+    m = tm.build(CACHE / "network.pkl", gates, log=log, port_gates=dict(base.get("gates") or {}))
     dft = ext.count_points(log=log)
     tm.calibrate_external(m, dft["sites"], log=log, grid=(0.6, 0.8, 1.0, 1.25, 1.6))
     calibration = tm.calibrate_to_counts(m, COUNT_SITES, log=log)
+    freight_rows = tm.calibrate_freight(m, dft["sites"], log=log)
     near = tuple(round(m.scale_ext * f, 3) for f in (0.85, 0.92, 1.0, 1.08, 1.17))
     dft_rows = tm.calibrate_external(m, dft["sites"], log=log, grid=near)
     capacity_notes = tm.anchor_counts(m, COUNT_SITES, calibration, log=log)
@@ -341,7 +342,8 @@ def build_ctx(log=print) -> tuple[Ctx, dict]:
               seg_ptr=seg_ptr, gates=gate_ids, terminal_gate=terminal_gate, luts=luts,
               gate_mask=gate_mask, gw_in=gw_in, cruise_ods=cruise_ods,
               extra={"segs": segs, "gateways": gws, "calibration": calibration,
-                     "capacity": capacity_notes, "dft": {**dft, "rows": dft_rows}})
+                     "capacity": capacity_notes, "dft": {**dft, "rows": dft_rows},
+                     "freight": freight_rows})
     return ctx, base
 
 
@@ -521,7 +523,7 @@ def day_multipliers(d: date, wet: bool) -> dict:
         visitors *= hol
     w = WET_DEMAND if wet else 1.0
     return {"county": commute * w * hol, "outbound": commute * w * hol, "internal": w * hol,
-            "through": hol, "visitors": visitors * w, "school": w}
+            "through": hol, "visitors": visitors * w, "school": w, "freight": hol}
 
 
 def forecast(task: dict) -> dict:
@@ -1070,6 +1072,7 @@ def main(argv=None) -> None:
                  "horizon": HORIZON.isoformat(), "n": args.n, "seed": SEED, "bin_minutes": BIN_MIN,
                  "at_risk": tm.AT_RISK, "unknown_pax_range": UNKNOWN_PAX_RANGE, "model": "v0.2-demo",
                  "scale": round(m.scale, 3), "scale_ext": round(m.scale_ext, 3),
+                 "scale_freight": round(m.scale_freight, 3),
                  "capacity_notes": ctx.extra["capacity"], "uni_term": tm.UNI_TERM,
                  "uncertainty": {"p_wet": P_WET, "wet_capacity": WET_CAPACITY, "wet_demand": WET_DEMAND,
                                  "incident_p": INCIDENT_P, "perception_sd": PERCEPTION_SD,
@@ -1086,7 +1089,13 @@ def main(argv=None) -> None:
                                          "collected": ctx.extra["dft"]["collected"],
                                          "rows": ctx.extra["dft"]["rows"],
                                          "day_weights": tm.DAY_WEIGHTS,
-                                         "estimated_weight": tm.ESTIMATED_WEIGHT}},
+                                         "estimated_weight": tm.ESTIMATED_WEIGHT},
+                                 "freight": {"rows": ctx.extra["freight"], "hgv_pcu": tm.HGV_PCU,
+                                             "port_share_m271": tm.PORT_SHARE_M271,
+                                             "gate_share": tm.PORT_GATE_SHARE,
+                                             "day_ratio": tm.FREIGHT_DAYS,
+                                             "lorries_each_way":
+                                                 round(tm.FREIGHT_LORRIES * m.scale_freight)}},
                  "census": m.census,
                  "counts": {"zones": sum(c.kind == "zone" for c in m.centroids),
                             "gateways": len(gws), "ods": m.n_od, "routes": len(m.paths),
