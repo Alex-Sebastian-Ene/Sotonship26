@@ -115,8 +115,10 @@ def page_data(path: Path) -> dict | None:
 
 
 def fitted_cruise(page: dict | None) -> dict | None:
-    """Cruise assumptions fitted to the learned M271 uplift, when the page has them."""
-    fit = ((page or {}).get("meta") or {}).get("cruise_fit") or {}
+    """Cruise assumptions fitted to the learned M271 uplift, when the page has them (top-level
+    ``cruise_fit``; older pages kept it in ``meta``)."""
+    page = page or {}
+    fit = page.get("cruise_fit") or (page.get("meta") or {}).get("cruise_fit") or {}
     return fit.get("params")
 
 
@@ -418,26 +420,23 @@ class DaySim:
                  iters: int = 3):
         self.m, self.shares0, self.pre, self.iters = m, shares0, pre, iters
         self.b = 0
-        self.queue = np.zeros(m.n_od)
+        self.queues = tm.Queues(m)
 
     def step(self, D_b: np.ndarray, cap_b: np.ndarray, noise: np.ndarray | None = None) -> dict:
-        """Route bin self.b's new demand plus the queue carried over; returns the bin's flows."""
+        """Route bin self.b's new demand with the queues carried over; returns the bin's flows."""
         m, b = self.m, self.b
-        veh = D_b + self.queue
-        rate = veh * 4.0
+        rate = D_b * 4.0
         pb = self.pre[b] if self.pre is not None else 0.0
-        f = tm.equilibrium_bin(m, rate, cap_b, self.shares0[b], self.iters, pb, noise)
-        v = m.A @ f + pb
+        qload = self.queues.load()
+        f = tm.equilibrium_bin(m, rate, cap_b, self.shares0[b], self.iters, pb + qload, noise)
+        v = m.A @ f + qload + pb
         x = v / cap_b
-        bottleneck = np.maximum.reduceat(x[m.col_idx], m.col_ptr)
-        served = f / np.maximum(bottleneck, 1.0)
-        unserved = tm.CARRY * (f - served).reshape(m.n_od, tm.ROUTES).sum(axis=1) / 4.0
+        held = self.queues.step(f, x)["held"]
         with np.errstate(invalid="ignore", divide="ignore"):
             sh = np.where(rate[:, None] > 0, f.reshape(m.n_od, tm.ROUTES) / rate[:, None],
                           self.shares0[b])
-        self.queue = unserved
         self.b += 1
-        return {"x": x, "v": v, "f": f, "share": sh, "held": float(unserved.sum()),
+        return {"x": x, "v": v, "f": f, "share": sh, "held": held,
                 "queue": np.maximum(v - cap_b, 0.0) / 4.0}
 
 

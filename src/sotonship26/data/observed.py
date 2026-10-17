@@ -24,6 +24,12 @@ from pathlib import Path
 
 import pandas as pd
 
+# Observed cruise uplift (flow minus the same-weekday+time median on non-cruise days) is computed
+# in sotonship26.uplift from the flows this module loads. SOT-7 documents the public entry point
+# as observed.py::observed_uplift, so re-export the one implementation here rather than duplicate
+# it. The redundant alias marks this as an intentional re-export.
+from sotonship26.uplift import observed_uplift as observed_uplift
+
 API_ROOT = "https://webtris.nationalhighways.co.uk/api/v1.0"
 CACHE_DIR = Path(__file__).resolve().parents[3] / "data" / "raw" / "webtris"
 TZ = "Europe/London"

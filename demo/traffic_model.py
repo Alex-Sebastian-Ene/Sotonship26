@@ -1068,8 +1068,8 @@ def match_demand(m: Model, kickoff_h: float, rng: np.random.Generator | None = N
 def equilibrium_bin(m: Model, rate: np.ndarray, cap: np.ndarray, shares: np.ndarray, iters: int,
                     pre=0.0, noise: np.ndarray | None = None):
     """Split each OD's flow (veh/h) over its routes, moving towards the routes drivers think are
-    quickest. ``noise`` multiplies each road's perceived travel time (shared by everyone on it).
-    Returns path flows."""
+    quickest. ``pre`` is traffic already on each road (veh/h: local traffic, queues), ``noise``
+    multiplies each road's perceived travel time (shared by everyone on it). Returns path flows."""
     f = (shares * rate[:, None]).ravel()
     for k in range(iters):
         v = m.A @ f + pre
@@ -1095,76 +1095,175 @@ def run_day(m: Model, D: np.ndarray, cap: np.ndarray, shares0: np.ndarray, iters
     D: vehicles per bin per OD (all traffic), cruise: the cruise part of D (or None).
     Returns a dict of per-bin arrays and the route shares to warm-start from next time.
 
-    "x" is demand over capacity: traffic waiting in a queue is on every link of its route again
-    in each 15 minutes it waits. "count" (and "cruise_count") is what a roadside counter sees,
-    each vehicle once: on the links before its route's bottleneck when it sets off, on the
-    bottleneck and after it when it gets through.
+    Each bin's new trips are split over their routes. Traffic that cannot get past its route's
+    bottleneck (the first link where the route's demand over capacity is highest) waits there:
+    CARRY of it is still waiting 15 minutes later, on the same route, and then loads only that
+    link and the links after it (the rest got through within the 15 minutes). It is not routed
+    again; new trips see its load when they choose.
+
+    "x" is demand over capacity: new trips on every link of their route, queued traffic from the
+    link it waits at on. "count" (and "cruise_count") is what a roadside counter sees, each
+    vehicle once: on a link when it gets past it, so on the links before its bottleneck when it
+    sets off and on the bottleneck and after it when it gets through. "cruise_path" is the cruise
+    traffic setting off on each route (veh/h), "held" the vehicles waiting after each bin.
     """
-    queue = np.zeros(m.n_od)
-    cruise_queue = np.zeros(m.n_od)
+    queues = Queues(m, cruise is not None)
     out = {k: [] for k in want}
     shares = np.empty_like(shares0)
-    counting = "count" in out or "cruise_count" in out
-    if counting:
-        starts = m.col_ptr
-        path_of = np.repeat(np.arange(len(starts)), np.diff(np.append(starts, len(m.col_idx))))
     for b in range(N_BINS):
-        veh = D[b] + queue
-        rate = veh * 4.0
+        rate = D[b] * 4.0
         pb = pre[b] if pre is not None else 0.0
         capb = cap
         for edges, b0, b1, factor in events:  # incidents: capacity drops for a while
             if b0 <= b < b1:
                 capb = capb.copy() if capb is cap else capb
                 capb[edges] *= factor
-        f = equilibrium_bin(m, rate, capb, shares0[b], iters, pb, noise)
-        v = m.A @ f + pb
+        qload = queues.load()
+        f = equilibrium_bin(m, rate, capb, shares0[b], iters, pb + qload, noise)
+        v = m.A @ f + qload + pb
         x = v / capb
-        bottleneck = np.maximum.reduceat(x[m.col_idx], m.col_ptr)
-        if "delay" in out:
-            out["delay"].append(delay_minutes(m, x))
-        served = f / np.maximum(bottleneck, 1.0)
-        unserved = CARRY * (f - served).reshape(m.n_od, ROUTES).sum(axis=1) / 4.0
-        if counting:
-            reached = x[m.col_idx] >= bottleneck[path_of]
-            cs = np.cumsum(reached)
-            after = cs - (cs[starts] - reached[starts])[path_of] > 0
-            new = np.repeat(np.divide(D[b], veh, out=np.zeros_like(veh), where=veh > 0), ROUTES)
-            if "count" in out:
-                w = np.where(after, served[path_of], (f * new)[path_of])
-                out["count"].append(np.bincount(m.col_idx, weights=w, minlength=len(m.t0)) + pb)
-        cap_now = capb
+        fc = None
+        if cruise is not None:
+            frac = np.divide(cruise[b], D[b], out=np.zeros_like(rate), where=D[b] > 0)
+            fc = f * np.repeat(frac, ROUTES)
+        got = queues.step(f, x, fc, want)
+        if "count" in out:
+            out["count"].append(got["count"] + pb)
+        for k in ("cruise_count", "cruise_edge", "held"):
+            if k in out and k in got:
+                out[k].append(got[k])
+        if "cruise_path" in out and fc is not None:
+            out["cruise_path"].append(fc)
         with np.errstate(invalid="ignore", divide="ignore"):
             sh = np.where(rate[:, None] > 0, f.reshape(m.n_od, ROUTES) / rate[:, None], shares0[b])
         shares[b] = sh
         if "x" in out:
             out["x"].append(x)
+        if "delay" in out:
+            out["delay"].append(delay_minutes(m, x))
         if "queue" in out:
-            out["queue"].append(np.maximum(v - cap_now, 0.0) / 4.0)
-        if cruise is not None:
-            c_veh = cruise[b] + cruise_queue
-            frac = np.divide(c_veh, veh, out=np.zeros_like(veh), where=veh > 0)
-            fc = f * np.repeat(frac, ROUTES)
-            if "cruise_edge" in out:
-                out["cruise_edge"].append(m.A @ fc)
-            if "cruise_count" in out:
-                new_c = np.repeat(np.divide(cruise[b], veh, out=np.zeros_like(veh), where=veh > 0),
-                                  ROUTES)
-                w = np.where(after, (served * np.repeat(frac, ROUTES))[path_of],
-                             (f * new_c)[path_of])
-                out["cruise_count"].append(np.bincount(m.col_idx, weights=w, minlength=len(m.t0)))
-            if "cruise_path" in out:
-                out["cruise_path"].append(fc)
-            cruise_queue = unserved * frac
+            out["queue"].append(np.maximum(v - capb, 0.0) / 4.0)
         if "path" in out:
             out["path"].append(sh)
         if "time" in out:
             t = m.t0 * (1.0 + 0.15 * x**4)
             out["time"].append((m.AT @ t).reshape(m.n_od, ROUTES))
-        if "held" in out:
-            out["held"].append(unserved.sum())
-        queue = unserved
     return {k: np.asarray(v) for k, v in out.items()}, shares
+
+
+class Queues:
+    """Traffic waiting at the bottlenecks of its routes, from one 15-minute bin to the next: the
+    links it waits at (positions in m.col_idx, so route and link) and how many vehicles."""
+
+    def __init__(self, m: Model, cruise: bool = False):
+        self.m, self.ix = m, _route_index(m)
+        self.at = np.zeros(0, int)
+        self.veh = np.zeros(0)
+        self.cruise = np.zeros(0) if cruise else None  # the cruise part of veh
+
+    def load(self) -> np.ndarray:
+        """Queued traffic (veh/h) on the link it waits at and every link after it."""
+        return self.ix.ahead(self.at, self.veh * 4.0)
+
+    def step(self, f: np.ndarray, x: np.ndarray, fc: np.ndarray | None = None, want=()) -> dict:
+        """Close a bin: new trips ``f`` (veh/h per route, ``fc`` their cruise part) and the queue
+        met demand over capacity ``x``. Each part gets through the worst link ahead of it in
+        proportion 1/x; CARRY of the rest is still waiting at that link 15 minutes later, and the
+        others got through within the bin.
+
+        Returns "held" (vehicles waiting now) and, if in ``want``, "count" / "cruise_count" (each
+        vehicle once on every link it gets past, veh/h) and "cruise_edge" (cruise demand, veh/h).
+        """
+        m, ix = self.m, self.ix
+        hot = ix.positions(np.flatnonzero(x > 1.0))  # links over capacity, on every route
+        r_hot = ix.route[hot]
+        worst, first_max = _worst_ahead(x[m.col_idx[hot]], r_hot)
+        # new trips wait at the worst link of their route
+        k = np.flatnonzero(np.r_[True, r_hot[1:] != r_hot[:-1]]) if len(hot) else hot
+        routes, stuck_f, neck_f = r_hot[k], 1.0 - 1.0 / worst[k], hot[first_max[k]]
+        # queued traffic at the worst link from where it waits on
+        k = np.minimum(np.searchsorted(hot, self.at), max(len(hot) - 1, 0))
+        on = (r_hot[k] == ix.route[self.at]) & (hot[k] >= self.at) if len(hot) else self.at < 0
+        stuck_q = np.where(on, 1.0 - 1.0 / worst[k] if len(hot) else 0.0, 0.0)
+        neck_q = np.where(on, hot[first_max[k]] if len(hot) else 0, self.at)
+        at = np.concatenate([self.at, neck_f, neck_q])
+        got = {}
+
+        def moved(fall, qr):
+            """What gets past each link (veh/h), and the vehicles left waiting at neck_f, neck_q."""
+            fs, qs = fall[routes] * stuck_f * CARRY, qr * stuck_q * CARRY
+            return np.concatenate([qr, -fs, -qs]), np.concatenate([fs, qs]) / 4.0
+
+        w, held = moved(f, self.veh * 4.0)
+        if "count" in want:
+            got["count"] = m.A @ f + ix.ahead(at, w)
+        if fc is not None:
+            qcr = self.cruise * 4.0
+            wc, held_c = moved(fc, qcr)
+            if "cruise_count" in want:
+                got["cruise_count"] = m.A @ fc + ix.ahead(at, wc)
+            if "cruise_edge" in want:
+                got["cruise_edge"] = m.A @ fc + ix.ahead(self.at, qcr)
+        keep = held > 1e-6
+        self.at, inv = np.unique(at[len(self.at):][keep], return_inverse=True)
+        self.veh = np.bincount(inv, weights=held[keep], minlength=len(self.at))
+        if fc is not None:
+            self.cruise = np.bincount(inv, weights=held_c[keep], minlength=len(self.at))
+        got["held"] = float(self.veh.sum())
+        return got
+
+
+@dataclass
+class _RouteIndex:
+    m: Model
+    route: np.ndarray  # route of each position in m.col_idx
+    end: np.ndarray  # first position after each route
+    by_edge: np.ndarray  # positions in m.col_idx sorted by link
+    edge_ptr: np.ndarray  # where each link's positions start in by_edge
+
+    def positions(self, edges: np.ndarray) -> np.ndarray:
+        """Every position of ``edges`` in m.col_idx, in route order."""
+        lo, n = self.edge_ptr[edges], np.diff(self.edge_ptr)[edges]
+        return np.sort(self.by_edge[_ranges(lo, n)])
+
+    def ahead(self, at: np.ndarray, w: np.ndarray) -> np.ndarray:
+        """``w`` added to the link at each position ``at`` and every link after it on its route."""
+        n = self.end[self.route[at]] - at
+        return np.bincount(self.m.col_idx[_ranges(at, n)], weights=np.repeat(w, n),
+                           minlength=len(self.m.t0))
+
+
+_INDEX: dict[int, _RouteIndex] = {}
+
+
+def _route_index(m: Model) -> _RouteIndex:
+    ix = _INDEX.get(id(m))
+    if ix is None or ix.m is not m:
+        lens = np.diff(np.append(m.col_ptr, len(m.col_idx)))
+        by_edge = np.argsort(m.col_idx, kind="stable")
+        ptr = np.zeros(len(m.t0) + 1, int)
+        ptr[1:] = np.cumsum(np.bincount(m.col_idx, minlength=len(m.t0)))
+        ix = _INDEX[id(m)] = _RouteIndex(m, np.repeat(np.arange(len(lens)), lens),
+                                         m.col_ptr + lens, by_edge, ptr)
+    return ix
+
+
+def _ranges(lo: np.ndarray, n: np.ndarray) -> np.ndarray:
+    """lo[0], ..., lo[0] + n[0] - 1, lo[1], ... as one array."""
+    start = np.zeros(len(n), int)
+    start[1:] = np.cumsum(n)[:-1]
+    return np.repeat(lo - start, n) + np.arange(n.sum())
+
+
+def _worst_ahead(xh: np.ndarray, r: np.ndarray):
+    """For links in route order (``r`` their routes): the highest x from each to the last of its
+    route, and the index of the first link where it is reached."""
+    if not len(xh):
+        return xh, np.zeros(0, int)
+    off = (r[-1] - r) * (xh.max() + 1.0)  # earlier routes higher: a running max stops at a route
+    run = np.maximum.accumulate((xh + off)[::-1])[::-1]
+    at = np.where(xh + off >= run, np.arange(len(xh)), len(xh))  # a route's last link qualifies
+    return run - off, np.minimum.accumulate(at[::-1])[::-1]
 
 
 def initial_shares(m: Model) -> np.ndarray:

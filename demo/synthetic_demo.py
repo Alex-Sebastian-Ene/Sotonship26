@@ -284,6 +284,8 @@ def build_ctx(log=print) -> tuple[Ctx, dict]:
         tm.calibrate_external(m, dft["sites"], log=log, grid=(0.6, 0.8, 1.0, 1.25, 1.6))
         calibration = tm.calibrate_to_counts(m, COUNT_SITES, log=log)
     freight_rows = tm.calibrate_freight(m, dft["sites"], log=log)
+    # the council-count grid steps by about 15%; settle the city scale more finely
+    calibration = tm.calibrate_to_counts(m, COUNT_SITES, log=log, grid=(0.9, 0.95, 1.0, 1.05, 1.1))
     near = tuple(round(m.scale_ext * f, 3) for f in (0.85, 0.92, 1.0, 1.08, 1.17))
     dft_rows = tm.calibrate_external(m, dft["sites"], log=log, grid=near)
     capacity_notes = tm.anchor_counts(m, COUNT_SITES, calibration, log=log)
@@ -609,7 +611,8 @@ def forecast(task: dict) -> dict:
         Dbg, groups = tm.background(m, dtype, rng, term=term, spread=spread, mult=mult)
         Dm = tm.match_demand(m, kickoff_hours(kick), rng) if kick else np.zeros_like(Dbg)
         Dc = sample_cruise(ctx, calls, rng, params, shifts, task.get("cruise")) if calls else np.zeros_like(Dbg)
-        want = ("x",)
+        probe = task.get("probe") if paired and calls else None  # edges for the M271 fit
+        want = base_want = ("x",) + (("count",) if probe is not None else ())
         if full:
             want += ("queue", "held")
             if calls:
@@ -626,17 +629,16 @@ def forecast(task: dict) -> dict:
         sc = float((cx > tm.AT_RISK).sum() * BIN_MIN / 60)
         if paired:
             if calls:
-                rb, _ = tm.run_day(m, Dbg + Dm, cap, sh0, 3, want=("x",), pre=pre, noise=noise,
+                rb, _ = tm.run_day(m, Dbg + Dm, cap, sh0, 3, want=base_want, pre=pre, noise=noise,
                                    events=events)
                 cxb, _ = corridor_stats(rb["x"])
-                if task.get("probe") is not None:  # paired cruise flow on chosen edges, veh/h
-                    # Link load at most capacity, not run_day's "count": queued traffic still
-                    # re-occupies the links before its bottleneck every 15 minutes, so counted
-                    # once the extra cruise cars mostly displace others at Redbridge (SOT-27,
-                    # docs/west-side-counts.md).
-                    pe = np.asarray(task["probe"])
-                    diff = np.minimum(x[:, pe], 1.0) - np.minimum(rb["x"][:, pe], 1.0)
-                    acc["probe"] = acc["probe"] + (diff * cap[pe]).mean(axis=1)
+                if probe is not None:  # paired cruise flow on chosen edges, veh/h
+                    # what a counter there sees, each vehicle once and at most capacity, as the
+                    # WebTRIS site the learned uplift comes from (SOT-30)
+                    pe = np.asarray(probe)
+                    diff = (np.minimum(res["count"][:, pe], cap[pe])
+                            - np.minimum(rb["count"][:, pe], cap[pe]))
+                    acc["probe"] = acc["probe"] + diff.mean(axis=1)
             else:
                 cxb = cx
             acc["bg85"] = acc["bg85"] + (cxb > tm.AT_RISK)
