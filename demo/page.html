@@ -24,7 +24,7 @@
   --cruise: #7A3FD1; --queue: #D8432F;
   --ra: #0A5C78; --rb: #B4458F; --rc: #C77A12;
   --g-through: #8C9BA5; --g-county: #2F7EA6; --g-outbound: #7FB8D8; --g-internal: #8DB86A;
-  --g-visitors: #E3B04B; --g-match: #C2553A; --g-cruise: #7A3FD1;
+  --g-visitors: #E3B04B; --g-match: #C2553A; --g-cruise: #7A3FD1; --g-freight: #8A6A4F;
   --font-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
   --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-data: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
@@ -47,7 +47,7 @@
     --cruise: #B894FF; --queue: #FF5A45;
     --ra: #63BEDD; --rb: #E681C9; --rc: #F0B04B;
     --g-through: #6E7F8B; --g-county: #4FA3CF; --g-outbound: #9CCDE8; --g-internal: #9CCB78;
-    --g-visitors: #F0C25E; --g-match: #E07058; --g-cruise: #B894FF;
+    --g-visitors: #F0C25E; --g-match: #E07058; --g-cruise: #B894FF; --g-freight: #B89878;
     color-scheme: dark;
   }
 }
@@ -66,7 +66,7 @@
   --cruise: #B894FF; --queue: #FF5A45;
   --ra: #63BEDD; --rb: #E681C9; --rc: #F0B04B;
   --g-through: #6E7F8B; --g-county: #4FA3CF; --g-outbound: #9CCDE8; --g-internal: #9CCB78;
-  --g-visitors: #F0C25E; --g-match: #E07058; --g-cruise: #B894FF;
+  --g-visitors: #F0C25E; --g-match: #E07058; --g-cruise: #B894FF; --g-freight: #B89878;
   color-scheme: dark;
 }
 
@@ -426,7 +426,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
         <ol class="steps">
           <li><strong>The network is Southampton's.</strong> <span id="m-edges"></span> one-way road links from OpenStreetMap, with lanes and speed limits, from motorways down to unclassified roads.</li>
           <li><strong>Zones and gateways come from geography.</strong> <span id="m-zones"></span> zones built from OSM places. Each zone's homes, jobs and shops come from nearby residential, commercial, industrial, port and retail land. <span id="m-gw"></span> county gateways sit where the M27, M3, A35, A33 and other roads cross into the area. Where cutting the map to the area broke the M27 and M3 (a missing carriageway, slip roads standing in for the motorway), and where OpenStreetMap lacks the M3 to M27 eastbound link, the model joins them up.</li>
-          <li><strong>General traffic is generated, not assumed.</strong> Commuters from the county to the area's jobs and back, residents working outside, trips between zones (more between big, close zones), through traffic between gateways and county visitors to the shops. Each has its own pattern over the day, different at weekends. The school run adds drop-off and pick-up peaks on term-time weekdays only (city council half-term 26–30 Oct). Match days add fans to St Mary's.</li>
+          <li><strong>General traffic is generated, not assumed.</strong> Commuters from the county to the area's jobs and back, residents working outside, trips between zones (more between big, close zones), through traffic between gateways, county visitors to the shops, and lorries to and from the port (fitted to DfT lorry counts on the M271). Each has its own pattern over the day, different at weekends. The school run adds drop-off and pick-up peaks on term-time weekdays only (city council half-term 26–30 Oct). Match days add fans to St Mary's.</li>
           <li><strong>Counted roads use the counts.</strong> On Portswood Road, Highfield Lane and Bevois Hill, measured peak speeds of 16–20 mph on 30 mph roads show they are at their limit, so the counted peak-hour flow sets their capacity. Local traffic the zones miss is added so flows match the counts, plus <span id="m-uni"></span> for university term, because the counts were taken in July.</li>
           <li><strong>Cruise traffic is added per ship.</strong> Car drop-offs, park and cruise, taxis and coaches, timed by disembarkation and boarding and sent to the terminal's nearest dock gate.</li>
           <li><strong>Routes are allocated dynamically.</strong> Every 15 minutes each of the <span id="m-ods"></span> origin–destination flows splits over up to three real routes and shifts towards the quickest given everyone's congestion. Traffic that cannot get through a full road waits and joins the next 15 minutes, so queues build and clear.</li>
@@ -446,7 +446,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       <div class="card">
         <h3>Trip totals in this demo</h3>
         <div class="table-scroll"><table id="purposes"></table></div>
-        <p class="foot-note">Scaled <span id="m-scale"></span>. Commuters from the county and residents working outside are Census 2021 car drivers crossing the edge of the area (<span id="m-census"></span>), with where they come from and which road they use. Through traffic and other county trips come from DfT counts on the roads into the area. Visitors, trips within the area and the school run are invented totals. Trips within the area are fitted to council counts. Everything crossing the edge of the area is fitted to DfT counts (below), because census day fell in lockdown. Cruise travel split: <span id="m-modes"></span>.</p>
+        <p class="foot-note">Scaled <span id="m-scale"></span>. Commuters from the county and residents working outside are Census 2021 car drivers crossing the edge of the area (<span id="m-census"></span>), with where they come from and which road they use. Through traffic and other county trips come from DfT counts on the roads into the area. Port freight is in car-equivalents (a lorry counts as 2.5 cars on a busy road), fitted to DfT lorry counts. Visitors, trips within the area and the school run are invented totals. Trips within the area are fitted to council counts. Everything crossing the edge of the area is fitted to DfT counts (below), because census day fell in lockdown. Cruise travel split: <span id="m-modes"></span>.</p>
       </div>
       <div class="card" style="grid-column: 1 / -1">
         <h3>Checked against council traffic counts</h3>
@@ -456,8 +456,13 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       </div>
       <div class="card" style="grid-column: 1 / -1">
         <h3>Checked against DfT traffic counts</h3>
-        <p class="foot-note">County commuters, visitors and through traffic are scaled together so that modelled average daily two-way flows match the DfT annual average daily flow (all motor vehicles) at these count points. Modelled flows are 05:00–20:00 on a weekday, Saturday and Sunday, weighted 5:1:1 and grossed up to 24 hours (<span id="dft-window"></span> of traffic assumed between 05:00 and 20:00). "Estimated" points are DfT figures factored from an older count and count half in the fit. Itchen Bridge is tolled and the model has no tolls, so some of its traffic sits on Northam Bridge instead; both are checks, not fitted. At each gateway, what the DfT count on that road leaves after census commuters and visitors is split: 30% through traffic, 70% other trips to and from the area (business, freight, the port, shopping), going to bigger and nearer zones first. Source: <span id="dft-src"></span>, downloaded <span id="dft-date"></span>.</p>
+        <p class="foot-note">County commuters, visitors and through traffic are scaled together so that modelled average daily two-way flows match the DfT annual average daily flow (all motor vehicles) at these count points. Modelled flows are 05:00–20:00 on a weekday, Saturday and Sunday, weighted 5:1:1 and grossed up to 24 hours (<span id="dft-window"></span> of traffic assumed between 05:00 and 20:00). "Estimated" points are DfT figures factored from an older count and count half in the fit. Itchen Bridge is tolled and the model has no tolls, so some of its traffic sits on Northam Bridge instead; both are checks, not fitted. At each gateway, what the DfT count on that road leaves after census commuters, visitors and port lorries is split: 30% through traffic, 70% other trips to and from the area (business, other deliveries, shopping), going to bigger and nearer zones first. Modelled port lorries count once here, not as 2.5 cars. Source: <span id="dft-src"></span>, downloaded <span id="dft-date"></span>.</p>
         <div class="table-scroll"><table id="calib-dft"></table></div>
+      </div>
+      <div class="card" id="freight-card" hidden style="grid-column: 1 / -1">
+        <h3>Port freight checked against DfT lorry counts</h3>
+        <p class="foot-note">Lorries run between the county gateways (shared by each gateway road's DfT lorry count) and the port: <span id="fr-gates"></span>. Their number is scaled so that the M271 between the A35 and junction 1, which leads only to the Western Docks and Redbridge, carries <span id="fr-share"></span> of its DfT lorry count (assumed port share). The other points also carry lorries that are not going to the port, so they are checks: modelled port lorries should sit below the count. Weekend days run at <span id="fr-days"></span> of a weekday, and lorries follow the hour-by-hour pattern of articulated lorries leaving the docks on the M271 (National Highways WebTRIS site 19974, 410 complete days, Oct 2024 to Jun 2026).<span id="fr-vts"></span> The port's own gate counts would replace these assumptions. Counted lorries are all HGVs, both directions. Source: <span id="fr-src"></span>.</p>
+        <div class="table-scroll"><table id="calib-freight"></table></div>
       </div>
       <div class="card">
         <h3>Not modelled yet</h3>
@@ -494,7 +499,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
   const N_BINS = 60, HALF = 30;
   const ISSUED_DAY = M.issued.slice(0, 10);
   const CH = '0123456789abcdefghijklmnopqrstuvwxyz';
-  const GROUP_ORDER = ['through', 'county', 'outbound', 'internal', 'visitors', 'match', 'cruise'];
+  const GROUP_ORDER = ['through', 'freight', 'county', 'outbound', 'internal', 'visitors', 'match', 'cruise'];
   const WIDTH = { motorway: 3.4, trunk: 3.0, primary: 2.6, secondary: 2.1, tertiary: 1.7, unclassified: 1.3 };
   const LEVELS = [
     { key: 'quiet', label: 'Quiet', min: 0, n: 0 }, { key: 'watch', label: 'Watch', min: 1.5, n: 1 },
@@ -604,6 +609,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     if (works) real.push(`roadworks from DfT Street Manager (${S.permits.short})`); else made.push('roadworks permits');
     if (S.matches) real.push('home matches from Southampton FC'); else made.push('match fixtures');
     if (S.terms) real.push('school holidays from Southampton City Council');
+    if (S.freight) real.push(`container and ro-ro ship calls from ${S.freight.label.split(':')[0]} (${S.freight.short})`);
     const list = a => a.length < 2 ? a.join('') : `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}`;
     const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
     $('#m-banner-label').textContent = sc.synthetic ? 'Real map, synthetic traffic' : 'Real map and inputs, modelled traffic';
@@ -623,13 +629,14 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     $('#m-zones').textContent = int(c.zones);
     $('#m-gw').textContent = int(c.gateways);
     $('#m-ods').textContent = int(c.ods);
-    $('#m-scale').textContent = `×${M.scale} for trips within the area and ×${M.scale_ext} for county and through trips`;
+    $('#m-scale').textContent = `×${M.scale} for trips within the area, ×${M.scale_ext} for county and through trips` + (M.scale_freight ? ` and ×${M.scale_freight} for port freight` : '');
+    const scaleOf = g => g === 'freight' ? (M.scale_freight || 1) : EXTERNAL.has(g) ? M.scale_ext : M.scale;
     const ms = M.assumptions.mode_share;
     $('#m-modes').textContent = `car drop-off ${Math.round(ms.car * 100)}%, park and cruise ${Math.round(ms.park * 100)}%, taxi ${Math.round(ms.taxi * 100)}%, coach ${Math.round(ms.coach * 100)}%`;
     const rows = {};
     M.purposes.forEach(p => { (rows[p.group] ||= [0, 0, 0]); p.totals.forEach((t, i) => rows[p.group][i] += t); });
     $('#purposes').innerHTML = `<thead><tr><th>Trips per day</th><th>Weekday</th><th>Saturday</th><th>Sunday</th></tr></thead><tbody>${Object.entries(rows).map(([g, t]) =>
-      `<tr><td>${esc(M.groups[g])}</td>${t.map(v => `<td class="num">${int(v * (EXTERNAL.has(g) ? M.scale_ext : M.scale))}</td>`).join('')}</tr>`).join('')}</tbody>`;
+      `<tr><td>${esc(M.groups[g])}</td>${t.map(v => `<td class="num">${int(v * scaleOf(g))}</td>`).join('')}</tr>`).join('')}</tbody>`;
     const cal = M.calibration;
     const keep = cal.rows.filter(r => r.period !== 'day');
     const sum = (dd, per, k) => keep.filter(r => r.day === dd && r.period === per).reduce((a, r) => a + r[k], 0);
@@ -649,6 +656,18 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
       $('#dft-src').textContent = dft.source;
       $('#dft-date').textContent = dft.collected;
       $('#dft-window').textContent = `${Math.round(cal.day_window_share * 100)}%`;
+    }
+    const fr = cal.freight;
+    if (fr && fr.rows && fr.rows.length) {
+      $('#freight-card').hidden = false;
+      $('#fr-gates').textContent = Object.entries(fr.gate_share).map(([g, v]) => `${g} ${Math.round(v * 100)}%`).join(', ') + `; about ${int(fr.lorries_each_way)} lorries each way on a weekday`;
+      $('#fr-share').textContent = `${Math.round(fr.port_share_m271 * 100)}%`;
+      $('#fr-days').textContent = `${Math.round(fr.day_ratio[1] * 100)}% (Saturday) and ${Math.round(fr.day_ratio[2] * 100)}% (Sunday)`;
+      $('#fr-src').textContent = dft ? `${dft.source}, downloaded ${dft.collected}` : '';
+      const fv = (M.sources || {}).freight;
+      $('#fr-vts').textContent = fv ? ` On ${fv.days.length} days the VTS feed covers in full, the day's container and ro-ro ship calls move port lorries up or down (half the swing in calls; an assumption, not fitted). Source: ${fv.label}.` : ' Ship calls do not change the lorry numbers yet: no VTS freight snapshot was available for this build.';
+      $('#calib-freight').innerHTML = `<thead><tr><th>Count point</th><th>Year</th><th>Lorries counted (AADF)</th><th>Modelled port lorries</th><th>Port share</th></tr></thead><tbody>${fr.rows.map(r =>
+        `<tr><td>${esc(r.road)} <span class="muted mono">#${r.count_point}</span>${r.fitted ? ' <strong>(fitted)</strong>' : ' <span class="muted">(check)</span>'}</td><td>${r.year}</td><td class="num">${int(r.observed_hgv)}</td><td class="num">${int(r.modelled_port_lorries)}</td><td class="num">${Math.round(r.modelled_port_lorries / r.observed_hgv * 100)}%</td></tr>`).join('')}</tbody>`;
     }
     const cz = M.census;
     if (cz && cz.drivers) $('#m-census').textContent = `${int(cz.drivers.county)} in and ${int(cz.drivers.outbound)} out per weekday in 2021, ${Math.round(cz.commute_day * 100)}% assumed to travel on a given weekday`;
@@ -1271,6 +1290,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
     d.calls.filter(c => c.pax == null).forEach(c => notes.push(`<div class="notice notice-warn"><span class="tag">Missing data</span><span><strong>${esc(c.ship)}</strong> has no published passenger figure. The forecast assumes ${int(M.unknown_pax_range[0])} to ${int(M.unknown_pax_range[1])} passengers, so its gate traffic has a wider range than usual.</span></div>`));
     const wd = dateOf(d.date).getDay();
     if (wd >= 1 && wd <= 5 && !d.term) notes.push('<div class="notice"><span class="tag">Half-term</span><span>No school run this week (Southampton City Council half-term), so the 08:15 and 15:00 peaks are lighter.</span></div>');
+    if (d.freight) notes.push(`<div class="notice${d.freight.unconfirmed ? ' notice-warn' : ''}"><span class="tag">Freight</span><span>Port lorries ×${d.freight.factor.toFixed(2)}: ${d.freight.moves} container and ro-ro ship arrivals and departures planned today, against ${d.freight.mean_moves} a day over the days the feed covers (Southampton VTS, ABP). Scaling lorries by ship calls is an assumption, not fitted, so the swing is halved.${d.freight.unconfirmed ? ` ${d.freight.unconfirmed} of today's times are not yet confirmed.` : ''}</span></div>`);
     if (!d.calls.length) notes.push('<div class="notice"><span class="tag">No ships</span><span>No turnarounds today. The map shows everyday traffic only.</span></div>');
     $('#notices').innerHTML = notes.join('');
     $('#notices').querySelectorAll('[data-scenario]').forEach(b => b.addEventListener('click', () => setScenario(b.dataset.scenario)));

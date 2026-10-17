@@ -38,6 +38,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "src"))
 sys.path.insert(0, str(HERE))
 import external_data as ext  # noqa: E402
+import freight_days as fd  # noqa: E402
 import traffic_model as tm  # noqa: E402
 
 from sotonship26.demand.passengers import TurnaroundParams  # noqa: E402
@@ -276,10 +277,11 @@ def build_ctx(log=print) -> tuple[Ctx, dict]:
             gates["Western Docks gate"] = tuple(np.mean(west, axis=0).round().astype(int))
         if east:
             gates["Eastern Docks gate"] = tuple(np.mean(east, axis=0).round().astype(int))
-    m = tm.build(CACHE / "network.pkl", gates, log=log)
+    m = tm.build(CACHE / "network.pkl", gates, log=log, port_gates=dict(base.get("gates") or {}))
     dft = ext.count_points(log=log)
     tm.calibrate_external(m, dft["sites"], log=log, grid=(0.6, 0.8, 1.0, 1.25, 1.6))
     calibration = tm.calibrate_to_counts(m, COUNT_SITES, log=log)
+    freight_rows = tm.calibrate_freight(m, dft["sites"], log=log)
     near = tuple(round(m.scale_ext * f, 3) for f in (0.85, 0.92, 1.0, 1.08, 1.17))
     dft_rows = tm.calibrate_external(m, dft["sites"], log=log, grid=near)
     capacity_notes = tm.anchor_counts(m, COUNT_SITES, calibration, log=log)
@@ -341,7 +343,8 @@ def build_ctx(log=print) -> tuple[Ctx, dict]:
               seg_ptr=seg_ptr, gates=gate_ids, terminal_gate=terminal_gate, luts=luts,
               gate_mask=gate_mask, gw_in=gw_in, cruise_ods=cruise_ods,
               extra={"segs": segs, "gateways": gws, "calibration": calibration,
-                     "capacity": capacity_notes, "dft": {**dft, "rows": dft_rows}})
+                     "capacity": capacity_notes, "dft": {**dft, "rows": dft_rows},
+                     "freight": freight_rows})
     return ctx, base
 
 
@@ -521,7 +524,36 @@ def day_multipliers(d: date, wet: bool) -> dict:
         visitors *= hol
     w = WET_DEMAND if wet else 1.0
     return {"county": commute * w * hol, "outbound": commute * w * hol, "internal": w * hol,
-            "through": hol, "visitors": visitors * w, "school": w}
+            "through": hol, "visitors": visitors * w, "school": w, "freight": hol}
+
+
+def load_freight_days(log=print) -> tuple[dict, dict | None]:
+    """Port lorry factors per day from the cached VTS freight snapshots (see freight_days.py),
+    and their source for the page. Without snapshots every day keeps the DfT-fitted average."""
+    try:
+        import pandas as pd
+        from sotonship26.data import vts_freight as vf
+    except ImportError as exc:
+        log(f"VTS freight: loader unavailable ({exc}); port lorries stay at the DfT-fitted average")
+        return {}, None
+    frames = [f for f in vf.load_extracts() if len(f)]
+    if not frames:
+        log(f"VTS freight: no snapshots in {vf.RAW_DIR}; "
+            "port lorries stay at the DfT-fitted average")
+        return {}, None
+    factors = fd.freight_day_factors(vf.daily_freight_calls(frames))
+    stamps = [pd.Timestamp(f["collected_at"].max()) for f in frames]
+    taken = max(t if t.tzinfo else t.tz_localize("UTC") for t in stamps).tz_convert("Europe/London")
+    for d, f in sorted(factors.items()):
+        log(f"VTS freight {d}: {f['moves']} container and ro-ro movements (mean {f['mean_moves']}) "
+            f"-> port lorries x{f['factor']:.2f}"
+            + (f", {f['unconfirmed']} not confirmed" if f["unconfirmed"] else ""))
+    when = taken.strftime("%d %b %Y %H:%M")
+    return factors, {
+        "label": f"{fd.CREDIT}: planned container and ro-ro movements, {len(frames)} snapshot"
+                 f"{'s' if len(frames) > 1 else ''}, latest {when}",
+        "short": f"latest snapshot {when}", "synthetic": False, "url": vf.SOURCE_PAGE,
+        "checked": taken.date().isoformat(), "shrink": fd.SHRINK, "days": sorted(factors)}
 
 
 def forecast(task: dict) -> dict:
@@ -570,8 +602,9 @@ def forecast(task: dict) -> dict:
             b0 = int(rng.integers(0, N_BINS - 4))
             events.append((np.asarray(seg["edges"]), b0, b0 + int(rng.integers(4, 9)), 0.55))
         noise = rng.lognormal(-PERCEPTION_SD**2 / 2, PERCEPTION_SD, len(m.t0))
-        Dbg, groups = tm.background(m, dtype, rng, term=term, spread=spread,
-                                    mult=day_multipliers(d, wet))
+        mult = day_multipliers(d, wet)
+        mult["freight"] = mult.get("freight", 1.0) * task.get("freight_f", 1.0)
+        Dbg, groups = tm.background(m, dtype, rng, term=term, spread=spread, mult=mult)
         Dm = tm.match_demand(m, kickoff_hours(kick), rng) if kick else np.zeros_like(Dbg)
         Dc = sample_cruise(ctx, calls, rng, params, shifts, task.get("cruise")) if calls else np.zeros_like(Dbg)
         want = ("x",)
@@ -886,6 +919,9 @@ def main(argv=None) -> None:
         pickle.dump(ctx, f)
 
     sched = make_schedule(np.random.default_rng(SEED))
+    freight_f, freight_src = load_freight_days(log)
+    if freight_src:
+        SOURCES["freight"] = freight_src
     tasks = []
     d = FIRST_DAY
     while d <= HORIZON and (args.days is None or len(tasks) < args.days):
@@ -894,7 +930,8 @@ def main(argv=None) -> None:
                  for c in sched[d]]
         tasks.append({"date": d.isoformat(), "key": "base", "calls": calls, "full": True,
                       "closed": [p["corridor"] for p in permits_on(d)], "match": match_on(d),
-                      "n": args.n, "term": in_term(d), "paired": True})
+                      "n": args.n, "term": in_term(d), "paired": True,
+                      "freight_f": fd.factor_on(freight_f, d)})
         d += timedelta(days=1)
     log(f"forecasting {len(tasks)} days on {args.workers} workers")
     with ProcessPoolExecutor(args.workers, initializer=_init, initargs=(str(ctx_path),)) as pool:
@@ -980,7 +1017,7 @@ def main(argv=None) -> None:
             for c in task["calls"]],
             "score": round(score(r["p85"]), 2), "bg_score": round(score(r["bg85"]), 2),
             "permits": [p["id"] for p in permits_on(date.fromisoformat(task["date"]))],
-            "match": task["match"], "term": task["term"],
+            "match": task["match"], "term": task["term"], "freight": freight_f.get(task["date"]),
             "delay": {c[0]: np.rint(r["delay50"][:, i]).astype(int).tolist() for i, c in enumerate(ctx.corr)},
             "delay90": {c[0]: np.rint(r["delay90"][:, i]).astype(int).tolist() for i, c in enumerate(ctx.corr)},
             "range": ranges(r["scores"]), "spread": round(r["spread"], 2),
@@ -1070,6 +1107,7 @@ def main(argv=None) -> None:
                  "horizon": HORIZON.isoformat(), "n": args.n, "seed": SEED, "bin_minutes": BIN_MIN,
                  "at_risk": tm.AT_RISK, "unknown_pax_range": UNKNOWN_PAX_RANGE, "model": "v0.2-demo",
                  "scale": round(m.scale, 3), "scale_ext": round(m.scale_ext, 3),
+                 "scale_freight": round(m.scale_freight, 3),
                  "capacity_notes": ctx.extra["capacity"], "uni_term": tm.UNI_TERM,
                  "uncertainty": {"p_wet": P_WET, "wet_capacity": WET_CAPACITY, "wet_demand": WET_DEMAND,
                                  "incident_p": INCIDENT_P, "perception_sd": PERCEPTION_SD,
@@ -1086,7 +1124,13 @@ def main(argv=None) -> None:
                                          "collected": ctx.extra["dft"]["collected"],
                                          "rows": ctx.extra["dft"]["rows"],
                                          "day_weights": tm.DAY_WEIGHTS,
-                                         "estimated_weight": tm.ESTIMATED_WEIGHT}},
+                                         "estimated_weight": tm.ESTIMATED_WEIGHT},
+                                 "freight": {"rows": ctx.extra["freight"], "hgv_pcu": tm.HGV_PCU,
+                                             "port_share_m271": tm.PORT_SHARE_M271,
+                                             "gate_share": tm.PORT_GATE_SHARE,
+                                             "day_ratio": tm.FREIGHT_DAYS,
+                                             "lorries_each_way":
+                                                 round(tm.FREIGHT_LORRIES * m.scale_freight)}},
                  "census": m.census,
                  "counts": {"zones": sum(c.kind == "zone" for c in m.centroids),
                             "gateways": len(gws), "ods": m.n_od, "routes": len(m.paths),
