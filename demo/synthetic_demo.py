@@ -401,6 +401,9 @@ WET_DEMAND = 1.03  # and a few more people drive
 INCIDENT_P = 0.15  # chance a day has a breakdown or crash on a main road
 PERCEPTION_SD = 0.12  # how far drivers misjudge a road's travel time, shared by all its users
 MAJOR_CLASSES = {"motorway", "trunk", "primary"}
+# Day in December -> traffic compared with a normal day. Observed: daytime totals at WebTRIS
+# M3 J14 (20025) and M271 (19974), 2024 and 2025, against the same weekday 2-5 weeks earlier.
+CHRISTMAS_WEEK = {24: 0.65, 25: 0.30, 26: 0.50, 27: 0.70}
 
 
 def lead_spread(d: date) -> float:
@@ -409,16 +412,20 @@ def lead_spread(d: date) -> float:
 
 
 def day_multipliers(d: date, wet: bool) -> dict:
-    """Weekday pattern, Christmas shopping season and weather, per kind of trip."""
+    """Weekday pattern, Christmas shopping season, Christmas week and weather, per kind of trip."""
     wd = d.weekday()
     commute = {0: 0.97, 1: 1.02, 2: 1.03, 3: 1.02, 4: 0.93}.get(wd, 1.0)
     visitors = {4: 1.06}.get(wd, 1.0)
-    start, peak = date(d.year, 11, 14), date(d.year, 12, 24)
-    if start <= d <= peak:  # Christmas shopping builds week by week, then drops back in January
+    start, peak = date(d.year, 11, 14), date(d.year, 12, 23)
+    if start <= d <= peak:  # Christmas shopping builds week by week, then drops back
         visitors *= 1.10 + 0.05 * ((d - start).days // 7)
+    # Christmas week: commuting, local and through trips fall away; shops shut on Christmas Day
+    hol = CHRISTMAS_WEEK.get(d.day, 1.0) if d.month == 12 else 1.0
+    if d.month == 12 and d.day == 25:
+        visitors *= hol
     w = WET_DEMAND if wet else 1.0
-    return {"county": commute * w, "outbound": commute * w, "internal": w, "through": 1.0,
-            "visitors": visitors * w, "school": w}
+    return {"county": commute * w * hol, "outbound": commute * w * hol, "internal": w * hol,
+            "through": hol, "visitors": visitors * w, "school": w}
 
 
 def forecast(task: dict) -> dict:
