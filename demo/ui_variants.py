@@ -72,15 +72,17 @@ body[data-variant="focus"] .map-box { height: max(420px, calc(100vh - 360px)) !i
 
 # 2 ---------------------------------------------------------------- Story: a landing page, then five guided steps
 VARIANTS["story"] = ("""
-.storybar { position: sticky; top: 58px; z-index: 35; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: 10px max(16px, env(safe-area-inset-left, 0px));
+.storybar { position: sticky; top: 58px; z-index: 35; display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 10px 14px; padding: 10px max(16px, env(safe-area-inset-left, 0px));
   background: color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
-.story-q { display: flex; align-items: center; gap: 12px; font-family: var(--font-display); font-size: clamp(1.3rem, 2.6vw, 2rem); font-weight: 750; margin-right: auto; }
+.story-q { display: flex; align-items: center; gap: 12px; min-width: 0; white-space: nowrap; font-family: var(--font-display); font-size: clamp(1.3rem, 2.6vw, 2rem); font-weight: 750; }
+#story-q { overflow: hidden; text-overflow: ellipsis; }
+.storybar .v-btn { min-width: 88px; }
 .story-q .spr { height: 46px; width: auto; flex: none; }
 .story-ico { display: inline-flex; animation: stk-pop .45s cubic-bezier(.2, 1.6, .4, 1) both; }
 .story-n { font-family: var(--font-data); color: var(--accent); }
 @keyframes stk-pop { from { transform: scale(.3) rotate(-20deg); } to { transform: none; } }
 /* voyage: the current step is a steamship sailing between buoys */
-.voyage { position: relative; width: 260px; height: 56px; margin-right: 28px; --k: 0; }
+.voyage { position: relative; width: 260px; height: 56px; margin-right: 28px; flex: none; --k: 0; }
 .voy-sea { position: absolute; left: 0; right: 0; bottom: 6px; height: 10px; opacity: .8;
   background: radial-gradient(circle at 5px -1px, transparent 5px, var(--accent) 5.5px 7px, transparent 7.5px) 0 0 / 10px 10px repeat-x; }
 .voy-port { position: absolute; bottom: 4px; left: calc(var(--x) * (100% - 18px)); width: 18px; height: 18px; padding: 0; border-radius: 50%; cursor: pointer;
@@ -122,6 +124,17 @@ body[data-variant="story"] .map-box { height: max(440px, calc(100vh - 300px)) !i
 body[data-variant="story"][data-view="step3"] .map-bar .seg-ctl, body[data-variant="story"][data-view="step3"] .map-bar select,
 body[data-variant="story"][data-view="step3"] .map-bar label, body[data-variant="story"][data-view="step3"] .map-legend,
 body[data-variant="story"][data-view="step3"] .time-row { display: none !important; }
+.scroll-next { position: fixed; left: 50%; bottom: 18px; z-index: 50; display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-radius: 999px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); box-shadow: 0 10px 30px rgba(0, 0, 0, .3); font-weight: 700; font-size: .9rem;
+  transform: translate(-50%, 140%); opacity: 0; transition: transform .3s cubic-bezier(.2, .8, .2, 1), opacity .3s; pointer-events: none; }
+.scroll-next.on { transform: translate(-50%, 0); opacity: 1; }
+.scroll-next.up { top: 150px; bottom: auto; transform: translate(-50%, -40%); }
+.scroll-next.up.on { transform: translate(-50%, 0); }
+.sn-arrow { font-size: 1.1rem; color: var(--accent); animation: sn-bob 1.2s ease-in-out infinite; }
+@keyframes sn-bob { 50% { transform: translateY(3px); } }
+.sn-bar { width: 70px; height: 6px; border-radius: 3px; background: var(--sunk); overflow: hidden; }
+.sn-bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .12s; }
+:root[data-theme="steam"] .scroll-next { border: 2px solid #1D2B45; box-shadow: 3px 3px 0 #1D2B45; }
 .home-btn { width: 46px; height: 40px; padding: 2px 4px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--surface); cursor: pointer; transition: transform .15s; }
 .home-btn:hover { transform: translateY(-2px) rotate(-3deg); }
 .home-btn .ship-svg { width: 100%; }
@@ -219,7 +232,8 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
   .l-ship { left: 79%; width: 30vmax; bottom: 16%; } .l-sun { left: 79%; } .l-light { display: none; } .l-rock-spray { display: none; }
 }
 @media (max-width: 640px) { .l-light { display: none; } .l-rock-spray { display: none; }
-  .storybar { gap: 8px 10px; } .story-q { flex-basis: 100%; } .voyage { flex: 1 1 150px; width: auto; } .storybar .v-btn { padding: 6px 12px; min-height: 36px; } }
+  .storybar { grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px 10px; } .story-q { grid-column: 1 / -1; } .voyage { width: auto; margin-right: 22px; }
+  .storybar .v-btn { padding: 6px 12px; min-height: 36px; min-width: 64px; } }
 @media (prefers-reduced-motion: reduce) { .landing *, .voy-ship, .deco-gull { animation: none !important; transition: none !important; } .landing { transition: none; } }
 """, r"""
   const NAVY = '#1D2B45', CREAM = '#FFF6E6', RED = '#E4573F';
@@ -268,7 +282,7 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
   home.innerHTML = SHIP_SVG('home'); $('.brand').prepend(home);
   const gull = document.createElement('span'); gull.className = 'deco-gull'; gull.innerHTML = '<span class="gl"><span class="gl2"><span class="spr spr-gull"></span></span></span>'; gull.setAttribute('aria-hidden', 'true'); document.body.append(gull);
   let step = 0;
-  function showStep(i) {
+  function showStep(i, fromBelow) {
     const prev = step;
     step = Math.max(0, Math.min(STEPS.length - 1, i));
     showSet('step' + step);
@@ -280,9 +294,50 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
     if (STEPS[step].map) mapLive(true); else stopVehicles();
     if (step === 4) { const v = $('#ppo-viz'); if (v && !v.open) { v.open = true; v.dispatchEvent(new Event('toggle')); } }
     const w = $('.wrap'); w.classList.remove('view-enter'); void w.offsetWidth; w.classList.add('view-enter');
-    window.scrollTo(0, 0);
+    window.scrollTo(0, fromBelow ? document.documentElement.scrollHeight : 0);
+    scrollHint();
   }
   $('#story-back').addEventListener('click', () => showStep(step - 1));
+
+  /* scroll through: past the end of a step, keep scrolling (wheel, trackpad, swipe, Page Down) to reach the
+     next one, and past the top to go back. A bar fills as you pull, so a stray flick never turns the page. */
+  const hint = document.createElement('div'); hint.className = 'scroll-next'; hint.setAttribute('aria-hidden', 'true');
+  hint.innerHTML = '<span class="sn-arrow"></span><span class="sn-t"></span><span class="sn-bar"><i></i></span>';
+  document.body.append(hint);
+  const NEED = 280, tgt = e => (e.target instanceof Element ? e.target : document.body);
+  let pull = 0, lock = 0, relax = null;
+  const atBottom = () => innerHeight + scrollY >= document.documentElement.scrollHeight - 6;
+  const atTop = () => scrollY <= 2;
+  const blocked = () => performance.now() < lock || !!document.querySelector('.landing') || document.body.classList.contains('selecting');
+  function scrollHint() {
+    const down = pull >= 0, target = step + (down ? 1 : -1), show = !blocked() && STEPS[target] && (down ? atBottom() : pull < 0);
+    hint.classList.toggle('on', !!show); hint.classList.toggle('up', !down);
+    if (!show) return;
+    hint.querySelector('.sn-arrow').textContent = down ? '↓' : '↑';
+    hint.querySelector('.sn-t').textContent = `${down ? 'Keep scrolling' : 'Back to'}: ${STEPS[target].q}`;
+    hint.querySelector('.sn-bar i').style.width = `${Math.min(100, Math.abs(pull) / NEED * 100)}%`;
+  }
+  function pullBy(d) {
+    if (blocked()) { pull = 0; return scrollHint(); }
+    if (d > 0 && atBottom() && step < STEPS.length - 1) pull = Math.max(0, pull) + d;
+    else if (d < 0 && atTop() && step > 0) pull = Math.min(0, pull) + d;
+    else pull = 0;
+    if (Math.abs(pull) >= NEED) { const dir = Math.sign(pull); pull = 0; lock = performance.now() + 900; showStep(step + dir, dir < 0); return; }
+    scrollHint();
+    clearTimeout(relax); relax = setTimeout(() => { pull = 0; scrollHint(); }, 700);
+  }
+  addEventListener('wheel', e => { if (!e.ctrlKey && !tgt(e).closest('.dial')) pullBy(e.deltaY * (e.deltaMode === 1 ? 32 : e.deltaMode === 2 ? innerHeight : 1)); }, { passive: true });
+  let touchY = null;
+  addEventListener('touchstart', e => { touchY = e.touches[0].clientY; }, { passive: true });
+  addEventListener('touchmove', e => { if (touchY == null || tgt(e).closest('.map-box')) return; const y = e.touches[0].clientY; pullBy((touchY - y) * 2); touchY = y; }, { passive: true });
+  addEventListener('touchend', () => { touchY = null; });
+  addEventListener('scroll', scrollHint, { passive: true });
+  addEventListener('keydown', e => {
+    if (blocked() || e.defaultPrevented || tgt(e).closest('input, select, textarea, [role="slider"]')) return;
+    const fwd = e.key === 'PageDown' || (e.key === ' ' && !tgt(e).closest('button')) || e.key === 'ArrowDown', back = e.key === 'PageUp' || e.key === 'ArrowUp';
+    if (fwd && atBottom() && step < STEPS.length - 1) { e.preventDefault(); lock = performance.now() + 400; showStep(step + 1); }
+    else if (back && atTop() && step > 0) { e.preventDefault(); lock = performance.now() + 400; showStep(step - 1, true); }
+  });
   $('#story-next').addEventListener('click', () => showStep(step + 1));
   bar.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => showStep(+b.dataset.step)));
   $('#cal').addEventListener('click', e => { if (e.target.closest('button[data-date]') && step === 0) setTimeout(() => showStep(1), 250); });
@@ -424,7 +479,12 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
   land.querySelector('#l-go').addEventListener('click', sail);
   if (location.hash !== '#app') {
     document.body.append(land);
-    land.addEventListener('keydown', e => { if (e.key === 'Escape') sail(); });
+    land.addEventListener('keydown', e => { if (e.key === 'Escape' || e.key === 'PageDown' || e.key === 'ArrowDown') sail(); });
+    // scrolling down on the landing page sets sail too
+    land.addEventListener('wheel', e => { if (e.deltaY > 20) sail(); }, { passive: true });
+    let ly = null;
+    land.addEventListener('touchstart', e => { ly = e.touches[0].clientY; }, { passive: true });
+    land.addEventListener('touchmove', e => { if (ly != null && ly - e.touches[0].clientY > 60) { ly = null; sail(); } }, { passive: true });
     setTimeout(() => $('#l-go').focus({ preventScroll: true }), 50);
   }
   renderChip(); showStep(0);
