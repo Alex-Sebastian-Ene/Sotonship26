@@ -580,7 +580,7 @@ tpl = TEMPLATE.read_text(encoding="utf-8")
 data = DATA.read_text(encoding="utf-8")
 for tag_ in ("demo-data", "extra-data"):
     m = re.search(rf'(<script id="{tag_}" type="application/json">)(.*?)(</script>)', data, re.S)
-    tpl = re.sub(rf'(<script id="{tag_}" type="application/json">)(.*?)(</script>)', lambda k: k[1] + m[2] + k[3], tpl, count=1, flags=re.S)
+    tpl = re.sub(rf'(<script id="{tag_}" type="application/json">)(.*?)(</script>)', lambda k, m=m: k[1] + m[2] + k[3], tpl, count=1, flags=re.S)
 assert tpl.count(INIT) == 1 and tpl.count("</style>") == 1
 TITLES = {"focus": "Forecast · Focus", "story": "Cruise-day traffic", "officer": "Forecast · Officer", "wall": "Forecast · Wallboard"}
 

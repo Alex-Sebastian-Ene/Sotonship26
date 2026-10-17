@@ -18,4 +18,6 @@ Ground rules that cost points if broken:
 - Record AI-generated parts in the README provenance section.
 - Stay in your lane's paths (see PROTOCOL.md). Shared files change through a PR.
 
-Commands: `uv run pytest`, `uv run ruff check .`, `uv run sotonship-eval --scenario streets`.
+Commands: `uv run --extra cpu pytest`, `uv run ruff check .`. The forecast page is built by the `demo/` scripts
+(see `cluster/iridis/agents_ppo_cpu.slurm` for the order); `sotonship-eval` and `sotonship-train` belong to the
+parked pedestrian and waterway design.

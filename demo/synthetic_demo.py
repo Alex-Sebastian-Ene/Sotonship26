@@ -223,7 +223,7 @@ def frame_origin():
 
     t = Transformer.from_crs("EPSG:4326", "EPSG:27700", always_xy=True)
     w, s, e, n = BBOX
-    xs, ys = zip(*[t.transform(x, y) for x, y in [(w, s), (e, s), (e, n), (w, n)]])
+    xs, ys = zip(*[t.transform(x, y) for x, y in [(w, s), (e, s), (e, n), (w, n)]], strict=True)
     return min(xs), max(ys), t
 
 
@@ -370,7 +370,8 @@ def cruise_sets(ctx: Ctx, county: float) -> dict:
     """Origin sets for cruise cars and taxis with ``county`` of them from the county gateways."""
     m, n_gw = ctx.m, len(ctx.extra["gateways"])
     out = {}
-    for key, gw_part in (("car_from", 0.8), ("taxi_far", 0.3)):
+    # the fixed county shares (0.8 cars, 0.3 taxis) predate the fitted `county`; both now use it
+    for key, _gw_part in (("car_from", 0.8), ("taxi_far", 0.3)):
         ids, probs = m.sets[key]
         probs = np.asarray(probs, float).copy()
         off = len(ids) - len(ctx.extra["gateways"]) - sum(1 for c in m.centroids if c.kind == "zone")
@@ -423,8 +424,8 @@ def sample_cruise(ctx: Ctx, calls, rng, p: TurnaroundParams, shifts=None, cruise
             cars, parks = round(n_car / PEOPLE_PER["car"]), round(n_park / PEOPLE_PER["park"])
             taxis, coaches = round(n_taxi / PEOPLE_PER["taxi"]), math.ceil(n_coach / PEOPLE_PER["coach"])
             if leg == "dis":
-                def when(n):
-                    return start + p.disembark_duration_min * rng.beta(2.0, 3.0, n)
+                def when(n):  # called within this iteration, so the loop variables are current
+                    return start + p.disembark_duration_min * rng.beta(2.0, 3.0, n)  # noqa: B023
                 t = when(cars)
                 o = add(t - 20, "car_from", gate, "in", 1.0)
                 if o is not None:
@@ -437,8 +438,8 @@ def sample_cruise(ctx: Ctx, calls, rng, p: TurnaroundParams, shifts=None, cruise
                 if o is not None:
                     put(when(coaches) + 20, o, "coach_from", gate, "out", COACH_PCU)
             else:
-                def when(n):
-                    return lo + (hi - lo) * rng.beta(2.0, 2.0, n)
+                def when(n):  # called within this iteration, so the loop variables are current
+                    return lo + (hi - lo) * rng.beta(2.0, 2.0, n)  # noqa: B023
                 t = when(cars)
                 o = add(t, "car_from", gate, "in", 1.0)
                 if o is not None:
@@ -536,6 +537,7 @@ def load_freight_days(log=print) -> tuple[dict, dict | None]:
     and their source for the page. Without snapshots every day keeps the DfT-fitted average."""
     try:
         import pandas as pd
+
         from sotonship26.data import vts_freight as vf
     except ImportError as exc:
         log(f"VTS freight: loader unavailable ({exc}); port lorries stay at the DfT-fitted average")
@@ -732,7 +734,7 @@ def advise(task: dict) -> dict:
 
     base = best = run(shifts)
     options = []
-    for i, c in enumerate(calls):
+    for i in range(len(calls)):
         opts = {"dis": {0: round(best, 2)}, "emb": {}}
         for kind, values in (("dis", DIS_OPTS), ("emb", EMB_OPTS)):
             j = 0 if kind == "dis" else 1
@@ -1011,7 +1013,7 @@ def main(argv=None) -> None:
     edge_seg = np.empty(len(m.t0), int)
     for i, s in enumerate(segs):
         edge_seg[s["edges"]] = i
-    for cid, label, group, idx in ctx.corr:
+    for cid, _label, _group, idx in ctx.corr:
         corr_segs[cid] = sorted({int(edge_seg[k]) for k in idx})
     gws = ctx.extra["gateways"]
     paths_out: dict[int, str] = {}
@@ -1059,7 +1061,7 @@ def main(argv=None) -> None:
             # route choice for the busiest cruise origin-destination pairs
             veh = r["path_c"].reshape(N_BINS, m.n_od, tm.ROUTES).sum(axis=(0, 2)) / 4
             picks = []
-            for gi, g in enumerate(ctx.gates):
+            for g in ctx.gates:
                 for direction in ("in", "out"):
                     js = [j for j in ctx.cruise_ods
                           if (m.ods[j][1] == g if direction == "in" else m.ods[j][0] == g)]

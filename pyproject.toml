@@ -1,7 +1,7 @@
 [project]
 name = "sotonship26"
 version = "0.1.0"
-description = "Probabilistic crowd and waterway congestion forecasts for Southampton cruise turnaround days."
+description = "Probabilistic cruise-day road traffic forecasts for Southampton City Council."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
@@ -110,6 +110,11 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# demo/ builds the forecast page: its files carry page markup, styles and scripts in Python strings and
+# long data literals, which do not wrap usefully at 100 characters.
+"demo/*.py" = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
