@@ -60,6 +60,8 @@ IMGSZ = {"street": 640, "aerial": 1024}
 
 TILE = 1024
 OVERLAP = 128
+# Above this bicubic only blurs, and a value like 25 is more likely cm than a factor.
+MAX_UPSAMPLE = 8.0
 GEOTIFF_SUFFIXES = {".tif", ".tiff"}
 
 _MODELS: dict[str, Any] = {}
@@ -181,29 +183,37 @@ def detect(
     """All counted detections in the image: columns cx, cy (image pixels), kind, conf.
 
     ``kind`` is "cars" or "large_vehicles"; other classes are dropped. Aerial images are tiled
-    (see module docstring); street stills go through in one pass. ``upsample`` > 1 enlarges the
-    image (bicubic) before detection, for imagery coarser than the model was trained on (DOTA is
-    roughly 10-30 cm a pixel, so 25 cm car parks gain from 2-4); cx, cy stay in the original
-    image's pixels.
+    (see module docstring); street stills go through in one pass.
+
+    ``upsample`` > 1 is for imagery coarser than the model was trained on (DOTA is roughly
+    10-30 cm a pixel, so 25 cm car parks gain from 2-4). Each crop is cut from the original at
+    ``tile / upsample`` px and enlarged (bicubic) to about ``tile`` px just before detection, so
+    memory stays at one crop whatever the image size; run time still grows with ``upsample**2``.
+    Centres are mapped back with each crop's exact size ratio, so cx, cy are in the original
+    image's pixels (pixel-edge convention, as raster transforms use).
     """
-    if upsample <= 0:
-        raise ValueError(f"upsample must be > 0, not {upsample}")
-    if upsample != 1:
-        det = detect(_resize(rgb, upsample), model, mode, conf=conf, tile=tile, overlap=overlap)
-        return det.assign(cx=det["cx"] / upsample, cy=det["cy"] / upsample)
+    if not 0 < upsample <= MAX_UPSAMPLE:
+        raise ValueError(f"upsample must be in (0, {MAX_UPSAMPLE}], not {upsample}")
     height, width = rgb.shape[:2]
     if mode == "aerial":
-        xs, ys = _axis_starts(width, tile, overlap), _axis_starts(height, tile, overlap)
+        src_tile = max(1, round(tile / upsample))
+        src_overlap = min(round(overlap / upsample), src_tile - 1)
+        xs, ys = (
+            _axis_starts(width, src_tile, src_overlap),
+            _axis_starts(height, src_tile, src_overlap),
+        )
     else:
-        xs, ys, tile = [0], [0], max(height, width)
+        xs, ys, src_tile = [0], [0], max(height, width)
     frames = []
-    for y0, (cy0, cy1) in zip(ys, _axis_cores(ys, tile), strict=True):
-        for x0, (cx0, cx1) in zip(xs, _axis_cores(xs, tile), strict=True):
-            crop = np.ascontiguousarray(rgb[y0 : y0 + tile, x0 : x0 + tile, ::-1])  # BGR in
-            (result,) = model.predict(crop, conf=conf, imgsz=IMGSZ[mode], verbose=False)
+    for y0, (cy0, cy1) in zip(ys, _axis_cores(ys, src_tile), strict=True):
+        for x0, (cx0, cx1) in zip(xs, _axis_cores(xs, src_tile), strict=True):
+            crop = rgb[y0 : y0 + src_tile, x0 : x0 + src_tile]
+            big = crop if upsample == 1 else _resize(crop, upsample)
+            bgr = np.ascontiguousarray(big[..., ::-1])  # Ultralytics takes BGR arrays
+            (result,) = model.predict(bgr, conf=conf, imgsz=IMGSZ[mode], verbose=False)
             det = _detections(result)
-            det["cx"] += x0
-            det["cy"] += y0
+            det["cx"] = det["cx"] * (crop.shape[1] / big.shape[1]) + x0
+            det["cy"] = det["cy"] * (crop.shape[0] / big.shape[0]) + y0
             own = (det["cx"] >= cx0) & (det["cx"] < cx1) & (det["cy"] >= cy0) & (det["cy"] < cy1)
             frames.append(det[own])
     det = pd.concat(frames, ignore_index=True)
@@ -217,7 +227,9 @@ def _resize(rgb: np.ndarray, factor: float) -> np.ndarray:
 
     height, width = rgb.shape[:2]
     size = (max(1, round(width * factor)), max(1, round(height * factor)))
-    return np.asarray(Image.fromarray(rgb).resize(size, Image.Resampling.BICUBIC))
+    return np.asarray(
+        Image.fromarray(np.ascontiguousarray(rgb)).resize(size, Image.Resampling.BICUBIC)
+    )
 
 
 def _polygon_items(polygons: Any) -> list[tuple[str, Any]]:
