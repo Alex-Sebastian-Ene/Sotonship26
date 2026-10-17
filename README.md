@@ -244,5 +244,10 @@ data improves it by about 4% a day (not significant) and 2% per 15 minutes.
   (`FREIGHT_HGV_LIMIT`), the refit of `COUNT_HEADROOM` and the `anchor_counts` skip rule after
   it (scan by the queues session), and `docs/west-side-counts.md` were written with Claude Code
   on Sat 17 Oct 2026.
+- **AI-generated (queues at the bottleneck, SOT-30):** `traffic_model.Queues` (queued traffic
+  waits at its route's bottleneck and loads only the links from there on), its use in `run_day`,
+  `daysim.DaySim` and `ppo_gpu.py`, the M271 cruise probe on counted flow,
+  `tests/test_demo_bottleneck_queues.py` and `docs/bottleneck-queues.md` were written with Claude
+  Code on Sat 17 Oct 2026.
 - **Existed before the event:** TODO, confirm with the organisers.
 - **Who helped:** TODO.
