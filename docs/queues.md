@@ -16,6 +16,10 @@ eight peak figures), down from 4.5. Corridor-hours at risk fall from 76.6 to 71.
 the 5.1 on Portswood Road and Highfield Lane. The cruise uplift (5.7 corridor-hours on ship
 days) and the DfT and council count fits do not change.
 
+Refitted after SOT-27 (count-once flows, new city and county scales): `COUNT_HEADROOM` = 1.3 (July
+peak hour at 81% of capacity), and roads the zones already fill (Highfield Lane, St Denys Road)
+keep road-class capacity; see [Refit after SOT-27](#refit-after-sot-27).
+
 ## The check
 
 `demo/bus_check.py` runs every Bluestar 2 and 20 trip from the Bus Open Data Service timetable
