@@ -124,6 +124,18 @@ class BatchedCruiseDayEnv(VecEnv):
         self.uniq = t(m.uniq)[:, :, None]
         self.col_idx = t(m.col_idx, torch.int64)
         self.path_len = t([len(p) for p in m.paths], torch.int64)
+        # run_day's queues (traffic_model.Queues) per link of each route, dense here
+        lens = np.array([len(p) for p in m.paths])
+        self.first = t(m.col_ptr, torch.int64)
+        self.route_of = t(np.repeat(np.arange(len(lens)), lens), torch.int64)
+        n_pe = len(m.col_idx)
+        self.pe_pos = t(np.arange(n_pe), torch.int64)
+        end = np.repeat(m.col_ptr + lens, lens)
+        self.ahead = []  # (shift, link that far ahead is on the same route) for the suffix scan
+        s_ = 1
+        while s_ < lens.max():
+            self.ahead.append((s_, t(np.arange(n_pe) + s_ < end, torch.bool)[:, None]))
+            s_ *= 2
         self.corr_idx = t(self.ctx.corr_idx, torch.int64)
         self.corr_len = t([len(c[3]) for c in self.ctx.corr], torch.int64)
         self.pre = torch.stack([t(m.pre[k]) if m.pre.get(k) is not None
@@ -194,7 +206,7 @@ class BatchedCruiseDayEnv(VecEnv):
         nothing = torch.full((B, nT), pe.NOTHING_OPEN, dtype=i64, device=dev)
         self.Emb_n, self.Epcu = self._emb(nothing)
         self.Emb = self.Emb_n
-        self.queue = torch.zeros(self.n_od, 2 * B, device=dev)
+        self.q = torch.zeros(len(self.col_idx), 2 * B, device=dev)  # waiting at each route link
         self.pool_v = torch.zeros(B, nT, pe.MAX_HOLD_BINS, nc, device=dev)
         self.pool_p = torch.zeros(B, nT, pe.MAX_HOLD_BINS, device=dev)
         self.last_cx = torch.zeros(B, self.n_corr, device=dev)
@@ -232,10 +244,29 @@ class BatchedCruiseDayEnv(VecEnv):
 
     # --- one bin for every day and its twin ----------------------------------------------------
 
+    def _along(self, a):
+        """Running total of ``a`` (route links, C) along each route, summed in float64."""
+        cs = a.double().cumsum(0)
+        return (cs - (cs[self.first] - a[self.first].double())[self.route_of]).float()
+
+    def _worst_ahead(self, xe):
+        """traffic_model._worst_ahead for (route links, C): the highest x from each link to the end
+        of its route and the first link where it is reached (log-step scan, no offsets)."""
+        run, arg = xe, self.pe_pos[:, None].expand_as(xe)
+        for s_, same in self.ahead:
+            cand, cand_arg = torch.roll(run, -s_, 0), torch.roll(arg, -s_, 0)
+            take = same & (cand > run)  # ties keep the earlier link
+            run, arg = torch.where(take, cand, run), torch.where(take, cand_arg, arg)
+        return run, arg
+
     def _route(self, D, cap, noise, pre, sh0):
-        """run_day's bin: D (od, C), cap/noise/pre (E, C), sh0 (od, R, C)."""
+        """run_day's bin: D (od, C), cap/noise/pre (E, C), sh0 (od, R, C). Returns x, v and the
+        vehicles waiting after the bin (C)."""
         C = D.shape[1]
-        rate = (D + self.queue) * 4.0
+        qload = torch.zeros(self.E, C, device=self.dev).index_add_(
+            0, self.col_idx, self._along(self.q) * 4.0)
+        pre = pre + qload
+        rate = D * 4.0
         f = (sh0 * rate[:, None, :]).reshape(self.P, C)
         for k in range(self.iters):
             v = self.A @ f + pre
@@ -247,11 +278,12 @@ class BatchedCruiseDayEnv(VecEnv):
             f = f + (y.reshape(self.P, C) - f) / (k + 2)
         v = self.A @ f + pre
         x = v / cap
-        bott = torch.segment_reduce(x[self.col_idx], "max", lengths=self.path_len, axis=0)
-        served = f / bott.clamp_min(1.0)
-        unserved = tm.CARRY * (f - served).reshape(self.n_od, R, C).sum(dim=1) / 4.0
-        self.queue = unserved
-        return x, v, unserved
+        worst, neck_at = self._worst_ahead(x[self.col_idx])
+        stuck = 1.0 - 1.0 / worst.clamp_min(1.0)
+        q = torch.zeros_like(self.q).scatter_add_(0, neck_at[self.first], f * stuck[self.first])
+        q.scatter_add_(0, neck_at, self.q * 4.0 * stuck)
+        self.q = q * (tm.CARRY / 4.0)
+        return x, v, self.q.sum(0)
 
     def _meter(self, b, levels):
         forced = self.pool_v[:, :, -1].clone()
@@ -290,12 +322,12 @@ class BatchedCruiseDayEnv(VecEnv):
         noise = torch.cat([noise_pol, self.noise], dim=1)
         pre = self.pre[self.dtype, b].T.repeat(1, 2)
         sh0 = self.shares[self.skey, b].permute(1, 2, 0).repeat(1, 1, 2)
-        x, v, unserved = self._route(D, capc, noise, pre, sh0)
+        x, v, waiting = self._route(D, capc, noise, pre, sh0)
         cx = torch.segment_reduce(x[self.corr_idx], "max", lengths=self.corr_len, axis=0)
         running = (torch.minimum(v, capc) * (self.t0 * 0.15 * x.clamp(max=1.5) ** 4)).sum(0)
         c = {"corridor_hours": (cx > tm.AT_RISK).sum(0).float() * 0.25,
-             "vehicle_hours": running / 4.0 / 3600.0 + unserved.sum(0) * 0.25,
-             "queue_hours": unserved.sum(0) * 0.25}
+             "vehicle_hours": running / 4.0 / 3600.0 + waiting * 0.25,
+             "queue_hours": waiting * 0.25}
         held = held_t.sum(dim=1) * 0.25
         marsh = marshals.sum(dim=1) * 0.25
         C = pe.COSTS

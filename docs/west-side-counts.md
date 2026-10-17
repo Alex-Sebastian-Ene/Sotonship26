@@ -138,6 +138,6 @@ real); port freight was added after the over-prediction already existed (+58% on
   passed. That is why the M271 cruise fit still compares link loads: counted once, extra cruise
   cars mostly displace other traffic at Redbridge, and the fit's error is 19.6 vehicles per
   15 minutes instead of 13.7. The fix is to keep each route's queue at its bottleneck and load it
-  only on the links from there on.
+  only on the links from there on. Done in SOT-30 (`docs/bottleneck-queues.md`).
 - A33 Millbrook Road West (-38%) and The Avenue (-25%) are under; the Itchen Bridge (no toll in
   the model) is over.
