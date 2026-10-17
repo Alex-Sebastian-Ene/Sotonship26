@@ -4,18 +4,18 @@ Draft by keanu-claude, Sat 17 Oct 2026, for the humans and Edward (pitch owner) 
 Only the evaluation numbers are checked here. Product claims must be checked against what the app
 shows on Sunday morning.
 
-## 150-word summary (150 words)
+## 150-word summary (149 words)
 
 > Southampton's traffic team must decide, days ahead, which cruise turnaround days need marshals,
 > sign messages and a hold on roadworks near the docks. Today that rests on experience and
 > "same day last year". We read the published VTS cruise schedule, match it with Saints fixtures,
-> and forecast traffic on the dock approach roads, with an 80% range, per 15 minutes.
+> and forecast traffic on the dock approach roads, with an 80% range.
 >
 > The forecast is a ridge regression on calendar features, including Southampton school holidays,
 > refitted monthly on counts National Highways has already published, about 105 days late.
 > On a year of held-out days at M3 J14 it is 6.6% more accurate than the strongest planner rule, a five-week same-week-last-year median (90% CI 0.5–12%), and its 80% range covers
-> 84% of outcomes. Where we lack history, at the M271, the planner rule still wins, and we
-> say so. We cannot yet measure the cruise effect itself: no open historic cruise schedule exists.
+> 84% of outcomes. On the 17 M271 days with a year-ago record, the
+> planner rule beats us, and we say so. We cannot yet measure the cruise effect itself: no open historic cruise schedule exists.
 
 Word count: `sed -n '/^> /p' notes/submission-draft.md | wc -w`, less the `>` markers.
 
@@ -33,6 +33,7 @@ Test period 2025-07-01 to 2026-06-29.
 | Ordinary days (the planner rule is slightly better) | MAE 34.1 vs 33.6 | the other 293 days |
 | 80% interval coverage, M3 J14 | 0.84 | 355 days |
 | M271 northbound (19974) vs five-week year-ago median | skill −0.30, which is a **loss** | 17 days only |
+| M271 northbound (19974) vs planner rule (year-ago median, else last four published weeks) | skill 0.087, no CI computed yet | 147 days |
 
 Do not quote:
 

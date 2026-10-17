@@ -94,9 +94,15 @@ honest about uncertainty.
 
 ## Things to try next (good practice reps)
 
-1. Add a **lagged-year feature** to ridge (last year's value in the same bin), so the model
+1. ~~Blend ridge with `year_median`~~, tried Sat 17 Oct, not adopted. The blend weight was
+   picked each month on the lagged calibration window, so the test stayed honest. Skill vs
+   `planner_rule` went from 0.066 to 0.071 at 20025 (355 days) and from 0.087 to 0.102 at
+   19974 (147 days), which is too small to be worth an extra moving part (no CI computed). Script:
+   `blend_check.py` in the session scratchpad, not committed. Lesson: don't add a part for a
+   gain you can't show is real.
+2. Add a **lagged-year feature** to ridge (last year's value in the same bin), so the model
    can beat `last_year` where a year of history exists.
-2. Replace ridge with **gradient-boosted trees with quantile loss** (scikit-learn
+3. Replace ridge with **gradient-boosted trees with quantile loss** (scikit-learn
    `HistGradientBoostingRegressor(loss="quantile")`) and compare skill and coverage.
-3. Plot a **reliability diagram** for `p_event`: bin the predicted probabilities, then compare
+4. Plot a **reliability diagram** for `p_event`: bin the predicted probabilities, then compare
    each bin with the observed frequency.
