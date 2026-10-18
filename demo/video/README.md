@@ -27,7 +27,7 @@ bash demo/video/build.sh     # renders each overlay to demo/video/out/<name>.png
 | `title.*` | Title card: product + pitch line + the three names | 0:00 open |
 | `quote.*` | Council's 2011 congestion quote, attributed | ~0:15 problem |
 | `stat.html` + `stat-scale.params.json` | **88%** of UK cruise passengers | ~0:15 problem |
-| `stat.html` + `stat-saving.params.json` | **5.0 congested road-hours/day avoided** by the learned plan (held-out) | ~1:40 AI-vs-baseline |
+| `stat.html` + `stat-saving.params.json` | **3.1 congested road-hours/day avoided** by the learned plan (held-out) | ~1:40 AI-vs-baseline |
 | `stat.html` + `stat-skill.params.json` | **+6.6%** forecast vs the planner rule | ~1:40 AI-vs-baseline |
 | `stat.html` + `stat-anchor.params.json` | **£29k/yr** price anchor | ~2:20 business |
 | `caption.*` | "Suggestions, an officer approves each one" chip | ~1:10 the plan |
@@ -40,14 +40,15 @@ or re-number without touching HTML/CSS.
 ## Rules these overlays keep
 
 - **Every number carries its source and date** in the `source` line (freeze-day guardrail).
-- The learned-plan stat is the **authoritative page eval** (`docs/ppo-results.md`; Seb's call, SOT-32).
-  Say what the plan **gains** and what it **costs**, never a negative-vs-nothing number: it **avoids
-  5.0 congested road-hours/day** on held-out dates (8.3% fewer, all 7 dates; 95% CI −5.28…−4.73) for
-  about **£2,100/day** of marshal+sign time, ≈£410 per road-hour avoided, **not a money saving**
-  (date-resampled −£330…+£4,180). The £5k/road-hour weighted score is an assumption, not cash. All
-  simulated; marshals' +25% gate capacity assumed. Do **not** quote the old −£10,724
-  (`ppo-results-gpu2.md`, superseded) or the embed's −£19.6k/96%. When job 1899759 lands (~08:15),
-  swap to `docs/ppo-results-aa8eae9.md`. See `SUBMISSION.md`.
+- The learned-plan stat is the **authoritative page eval** (`docs/ppo-results-aa8eae9.md` + robust
+  `docs/ppo-robust-aa8eae9.md`, job 1899759 re-score; Seb's call, SOT-32). Say what the plan **gains**
+  and what it **costs**, never a negative-vs-nothing number: it **avoids 3.1 congested road-hours/day**
+  on held-out dates (7.4% of the 41.1/day baseline, all 7 dates, 96% of days; 95% CI 2.2–3.9) for about
+  **£2,500/day** of marshal+sign time, ≈£830 per road-hour avoided, now a **cost, not a saving**
+  (+£2,545, 95% +£682…+£4,451). The free ship-timing advisor **saves ~£7,100/day** and avoids 1.2
+  road-hours; the £5k/road-hour weighted score is an assumption, not cash. All simulated; unit costs
+  assumed. Do **not** quote the pre-aa8eae9 5.0/8.3%/£2,100/£410/£220 figures, the old −£10,724
+  (`ppo-results-gpu2.md`, superseded) or the embed's −£19.6k/96%. See `SUBMISSION.md`.
 - The human-control caption and the "simulated days / observed, not live" captions keep
   provenance and officer-approval on screen.
 
