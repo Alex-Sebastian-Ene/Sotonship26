@@ -1,6 +1,6 @@
 # National Highways camera counts: source, licence, privacy
 
-Checked Sat 17 Oct 2026 by Keanu's Claude. Code: `src/sotonship26/data/cameras.py` (sampler),
+Checked Sat 17 Oct 2026 in Keanu's session. Code: `src/sotonship26/data/cameras.py` (sampler),
 `src/sotonship26/vision/detect.py` (vehicle counter), camera list in
 `src/sotonship26/data/cameras.csv`.
 

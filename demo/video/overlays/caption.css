@@ -1,0 +1,10 @@
+/* Small top-centre chip, e.g. "Suggestions, an officer approves each one" or
+   "Simulated days" / "Observed, not live". Keeps provenance + human-control on screen. */
+.caption{
+  position:absolute; top:6%; left:50%; transform:translateX(-50%);
+  display:inline-flex; align-items:center; gap:12px; padding:12px 22px; border-radius:999px;
+  background:rgba(7,19,33,.9); border:1px solid #1E3A57; backdrop-filter:blur(6px);
+  font-family:"IBM Plex Mono",monospace; color:#E4F0FA; font-size:1.3rem; font-weight:600;
+  white-space:nowrap;
+}
+.caption .dot{ width:12px; height:12px; border-radius:50%; background:#49D09B; flex:0 0 auto; }

@@ -3,8 +3,9 @@
 Structure comes from geography (OpenStreetMap, via osm_base.py):
 
 * roads, junctions, one-way streets, lanes and speed limits;
-* zones: OSM place points (suburbs, towns). Each zone's homes, jobs and shops come from the area of
-  residential, commercial/retail/industrial/port and retail land use nearest to it;
+* zones: OSM place points (suburbs, towns). Each zone's homes and jobs are Census 2021 residents
+  aged 16+ and workplace counts (ODWP01EW, per MSOA), placed within each MSOA by the residential
+  and commercial/industrial/port land use nearest the zone; its shops are retail land use;
 * county gateways: where motorways, trunk and A roads cross the edge of the study area.
 
 Commuters come in from the rest of the county and go home again, and residents commute out: Census
@@ -34,6 +35,7 @@ from __future__ import annotations
 import math
 import pickle
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 
 import external_data as ext
@@ -121,9 +123,19 @@ DAY_WEIGHTS = (5 / 7, 1 / 7, 1 / 7)  # weekday, Saturday, Sunday in an average d
 GATEWAY_COUNT_M = 3500.0
 GATEWAY_COUNT_DEPTH_M = 1000.0
 THROUGH_SHARE = 0.6
+# Motorway gateways instead take their split from the next DfT count inside the area (2025):
+# consecutive counts on a motorway mostly see the same vehicles, so only the drop between the
+# gateway's count and the next one can be traffic leaving for the area's zones; the rest stays on
+# the motorways (through traffic). M27 west of junction 2 80,096 -> 102,592 between 2 and 3 (more
+# join than leave), M27 8-9 114,876 -> 7-8 114,831 (almost none leave), M3 13-14 140,751 -> 72,424
+# on the link to the M27 at junction 4 (49% leave at junction 14 for the A33 and A335). The drop is
+# net: traffic that leaves and is replaced at the same junction is not seen, so it is a lower
+# bound. Before 18 Oct 2026 every gateway sent (1 - THROUGH_SHARE) of its count to the zones,
+# 64,000 trips a day from the M27 alone that never leave the motorway.
+MOTORWAY_NEXT = {"M27 west": (46037,), "M27 east": (38083,), "M3 north": (28018,)}
 OTHER_T_S = 1800.0  # other county trips: zone weight falls by e for every 30 free-flow minutes
 # Trips these give on an average day (both directions); build() recomputes them and warns.
-CORDON_DAILY = {"through": 114224, "other": 152298}
+CORDON_DAILY = {"through": 145842, "other": 89064}
 CORDON_DAYS = (1.0, 0.8, 0.7)  # assumed weekday, Saturday, Sunday ratio
 
 # Port freight (SOT-24): lorries between the county gateways and the port gates, in car-equivalents
@@ -486,6 +498,54 @@ def repair_motorways(g, size, log=print) -> set:
     return cut
 
 
+# OSM land use per square metre as a jobs weight; it only places each MSOA's census jobs within it
+JOB_LAND = {"commercial": 1.0, "industrial": 0.6, "port": 0.4, "campus": 1.2, "airport": 0.3}
+ZONE_REACH_M = 3000.0  # land use further than this from every zone point belongs to no zone
+
+
+def census_zone_weights(zones, samples, size, msoas: list[dict], log=print) -> None:
+    """Homes and jobs per zone from Census 2021 (ODWP01EW, external_data.msoa_totals).
+
+    Each MSOA's residents aged 16+ (homes) and its workplace count (jobs) are shared over the
+    residential land use (homes) or job land use (jobs, JOB_LAND weights) nearest its
+    population-weighted centroid inside the study area: OSM land use only says where within the
+    MSOA people live and work, the census says how many. Each piece then goes to its nearest zone
+    point (within ZONE_REACH_M). Land use outside the area is left out, since that traffic comes
+    in through the gateway counts, and an MSOA without land use of a kind gives its count to its
+    nearest zone. Before 18 Oct 2026 homes and jobs were the land-use areas themselves, which gave
+    large, thinly built places (Chilworth, Nursling) far more trips than their people make."""
+    W, H = size
+    mxy = np.array([(r["x"], r["y"]) for r in msoas], float)
+    count = np.array([[r["residents"], r["jobs"]] for r in msoas], float)
+    mtree, ztree = cKDTree(mxy), cKDTree([z.xy for z in zones])
+    pieces = []  # (zone, MSOA, 0 homes or 1 jobs, land-use weight)
+    for kind, x, y, area in samples:
+        k = 0 if kind == "residential" else 1 if kind in JOB_LAND else None
+        if k is None or not (0 <= x <= W and 0 <= y <= H):
+            continue
+        d, zi = ztree.query((x, y))
+        if d > ZONE_REACH_M:
+            continue
+        pieces.append((zi, int(mtree.query((x, y))[1]), k,
+                       area if k == 0 else JOB_LAND[kind] * area))
+    land = np.zeros_like(count)
+    for _, mi, k, w in pieces:
+        land[mi, k] += w
+    for z in zones:
+        z.homes = z.jobs = 0.0
+    for zi, mi, k, w in pieces:
+        if k == 0:
+            zones[zi].homes += count[mi, 0] * w / land[mi, 0]
+        else:
+            zones[zi].jobs += count[mi, 1] * w / land[mi, 1]
+    for mi in np.flatnonzero((land == 0).any(axis=1)):
+        z = zones[int(ztree.query(mxy[mi])[1])]
+        z.homes += count[mi, 0] if land[mi, 0] == 0 else 0.0
+        z.jobs += count[mi, 1] if land[mi, 1] == 0 else 0.0
+    log(f"zones: homes and jobs from Census 2021 ({len(msoas)} MSOAs, {count[:, 0].sum():.0f} "
+        f"residents 16+, {count[:, 1].sum():.0f} workplace jobs), placed by OSM land use")
+
+
 def build(net_path: Path, gates: dict[str, tuple[int, int]], log=print,
           port_gates: dict[str, tuple[int, int]] | None = None) -> Model:
     with open(net_path, "rb") as f:
@@ -531,24 +591,13 @@ def build(net_path: Path, gates: dict[str, tuple[int, int]], log=print,
     tree = cKDTree([z.xy for z in zones])
     for kind, x, y, area in net["samples"]:
         d, i = tree.query((x, y))
-        if d > 3000:
+        if d > ZONE_REACH_M:
             continue
-        z = zones[i]
-        if kind == "residential":
-            z.homes += area
-        elif kind == "commercial":
-            z.jobs += area
-            z.retail += area
-        elif kind == "industrial":
-            z.jobs += 0.6 * area
-        elif kind == "port":
-            z.jobs += 0.4 * area
-        elif kind == "campus":
-            z.jobs += 1.2 * area
-        elif kind == "airport":
-            z.jobs += 0.3 * area
+        if kind == "commercial":
+            zones[i].retail += area
         elif kind == "school":
-            z.schools += area
+            zones[i].schools += area
+    census_zone_weights(zones, net["samples"], (W, H), ext.msoa_totals(log)["rows"], log)
     total = sum(z.homes + z.jobs for z in zones)
     zones = [z for z in zones if z.homes + z.jobs > 0.002 * total]
     log(f"zones: {len(zones)} (from {len(places)} OSM places)")
@@ -901,7 +950,8 @@ def cordon_od(centroids, Z, G_, gw_class, census: dict, cordon: list[dict], attr
     one gateway per count point, and gateways without one get neither. What the count leaves after
     census commuters and county visitors crossing there (average day, before calibration) is split:
 
-    * THROUGH_SHARE is through traffic: gateway pairs more than 6 km apart are seeded 1, or 0.15
+    * THROUGH_SHARE is through traffic (at the motorway gateways in MOTORWAY_NEXT, what stays on
+      the motorway past the next count): gateway pairs more than 6 km apart are seeded 1, or 0.15
       unless both ends are motorway or trunk, then balanced to each gateway's through crossings
       by iterative proportional fitting;
     * the rest is other trips, half in and half out, to zones by ``attract`` times
@@ -942,9 +992,22 @@ def cordon_od(centroids, Z, G_, gw_class, census: dict, cordon: list[dict], attr
         w * f for w, f in zip(DAY_WEIGHTS, FREIGHT_DAYS, strict=True))
     crossing += port_lorries * hgv_share
     rest = np.zeros(len(G_))
+    other = np.zeros(len(G_))
+    by_id = {c["count_point"]: c for c in cordon}
+    local_share = {}
     for gi, c in count.items():
         rest[gi] = max(c["aadf"] - crossing[gi], 0.0)
-    target, other = THROUGH_SHARE * rest, (1 - THROUGH_SHARE) * rest
+        nxt = MOTORWAY_NEXT.get(centroids[G_[gi]].name)
+        if nxt and all(k in by_id for k in nxt):
+            share = max(0.0, 1.0 - sum(by_id[k]["aadf"] for k in nxt) / c["aadf"])
+            local_share[gi] = share
+            other[gi] = min(rest[gi], max(share * c["aadf"] - crossing[gi], 0.0))
+        else:
+            if nxt:
+                log(f"cordon: next count after {centroids[G_[gi]].name} missing, "
+                    f"using THROUGH_SHARE")
+            other[gi] = (1 - THROUGH_SHARE) * rest[gi]
+    target = rest - other
 
     gxy = np.array([centroids[g].xy for g in G_], float)
     far = np.hypot(*(gxy[:, None, :] - gxy[None, :, :]).transpose(2, 0, 1)) > 6000
@@ -982,6 +1045,8 @@ def cordon_od(centroids, Z, G_, gw_class, census: dict, cordon: list[dict], attr
         if c:
             row.update(count_point=c["count_point"], year=c["year"], method=c["method"],
                        aadf=c["aadf"])
+        if gi in local_share:
+            row["leaves_motorway"] = round(local_share[gi], 3)
         summary.append(row)
         log(f"  {centroids[g].name:14s} DfT "
             + (f"{c['aadf']:7d} ({c['count_point']}, {c['year']} {c['method'].lower()})" if c
@@ -1007,13 +1072,16 @@ def ar1(rng: np.random.Generator, n: int, sd: float, rho: float) -> np.ndarray:
 
 
 def background(m: Model, dtype: int, rng: np.random.Generator | None = None, term: bool = True,
-               spread: float = 1.0, mult: dict | None = None):
+               spread: float = 1.0, mult: dict | None = None, by_window: bool = False):
     """Vehicles per bin for each OD pair, and per chart group, for one day type.
 
     With ``rng`` the day is noisy in correlated ways (see the module docstring); ``spread`` widens
     the noise for dates further ahead, and ``mult`` scales chosen purposes (season, weather).
+    ``by_window`` returns the matrix split by how far its trips can move in time
+    ({purpose_window: matrix}, for spread_peaks) instead of one matrix.
     """
     D = np.zeros((N_BINS, m.n_od))
+    Dw: dict[int, np.ndarray] = {}
     groups = {}
     od_mult = 1.0
     day = 1.0
@@ -1039,9 +1107,84 @@ def background(m: Model, dtype: int, rng: np.random.Generator | None = None, ter
         if rng is not None:
             total *= rng.lognormal(0.0, NOISE["purpose"] * spread)
             prof = prof * ar1(rng, N_BINS, NOISE["bin"] * spread, NOISE["rho"]) * shared
-        D += np.outer(prof * total, m.purpose_od[key] * od_mult)
+        part = np.outer(prof * total, m.purpose_od[key] * od_mult)
+        if by_window:
+            w = purpose_window(key)
+            Dw[w] = Dw[w] + part if w in Dw else part
+        else:
+            D += part
         groups[group] = groups.get(group, 0) + prof * total
-    return D, groups
+    return (Dw if by_window else D), groups
+
+
+# Peak spreading (the team's rule, 18 Oct 2026): when a trip's routes are over capacity in its
+# 15 minutes, part of the trips that cannot get through set off earlier or later instead, as drivers
+# do, rather than all queuing. Commuters, freight and trips within the area move up to one bin
+# (15 minutes); visitors, other county trips and through traffic up to four (an hour); the school
+# run keeps its times. Assumed values.
+SPREAD_BINS = {"county": 1, "outbound": 1, "internal": 1, "freight": 1, "school": 0,
+               "visitors": 4, "through": 4}
+SPREAD_RESPONSE = 1.0  # share of the trips that do not fit through the bottleneck that re-time
+_GROUP = {k: g for k, g, *_ in PURPOSES}
+
+
+def purpose_window(name: str) -> int:
+    """Bins a purpose (or chart group) may move by under peak spreading."""
+    return SPREAD_BINS.get(name, SPREAD_BINS.get(_GROUP.get(name, ""), 0))
+
+
+def od_pressure(m: Model, D: np.ndarray, cap: np.ndarray, shares: np.ndarray, pre=None) -> np.ndarray:
+    """Per bin and OD pair: demand over capacity at the worst link of its routes, weighted by the
+    route shares, with every trip of the bin on the network (no queues carried over)."""
+    AT = m.AT
+    empty = np.diff(AT.indptr) == 0
+    starts = np.minimum(AT.indptr[:-1], max(len(AT.indices) - 1, 0))
+    out = np.zeros((N_BINS, m.n_od))
+    for b in range(N_BINS):
+        f = ((D[b] * 4.0)[:, None] * shares[b]).reshape(-1)
+        v = m.A @ f + (pre[b] if pre is not None else 0.0)
+        x = v / cap
+        worst = np.maximum.reduceat(x[AT.indices], starts) if len(AT.indices) else np.zeros(len(starts))
+        worst[empty] = 0.0
+        out[b] = (shares[b] * worst.reshape(m.n_od, ROUTES)).sum(axis=1)
+    return out
+
+
+def spread_peaks(m: Model, Dw: dict[int, np.ndarray], cap: np.ndarray, shares: np.ndarray,
+                 pre=None) -> tuple[np.ndarray, dict[int, np.ndarray]]:
+    """Peak spreading over demand split by how far it may move ({bins: matrix}).
+
+    Rounds of one-bin moves: each round recomputes the pressure (od_pressure) with the trips moved
+    so far, and where a bin and OD pair is above 1, SPREAD_RESPONSE of the share that does not fit
+    (1 - 1/pressure) moves one bin earlier or later, to whichever neighbour is less pressed (both,
+    split evenly, if both are). Demand with window w takes part in the first w rounds only, so no
+    trip moves further than its window. Totals per OD pair are kept. Returns the spread total
+    matrix and, per window, the factor each bin and OD pair was scaled by (for callers that keep
+    purposes apart; a bin that had none of a window's trips cannot show any it gained)."""
+    out = {w: D.copy() for w, D in Dw.items()}
+    for r in range(1, max(Dw, default=0) + 1):
+        x = od_pressure(m, sum(out.values()), cap, shares, pre)
+        excess = np.clip(1.0 - 1.0 / np.maximum(x, 1e-9), 0.0, None) * SPREAD_RESPONSE
+        if not (excess > 1e-6).any():
+            break
+        earlier = np.full_like(x, np.inf)
+        earlier[1:] = x[:-1]  # pressure one bin earlier
+        later = np.full_like(x, np.inf)
+        later[:-1] = x[1:]
+        to_e, to_l = (earlier < x).astype(float), (later < x).astype(float)
+        n = to_e + to_l
+        for w, D in out.items():
+            if w < r:
+                continue
+            moved = D * excess * (n > 0)
+            e = np.divide(moved * to_e, n, out=np.zeros_like(D), where=n > 0)
+            lt = np.divide(moved * to_l, n, out=np.zeros_like(D), where=n > 0)
+            new = D - moved
+            new[:-1] += e[1:]
+            new[1:] += lt[:-1]
+            out[w] = new
+    factors = {w: np.divide(out[w], Dw[w], out=np.ones_like(Dw[w]), where=Dw[w] > 0) for w in Dw}
+    return sum(out.values()), factors
 
 
 def match_demand(m: Model, kickoff_h: float, rng: np.random.Generator | None = None):
@@ -1566,7 +1709,19 @@ def delay_minutes(m: Model, x: np.ndarray) -> np.ndarray:
 
 
 MIN_CAP = 350.0  # floor for a high street with parking, bus stops and crossings (veh/h each way)
-UNI_TERM = 1.2  # assumed: July counts miss university term traffic around Highfield and Portswood
+# Local traffic on the counted roads round the university in its term, against the July 2024 counts
+# (outside term). Assumed, the team's call on 18 Oct 2026: few students drive, and WebTRIS shows no
+# term or vacation swing on the main roads, so term takes 10% off rather than adding (was +20%).
+UNI_TERM = 0.9
+# University of Southampton 2026-27 terms (southampton.ac.uk/about/term-dates, read 18 Oct 2026)
+UNI_TERMS = ((date(2026, 9, 21), date(2026, 12, 12)), (date(2027, 1, 4), date(2027, 3, 20)))
+
+
+def uni_term_factor(d: date) -> float:
+    """UNI_TERM on days in a university term, else 1 (the July counts' level)."""
+    return UNI_TERM if any(a <= d <= b for a, b in UNI_TERMS) else 1.0
+
+
 # The July 2024 counts are what the counted roads carried, not what they can carry: peak speeds
 # there were within 0-2 mph of the all-day average (Portswood Baseline Data Report, Table 3-10)
 # and buses on Portswood Road ran 0:24 to 4:22 behind timetable in the peaks (Table 3-5), which a
@@ -1590,8 +1745,8 @@ def anchor_counts(m: Model, sites: list[dict], fit_rows: list[dict], log=print) 
        value only where lower. Skipped where the zones alone already put at least the counted
        traffic on the road, since a lower capacity there would only create a false jam.
     2. Local traffic: traffic the zones do not generate (side streets, short hops) is added to
-       each link of the counted roads that carries less than the count, up to the count, raised by
-       UNI_TERM for university term. Links that already carry more get none.
+       each link of the counted roads that carries less than the count, up to the count (each
+       date scales it by uni_term_factor). Links that already carry more get none.
     """
     over = {}
     for r in fit_rows:
@@ -1642,7 +1797,6 @@ def anchor_counts(m: Model, sites: list[dict], fit_rows: list[dict], log=print) 
                         w = np.zeros(N_BINS)
                         w[a:b] = prof[a:b]
                         target += w / w.sum() * total * 4
-                target *= UNI_TERM
                 pre[:, ks] += np.maximum(target[:, None] - v[:, ks], 0.0)
         m.pre[dt] = pre
     m.pre[2] = m.pre[1] * 0.85  # Sunday: no count, take Saturday a little lower

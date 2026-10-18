@@ -3,7 +3,7 @@
 **Status:** the plan the team agreed on Fri 16 Oct 2026 at 22:30, kept as written. It replaced the
 first streets-and-waterway design. What was built differs in places (a static page instead of
 Streamlit, a 15-minute dynamic model instead of PathFinder negotiation, PPO for the decision
-layer); [decisions.md](decisions.md) records each choice and why. Drafted with Claude Code.
+layer); [decisions.md](decisions.md) records each choice and why.
 
 ## 1. The product
 

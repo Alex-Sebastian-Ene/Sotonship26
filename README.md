@@ -151,7 +151,7 @@ on a login node and `sbatch cluster/iridis/gpu_check.slurm`.
 | `models/ppo/1889084/` | The trained PPO policy used on the page |
 | `data/webtris/` | M271 speed and flow extracts (OGL), committed for the forecast engine |
 | `tests/`, `scripts/`, `cluster/`, `configs/` | Tests, helper scripts, Iridis jobs, settings |
-| `coord/` | How the team's three Claude Code sessions coordinated through Linear |
+| `coord/` | How the team's three coding sessions coordinated through Linear |
 | `Context/` | The event's rules and track briefs |
 
 ## Data sources
@@ -172,7 +172,7 @@ published.
 | GOV.UK [bank holidays](https://www.gov.uk/bank-holidays), England and Wales | `BANK_HOLIDAYS` in `uplift.py` | 16 Oct 2026 | Open Government Licence v3.0 |
 | DfT Street Manager open data, [permit archive](https://department-for-transport-streetmanager.github.io/street-manager-docs/archived-notifications/) `permit/2026/08.zip` and `09.zip` | Granted daytime works with signals or a lane closure on the corridors (`PERMITS` in `demo/synthetic_demo.py`): Platform Road 19–23 Oct and 2–6 Nov, Portswood Road 19–30 Oct and 20–23 Oct, M271 29–30 Oct. Left out: overnight-only lane closures (M271, Millbrook Road West, Mountbatten Way, Redbridge Road, 4–7 Nov), a 07:00–09:00 closure on Northam Bridge (Sun 18 Oct), applications not granted by 30 Sep (Western Esplanade 19–24 Oct and 2–3 Nov, The Avenue 24 Nov, M27 overnight 22–23 Oct) and works that only encroach on the carriageway. October grants are not archived until 1 Nov, so later short-notice works are missing. | 16 Oct 2026 (events to 30 Sep 2026) | Open Government Licence v3.0 |
 | OpenStreetMap via osmnx and the [Overpass API](https://overpass-api.de/) | Road network, lanes, speed limits, dock gates, land use for zones (`demo/osm_base.py`, `src/sotonship26/data/roads.py`); the SUMO cross-check network (`demo/sumo_net.py`) | 16 Oct 2026 (OSM base 21:45 UTC); SUMO network 17 Oct 2026 | ODbL 1.0 |
-| ONS Census 2021 ODWP01EW, place of residence and work by MSOA ([Nomis bulk download](https://www.nomisweb.co.uk/sources/census_2021_od)); method of travel to work by distance ([census API](https://api.beta.ons.gov.uk/v1/population-types/UR/census-observations?area-type=ltla&dimensions=transport_to_workplace_12a,workplace_travel_10a)); MSOA population-weighted centroids (Open Geography Portal) | Commuters into and out of the area, their car share and gateway (`demo/external_data.py`). Census day was 21 Mar 2021, in lockdown. | 16 Oct 2026 | Open Government Licence v3.0; contains OS data © Crown copyright and database right |
+| ONS Census 2021 ODWP01EW, place of residence and work by MSOA ([Nomis bulk download](https://www.nomisweb.co.uk/sources/census_2021_od)); method of travel to work by distance ([census API](https://api.beta.ons.gov.uk/v1/population-types/UR/census-observations?area-type=ltla&dimensions=transport_to_workplace_12a,workplace_travel_10a)); MSOA population-weighted centroids (Open Geography Portal) | Commuters into and out of the area, their car share and gateway; residents aged 16+ and workplace counts per MSOA, which set each zone's homes and jobs (`demo/external_data.py`). Census day was 21 Mar 2021, in lockdown. | 16 Oct 2026 | Open Government Licence v3.0; contains OS data © Crown copyright and database right |
 | DfT road traffic statistics: [AADF per count point](https://roadtraffic.dft.gov.uk/downloads) (2025 counts, published Jun 2026) and, via the API, AADF by direction and hourly manual counts for Southampton (LA 137) | Traffic crossing the edge of the area and lorry counts the model is fitted to (`demo/external_data.py`): traffic at each county gateway, less census commuters and visitors, is split 30% through traffic and 70% other trips to the area's zones (assumed); background traffic on counted roads (`src/sotonship26/data/dft.py`) | 16 Oct 2026 | Open Government Licence v3.0 |
 | Southampton City Council / WSP, *Portswood Project Baseline Data Report*, Jan 2025 | Peak traffic counts and bus run times on Portswood Road (Tables 3-5, 3-10) that the model is fitted to | 16–17 Oct 2026 | Figures cited to the report |
 | National Highways [WebTRIS](https://webtris.nationalhighways.co.uk/api/swagger/ui/index) 15-minute counts and speeds: M271 (sites 19974, 19796, 20313, 20605, 7588) and M3 J14 (20025) | Observed traffic for the everyday forecast, the cruise backtest and the lorry day pattern (`data/observed.py`, `flow_forecast.py`, `demo/webtris_backtest.py`); extracts in `data/webtris/` | 16–17 Oct 2026; counts Jan 2024 to Jun 2026 (published about 105 days late) | Open Government Licence v3.0 (contains National Highways information) |
@@ -203,12 +203,12 @@ opened at 20:00; the first code was committed at 21:21. Open-source libraries ar
 `pyproject.toml` and `uv.lock`.
 
 **Who did it.** The team: Keanu Czirjak (learning and evaluation), Alex-Sebastian Ene (forecast
-engine) and Edward Denton (product, data and pitch). Each worked with their own Claude Code
+engine) and Edward Denton (product, data and pitch). Each worked with their own AI coding
 session; the sessions coordinated through Linear (`coord/`). The humans chose the product, the
 data and its permitted use, and reviewed the methods and results. No one outside the team helped.
 
-**AI-generated.** Almost all code and writing in this repository was produced with Claude Code
-(Anthropic) under the team's direction, between Fri 16 and Sun 18 Oct 2026:
+**AI-generated.** Almost all code and writing in this repository was produced with an AI coding
+assistant under the team's direction, between Fri 16 and Sun 18 Oct 2026:
 
 - **Scaffold and first design:** `pyproject.toml` and its backend extras, `scripts/`, `cluster/`,
   `configs/`, the package skeleton and the parked pedestrian and waterway code. Written in Alex-Sebastian's session.

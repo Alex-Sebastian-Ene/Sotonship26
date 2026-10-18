@@ -1,7 +1,7 @@
 # Local evidence, scale and business numbers (SOT-13)
 
 Why cruise-day vehicle traffic is a real Southampton problem, how big it is, and what the council
-could pay for a forecast. Compiled Sat 17 Oct 2026 by Edward's Claude Code session, with a research
+could pay for a forecast. Compiled Sat 17 Oct 2026 in Edward's session, with a research
 subagent reading public sources. Every fact has its source, publisher, publication date where
 shown, and the access date (17 Oct 2026 unless noted). Quotes are exact unless marked as a
 paraphrase. **ESTIMATE** marks our own arithmetic, with how it was done; search-engine snippets that
