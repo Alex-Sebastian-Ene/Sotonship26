@@ -566,6 +566,14 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
 .lfx .v small { font-size: .75rem; color: var(--muted); font-weight: 600; }
 .lfx .s { font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .lfx .a { font-size: .75rem; color: var(--warn-ink); }
+details.how { border-top: 1px solid var(--line); padding-top: 8px; }
+details.how > summary { cursor: pointer; font-weight: 650; font-size: var(--step--1); }
+details.how[open] { display: grid; gap: 10px; }
+.how-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 8px; }
+.how-i { display: grid; gap: 2px; align-content: start; padding: 8px 12px; border-radius: 10px; background: var(--sunk); font-size: var(--step--1); }
+.how-n { font-weight: 700; color: var(--ink); }
+.how-by { font-size: .72rem; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); }
+.how-fx { color: var(--muted); }
 .plan-sum { display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px; }
 .ps { display: grid; gap: 1px; align-content: center; padding: 8px 14px; border-radius: 12px; background: var(--sunk); min-width: 110px; transition: background .25s, transform .25s; }
 .ps .k { font-size: .7rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
@@ -1969,9 +1977,35 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
         <span class="s">${e.road >= 0.05 ? `± ${fmt1(e.pm)} · ` : ''}${esc(use(e))}${per(e) ? ' · ' + esc(per(e)) : ''}</span>
         <span class="s">${esc(delayTxt(e.delay))} · ${esc(scoreTxt(e.score))}</span>
         ${note ? `<span class="a">${esc(note)}</span>` : ''}</div>`).join('')}</div>
-      ${rule ? `<p class="foot-note">For scale, a marshals-only rule without the AI takes ${fmt1(-mean(rule, 'corridor_hours'))} h a day off with ${fmt1(mean(rule, 'marshal_hours'))} gate-hours: fewer hours saved, about ${mins(-mean(rule, 'corridor_hours') / Math.max(0.1, mean(rule, 'marshal_hours')))} min per gate-hour.</p>` : ''}`;
+      ${rule ? `<p class="foot-note">For scale, a marshals-only rule without the AI takes ${fmt1(-mean(rule, 'corridor_hours'))} h a day off with ${fmt1(mean(rule, 'marshal_hours'))} gate-hours: fewer hours saved, about ${mins(-mean(rule, 'corridor_hours') / Math.max(0.1, mean(rule, 'marshal_hours')))} min per gate-hour.</p>` : ''}
+      ${howChosen(L, C)}`;
     host.hidden = false;
   })();
+  // How each kind of option is chosen: the forecast's own suggestions (thresholds on the risk the ships add, and
+  // what-if runs) and the learned plan's levers, with what the learned plan sees, is scored on and cannot do.
+  function howChosen(L, C) {
+    const pct = v => `${Math.round(v * 100)}%`, list = a => a.length > 1 ? `${a.slice(0, -1).join(', ')} or ${a[a.length - 1]}` : a.join('');
+    const meter = (L.meter || [1, 0.7, 0.4]).map(v => (v >= 1 ? 'all' : pct(v))), shifts = (L.open_shift || [-60, -30, 0, 30]);
+    const early = shifts.filter(v => v < 0).map(v => -v), late = shifts.filter(v => v > 0);
+    const rows = [
+      ['Marshals at the gates', 'Forecast and learned plan', `Forecast: a dock gate whose approach the ships make 40 points or more likelier to run above 85% of capacity, for 30 minutes or more. Learned plan: marshals on or off at each gate (${(L.gates || []).join(', ')}) every 15 minutes.`, `+${Math.round(((L.marshal_cap || 1.25) - 1) * 100)}% capacity on the gate's access roads (assumed)`],
+      ['Sign messages', 'Forecast and learned plan', `Forecast: a sign location whose roads the ships make 50 points or more likelier to run above 85%, switched on 30 minutes early. Learned plan: each of the ${(L.sign_groups || []).length || 5} locations on or off every 15 minutes.`, `drivers see signed roads as ${Math.round(((L.sign_factor || 1.3) - 1) * 100)}% slower when they choose a route (assumed)`],
+      ['Paced disembarkation', 'Learned plan', `At each of the ${(L.terminals || []).length || 5} terminals, every 15 minutes, release ${list(meter)} of the passengers waiting to leave; nobody is held more than ${L.max_hold_min || 90} minutes.`, 'their pick-up cars, taxis and coaches leave later'],
+      ['Check-in times', 'Learned plan', `Each terminal opens check-in ${list(early.map(String))} minutes earlier, as planned, or ${list(late.map(String))} minutes later, chosen at 05:00 for the day; closing time unchanged.`, 'passengers arrive earlier or later'],
+      ['Ship timing', 'Forecast what-if search', 'Tries earlier and later disembarkation and check-in windows for each ship on the same simulated days; suggested when the best combination takes 0.15 road-hours or more off the day.', 'the card gives the day\'s congested road-hours before and after'],
+      ['Roadworks', 'Forecast what-if', 'Street-works permits on a monitored road that day; reruns the day with the works moved off it.', 'the card gives the road-hours before and after'],
+      ['Diversion', 'Forecast route choice', 'Where 35% or more of the model\'s drivers switch to another route as the main one fills, for 30 minutes or more: sign that route.', 'already in the forecast; no extra effect'],
+      ['Match-day plan', 'Forecast', 'On match days, when roads in the north and east are at risk.', 'not modelled as a lever'],
+    ];
+    return `<details class="how"><summary>How each option is chosen, and what the learned plan can and cannot do</summary>
+      <div class="how-list">${rows.map(([name, by, how, fx]) => `<div class="how-i"><span class="how-n">${esc(name)}</span><span class="how-by">${esc(by)}</span>
+        <span class="how-t">${esc(how)}</span><span class="how-fx">Effect in the model: ${esc(fx)}</span></div>`).join('')}</div>
+      <ul class="plain">
+        <li><b>The learned plan decides every 15 minutes, 05:00 to 20:00.</b> It sees the time and type of day, rain, incidents, match days and closures, the load on every monitored road, the ships due and the passengers waiting at each terminal, and which signs and marshals are already on.</li>
+        <li><b>It is scored on</b> £${(C.corridor_hour || 5000).toLocaleString()} for each hour a road runs above 85% of capacity, £${C.vehicle_hour || 15} per vehicle-hour of delay and per passenger-hour held, £${C.marshal_hour || 120} per marshal gate-hour and £${C.sign_hour || 25} per sign-hour (our weights), against doing nothing on the same simulated day. Moving check-in is free.</li>
+        <li><b>It cannot</b> retime ships, move roadworks, divert traffic, or change buses or signal timings. Those options come from the forecast's what-if runs above.</li>
+      </ul></details>`;
+  }
   const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_', B64I = {};
   [...B64].forEach((c, i) => { B64I[c] = i; });
   function dec(s) {
