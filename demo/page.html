@@ -3252,6 +3252,8 @@ details.how[open] { display: grid; gap: 10px; }
     history.replaceState(null, '', '#demo');   // reload to retake
   }
   if (location.hash === '#demo') setTimeout(runDemo, 1500);
+  // Shift+D starts it too, for copies opened where the URL's #demo does not reach the page (an embedded artifact)
+  addEventListener('keydown', e => { if (e.key === 'D' && e.shiftKey && !e.target.closest('input, textarea, select')) runDemo(); });
   renderChip(); showView(location.hash.slice(1), true);
 })();
 </script>
