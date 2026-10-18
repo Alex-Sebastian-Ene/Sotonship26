@@ -65,6 +65,11 @@ ALLOW = ("private emergency authority army vip passenger hov taxi bus coach deli
          "trailer motorcycle evehicle custom1 custom2")
 NETCONVERT_OPTIONS = [
     "--lefthand", "true",
+    # UK roads have no give-way-to-the-right rule: an unsignalled junction gives way to its major
+    # road. By default netconvert makes every junction of equally ranked roads under 49 km/h
+    # right-before-left (535 of 2,642 here, Calmore Road and Ringwood Road among them), where
+    # every approach yields and the junction jams and deadlocks.
+    "--junctions.right-before-left.speed-threshold", "0",
     "--geometry.remove", "true",
     "--roundabouts.guess", "true",
     "--ramps.guess", "true",

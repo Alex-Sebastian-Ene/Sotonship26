@@ -34,6 +34,8 @@ OUT=${OUT:-runs/sumo}
 NET=${NET:-data/cache/sumo/southampton.net.xml.gz}  # or southampton_no_ring_signals.net.xml.gz
 MODES=${MODES:-"micro meso"}
 SIM_THREADS=${SIM_THREADS:-1}  # micro: SUMO's parallel simulation; 16 threads segfaulted once
+# extra SUMO options for a sensitivity run, e.g. "--time-to-impatience 30 --ignore-junction-blocker 10"
+SUMO_ARGS=${SUMO_ARGS:-}
 SUMO="apptainer exec -B /scratch,/iridisfs $SUMO_CONTAINER sumo"
 
 echo "== demand $DAY scale $SCALE $(date +%T)"
@@ -42,7 +44,7 @@ $PY -u demo/sumo_demand.py --date "$DAY" --scale "$SCALE" --out "$OUT" --threads
 R=$OUT/$DAY
 echo "== SUMO $MODES $(date +%T)"
 for M in $MODES; do
-    $SUMO -c $R/$M.sumocfg > $R/$M.out 2>&1 &
+    $SUMO -c $R/$M.sumocfg $SUMO_ARGS > $R/$M.out 2>&1 &
     eval "PID_$M=$!"
 done
 for M in $MODES; do
