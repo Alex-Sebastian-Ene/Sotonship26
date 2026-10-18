@@ -29,46 +29,32 @@ officer's approval.
 ## How it works
 
 ```mermaid
-flowchart TD
-    subgraph inputs["Inputs, real, dated, cited"]
-        vts["VTS cruise schedule<br/>ships · berths · passengers"]
-        cal["Saints fixtures · school terms<br/>bank holidays"]
-        permits["Street Manager<br/>roadworks permits"]
-        freight["Port freight calls<br/>container + RoRo"]
-        census["Census + DfT gateway<br/>commuter / through traffic"]
-    end
+flowchart LR
+    ships["🚢 <b>Ship schedule</b><br/>port's public list"]
+    events["📅 <b>Calendar</b><br/>matches · terms · roadworks"]
+    base["🛣️ <b>Everyday traffic</b><br/>roads · Census · freight"]
 
-    subgraph model["Traffic model on the real road network"]
-        trips["Vehicle trips per 15-min bin<br/>cars · taxis · coaches · lorries · buses"]
-        net["OSM directed road graph<br/>lanes · dock gates"]
-        route["Route choice + queues<br/>carried between bins"]
-        mc["Monte Carlo over sampled days<br/>paired with / without ships"]
-    end
+    model["🧮 <b>Traffic model</b><br/>real roads · 15-min steps<br/>with and without ships"]
+    obs[("📊 Observed counts<br/>WebTRIS · DfT")]
+    fc(["🎯 <b>Forecast</b><br/>odds of congestion<br/>10 / 50 / 90%"])
+    ai["🤖 <b>Learned plan</b><br/>marshals · signs<br/>roadworks holds"]
+    officer(["✅ <b>Officer decides</b><br/>approve or reject"])
 
-    subgraph calib["Fitted + checked against observed traffic"]
-        webtris["WebTRIS 15-min<br/>M271 · M3 J14"]
-        dft["DfT AADF + hourly counts"]
-        imagery["Aerial car-park occupancy<br/>+ camera vehicle counts"]
-    end
+    ships & events & base --> model --> fc --> ai --> officer
+    obs -. "fit + backtest" .-> model
 
-    out(["P(congestion) per corridor per 15 min<br/>+ cruise uplift, 10 / 50 / 90% range"])
-
-    subgraph product["demo/page.html, what the council sees"]
-        calendar["Calendar<br/>days coloured by risk"]
-        dayview["Day view<br/>corridor × 15-min heatmap + map"]
-        whatif["What-if<br/>close a road, rerun before/after"]
-    end
-
-    vts --> trips
-    cal --> trips
-    permits --> trips
-    freight --> trips
-    census --> trips
-    trips --> net --> route --> mc --> out
-    calib -. "calibrate / backtest" .-> model
-    out --> calendar
-    out --> dayview
-    out --> whatif
+    classDef data fill:#E8F1FB,stroke:#1F57A4,color:#0B2545,stroke-width:1.5px
+    classDef engine fill:#FFF3DC,stroke:#C88A12,color:#3A2A00,stroke-width:1.5px
+    classDef result fill:#1F57A4,stroke:#0B2545,color:#FFFFFF,stroke-width:2px
+    classDef ai fill:#EEE8FB,stroke:#6A4BC4,color:#24124F,stroke-width:1.5px
+    classDef human fill:#E3F5EA,stroke:#2E8B57,color:#0E3B22,stroke-width:2px
+    classDef check fill:#F3F5F8,stroke:#8A97A8,color:#2B3542,stroke-dasharray:4 3
+    class ships,events,base data
+    class model engine
+    class fc result
+    class ai ai
+    class officer human
+    class obs check
 ```
 
 1. **Trips.** Each ship call becomes car drop-offs, park-and-cruise cars, taxis and coaches, timed
