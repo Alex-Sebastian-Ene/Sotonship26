@@ -982,6 +982,22 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 .value-card th.num, .value-card td.num { text-align: right; }
 .value-card tr.vc-whole th, .value-card tr.vc-whole td { font-weight: 700; }
 .value-card .vc-take b { font-family: var(--font-data); }
+.vc-total { display: grid; gap: 8px; padding: 12px 14px; border-radius: 12px; background: var(--sunk); }
+.vc-big { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.vc-big b { font: 750 2rem/1.05 var(--font-data); }
+.vc-big span { color: var(--muted); font-weight: 600; }
+.vc-bar { display: flex; height: 40px; border-radius: 10px; overflow: hidden; background: var(--surface); }
+.vc-bar i { display: grid; place-items: center; color: #fff; font-style: normal; font: 700 .9rem var(--font-data); min-width: 3px; }
+.vc-bar i + i { box-shadow: inset 2px 0 0 var(--surface); }
+.vc-keys { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: var(--step--1); }
+.vc-keys i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.vc-moves > summary { cursor: pointer; font-weight: 650; }
+.vc-defs { display: grid; grid-template-columns: minmax(130px, max-content) minmax(0, 1fr); gap: 4px 14px; margin: 4px 0 0; font-size: var(--step--1); }
+.vc-defs dt { font-weight: 700; }
+.vc-defs dd { margin: 0; color: var(--muted); }
+@media (max-width: 560px) { .vc-defs { grid-template-columns: minmax(0, 1fr); } .vc-defs dd { margin-bottom: 4px; } }
+.vc-moves h4 { margin: 8px 0 4px; font-size: var(--step--1); }
+.vc-moves li { font-size: var(--step--1); }
 body:not(.ai-adv) .adv-only { display: none !important; }
 body.ai-adv .simple-only { display: none !important; }
 </style>
@@ -2290,10 +2306,43 @@ body.ai-adv .simple-only { display: none !important; }
     const tim = days.filter(d => d.timing && d.timing.best < d.timing.base - 0.15).map(d => d.timing.base - d.timing.best);
     const rw = days.filter(d => d.permits && d.permits.length && d.whatif && d.whatif.move_permit).map(d => d.score - d.whatif.move_permit.score).filter(v => v > 0);
     const plan = rows[0], rule = rows.find(r => r.name.startsWith('A marshals-only'));
+    // the six weeks: the learned plan on every published cruise day, plus each retiming and roadworks move
+    const cruise = days.filter(d => d.calls && d.calls.length), N = cruise.length, sum = a => a.reduce((t, v) => t + v, 0);
+    const W = C.corridor_hour || 5000;
+    const parts = [['Moving roadworks off cruise days', sum(rw), sum(rw) * W, '#E8A33D'], ['The learned plan (signs, marshals, check-in)', plan.road * N, plan.score * N, '#2A78D6'],
+      ['Retiming ships', sum(tim), sum(tim) * W, '#1A9E6E']].filter(x => x[2] > 0);
+    const totalH = sum(parts.map(x => x[1])), totalV = sum(parts.map(x => x[2]));
+    const figure = `<div class="vc-total"><div class="vc-big"><b>${gbp(totalV / days.length)} a day</b><span>weighted value of all the options together, on average over the ${days.length} published days (${N} with ships): <b>${gbp(totalV)}</b> in all, from <b>${int(totalH)}</b> fewer road-hours near the limit</span></div>
+      <div class="vc-bar">${parts.map(([n, h, v, c]) => `<i style="width:${(v / totalV * 100).toFixed(1)}%;background:${c}" title="${esc(n)}: ${gbp(v)}, ${int(h)} road-hours">${v / totalV > .14 ? `<b>${gbp(v)}</b>` : ''}</i>`).join('')}</div>
+      <div class="vc-keys">${parts.map(([n, h, v, c]) => `<span><i style="background:${c}"></i>${esc(n)} <b>${gbp(v)}</b> (${int(h)} road-hours)</span>`).join('')}</div>
+      <p class="muted">In money alone the learned plan costs about ${gbp(plan.cost * N)} over the ${N} cruise days (staff and delay); retiming ships and moving works are not priced, so their value is the road-hours alone. The parts are added as if independent; they overlap a little.</p>
+      <dl class="vc-defs">
+        <dt>Road-hour near the limit</dt><dd>One monitored road running above 85% of its capacity for an hour (counted in 15-minute steps).</dd>
+        <dt>Weighted value</dt><dd>£${W.toLocaleString()} for each road-hour avoided, a weight we set for the risk of a road locking up, less what the option costs in money.</dd>
+        <dt>Money</dt><dd>Staff (marshals at £30 an hour each), sign operator time (£${C.sign_hour || 25} an hour), passengers held in a terminal and vehicle delay (£${C.vehicle_hour || 15} an hour each).</dd>
+        <dt>The learned plan</dt><dd>The AI that switches signs and marshals, paces disembarkation and moves check-in every 15 minutes. Its figures are averages over ${AB.ppo.n} simulated cruise days, applied to each of the ${N} published cruise days.</dd>
+        <dt>Retiming ships</dt><dd>The forecast's search over earlier and later disembarkation and check-in times for each ship; the best combination for each day where it helps.</dd>
+        <dt>Moving roadworks</dt><dd>Pausing permitted street works on cruise days and doing them on days within the permit that have no ships.</dd>
+        <dt>Published days</dt><dd>Days with a published VTS cruise schedule (ABP Southampton); ${N} of the ${days.length} have ships in.</dd>
+      </dl></div>`;
+    // where to move: each ship's new times, and each permit's works off its cruise days onto days in its window without ships
+    const shipMoves = days.filter(d => d.timing && d.timing.best < d.timing.base - 0.15).map(d => {
+      const mv = d.timing.shifts.map((sh, i) => [sh, d.calls[i]]).filter(([sh, c]) => c && (sh[0] || sh[1]))
+        .map(([sh, c]) => `${esc(c.ship)}${sh[0] ? ` disembarks ${Math.abs(sh[0])} min ${sh[0] > 0 ? 'later' : 'earlier'}` : ''}${sh[0] && sh[1] ? ',' : ''}${sh[1] ? ` check-in ${Math.abs(sh[1])} min ${sh[1] > 0 ? 'later' : 'earlier'}` : ''}`);
+      return `<li><b>${esc(shortDate(d.date))}</b>: ${mv.join('; ')} <span class="muted">(−${fmt1(d.timing.base - d.timing.best)} h)</span></li>`;
+    });
+    const works = DATA.permits.map(pm => {
+      const inWin = days.filter(d => d.date >= pm.from && d.date <= pm.to);
+      const hit = inWin.filter(d => d.calls && d.calls.length && (d.permits || []).includes(pm.id) && d.whatif && d.whatif.move_permit && d.score > d.whatif.move_permit.score);
+      if (!hit.length) return '';
+      const quiet = inWin.filter(d => !(d.calls && d.calls.length)).map(d => shortDate(d.date));
+      const road = CORR[pm.corridor] ? CORR[pm.corridor].name : pm.corridor;
+      return `<li><b>${esc(road)}</b> (${esc(pm.what)}; permit ${esc(shortDate(pm.from))}–${esc(shortDate(pm.to))}): pause on ${hit.map(d => `${esc(shortDate(d.date))} <span class="muted">(day −${fmt1(d.score - d.whatif.move_permit.score)} h, all its works moved)</span>`).join(', ')}${quiet.length ? `; work instead on ${esc(quiet.slice(0, 4).join(', '))}${quiet.length > 4 ? ' and other days without ships' : ''}` : '; no day in the permit is free of ships'}.</li>`;
+    }).filter(Boolean);
     const tr = r => `<tr${r.whole ? ' class="vc-whole"' : ''}><th scope="row">${esc(r.name)}</th><td class="num">${r.road >= 0.05 ? fmt1(r.road) : '≈ 0'}</td>
       <td class="num">${Math.abs(r.cost) < 50 ? '≈ £0' : (r.cost > 0 ? '−' : '+') + gbp(r.cost)}</td><td class="num">${r.per ? gbp(r.per) : '–'}</td><td class="num">${Math.abs(r.score) < 50 ? '≈ £0' : (r.score > 0 ? '+' : '−') + gbp(r.score)}</td></tr>`;
     const what = (name, a, what2) => `<tr><th scope="row">${esc(name)}</th><td class="num">${a.length ? fmt1(avg(a)) : '–'}</td><td class="num" colspan="3">${esc(a.length ? `on ${a.length} of the ${days.length} published days (up to ${fmt1(Math.max(...a))} h); ${what2}` : 'no published day where it helps')}</td></tr>`;
-    return `<div class="vc"><h3>What each option is worth</h3>
+    return `<div class="vc"><h3>What all the options are worth</h3>${figure}
       <p class="muted">A day of each option, against doing nothing. <b>Money</b> counts staff, operator time, passengers held and delay at our rates (marshals £30 an hour each, £15 a vehicle-hour of delay); the <b>weighted score</b> adds £${(C.corridor_hour || 5000).toLocaleString()} for every hour a road runs above 85% of capacity, a weight we set for the risk of it locking up.</p>
       <div class="table-scroll"><table><thead><tr><th>Option</th><th class="num">Hours near the limit avoided</th><th class="num">Money a day</th><th class="num">Money per hour avoided</th><th class="num">Weighted score a day</th></tr></thead>
       <tbody>${rows.map(tr).join('')}
@@ -2305,6 +2354,9 @@ body.ai-adv .simple-only { display: none !important; }
         ${rule && rule.per ? `<li>A marshals-only rule is the cheapest per hour avoided (about <b>${gbp(rule.per)}</b>) but removes fewer hours (${fmt1(rule.road)} a day).</li>` : ''}
         ${rw.length ? `<li>The biggest single option is moving roadworks off a cruise day: about <b>${fmt1(avg(rw))} hours</b> on the days it applies.</li>` : ''}
       </ul>
+      ${shipMoves.length || works.length ? `<details class="vc-moves" open><summary>Which ships and works to move, to quieter times and days</summary>
+        ${shipMoves.length ? `<h4>Retiming ships (the forecast's best combination for each day)</h4><ul class="plain">${shipMoves.join('')}</ul>` : ''}
+        ${works.length ? `<h4>Moving roadworks off cruise days, within each permit's dates</h4><ul class="plain">${works.join('')}</ul>` : ''}</details>` : ''}
       <p class="foot-note">Simulated, not measured: the learned plan with and without each option on ${AB.ppo.n} sampled cruise days (${esc(String(PPO.ablation.made || '').replace('T', ' '))}); retiming and roadworks from the forecast's what-if runs on the published days.</p></div>`;
   }
   // How each kind of option is chosen: the forecast's own suggestions (thresholds on the risk the ships add, and
@@ -3666,7 +3718,7 @@ body.ai-adv .simple-only { display: none !important; }
   const frames = AI_EMBEDS.map((e, i) => { const f = $('#ai-f' + i); f.srcdoc = e.html; return f; });
   // under the two designs: what each option is worth (from the page's own data)
   const valHTML = typeof leverValueHTML === 'function' ? leverValueHTML() : '';
-  if (valHTML) { const vc = document.createElement('div'); vc.className = 'ai-card value-card'; vc.innerHTML = valHTML; aiSec.append(vc); }
+  if (valHTML) { const vc = document.createElement('div'); vc.className = 'ai-card value-card'; vc.innerHTML = valHTML; aiSec.querySelector('.ai-bar').after(vc); }
   const themeOf = () => document.documentElement.dataset.theme || 'harbour';
   function sizeFrames() {
     frames.forEach(f => { try { const d = f.contentDocument; if (!d || !d.documentElement) return; d.documentElement.dataset.theme = themeOf(); const h = d.documentElement.scrollHeight; if (h > 40) f.style.height = h + 'px'; } catch (err) { /* not ready */ } });
