@@ -222,6 +222,7 @@ button.cell:hover { border-color: var(--ink); }
 .seg-ctl { display: inline-flex; border: 1px solid var(--line-strong); border-radius: var(--radius); overflow: hidden; }
 .seg-ctl button { border: 0; background: var(--surface); padding: 5px 11px; cursor: pointer; font-size: var(--step--1); font-weight: 600; }
 .seg-ctl button + button { border-left: 1px solid var(--line-strong); }
+.seg-ctl button[hidden] + button { border-left: 0; }  /* Vehicles leads the map layers but is hidden on pages without simulated vehicles */
 .seg-ctl button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
 .seg-ctl button.elsewhere::after { content: ' ›'; color: var(--muted); }
 .map-box { position: relative; height: clamp(380px, 60vh, 620px); background: var(--land); overflow: hidden; }
@@ -755,11 +756,11 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
         <div class="map-bar">
           <h3>Roads at <span class="clock" id="clock"></span></h3>
           <div class="seg-ctl" role="group" aria-label="What the map shows">
+            <button data-layer="agents" aria-pressed="false" id="layer-agents" hidden>Vehicles</button>
             <button data-layer="load" aria-pressed="true">How full</button>
             <button data-layer="cruise" aria-pressed="false">Cruise traffic</button>
             <button data-layer="queue" aria-pressed="false">Queues</button>
             <button data-layer="traffic" aria-pressed="false">Traffic</button>
-            <button data-layer="agents" aria-pressed="false" id="layer-agents" hidden>Vehicles</button>
           </div>
           <label class="foot-note" for="scenario">Plan</label>
           <select id="scenario"></select>
