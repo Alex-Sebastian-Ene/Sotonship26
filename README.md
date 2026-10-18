@@ -11,6 +11,19 @@ add with a likely range, and a suggested plan an officer can approve.
 - **Design decisions:** [docs/decisions.md](docs/decisions.md), what we chose and why.
 - Built at SotonShip 2026 (Southampton City track), 16–18 Oct 2026.
 
+## In a paragraph
+
+Southampton City Council's traffic team must decide, for each cruise day, where to put marshals,
+what to show on signs, and whether to pause roadworks near the docks. Today it's a judgement call,
+and a bad guess means gridlock on the A33 and dock approaches, late buses and angry residents.
+Sotonship forecasts it: for every road corridor and 15-minute slot we give the probability of
+congestion and the extra traffic a ship adds, as a 10/50/90% range, built from the cruise schedule,
+football fixtures, school terms, roadworks and port freight, run over the real road network and
+checked against observed traffic. A reinforcement-learning agent then picks the cheapest mitigation
+plan, and on backtested days it beats doing nothing, a simple rule and the current advisor
+(simulated days; see [docs/backtest.md](docs/backtest.md)). It scales to any UK port city with open traffic
+and transit feeds, Liverpool, Dover, Portsmouth.
+
 ## How it works
 
 ```mermaid
