@@ -799,13 +799,93 @@ SPLASH_JS = r"""
     Promise.race([fonts, new Promise(r => setTimeout(r, 1500))]).then(() => setTimeout(out, 60));
   })();
 """
+STORY_DEMO_JS = r"""
+  // #demo (or Shift+D): the Story's own path for a screen recording, from the opening wave to the last step. A drawn
+  // cursor glides to each target before it is clicked (the real one is hidden); every step holds still for two seconds
+  // at its start and end; step times go to the console for editing; the URL returns to #demo so a reload retakes.
+  async function runStoryDemo() {
+    if (document.body.classList.contains('demo-run')) return;
+    document.body.classList.add('demo-run');
+    const wait = ms => new Promise(r => setTimeout(r, ms)), HOLD = 2000, t0 = performance.now();
+    const shot = (n, name) => console.log(`[demo] ${n} ${name} at ${((performance.now() - t0) / 1000).toFixed(1)} s`);
+    const cur = document.createElement('div'); cur.className = 'demo-cursor'; document.body.append(cur);
+    cur.style.left = `${innerWidth * 0.62}px`; cur.style.top = `${innerHeight * 0.45}px`;
+    const centre = el => { const r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
+    const moveTo = async (el, ms = 900) => {
+      if (!el) return;
+      const [x, y] = centre(el);
+      cur.style.transition = `left ${ms}ms cubic-bezier(.4, 0, .2, 1), top ${ms}ms cubic-bezier(.4, 0, .2, 1)`;
+      cur.style.left = `${x}px`; cur.style.top = `${y}px`; await wait(ms + 150);
+    };
+    const click = async (el, ms) => {
+      if (!el) return;
+      await moveTo(el, ms);
+      cur.classList.remove('tap'); void cur.offsetWidth; cur.classList.add('tap'); await wait(180);
+      const [x, y] = centre(el);
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: x, clientY: y })); await wait(350);
+    };
+    const scrollTo = async (el, offset = 120, ms = 1000) => {
+      if (!el) return;
+      window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - offset, behavior: 'smooth' }); await wait(ms);
+    };
+    const glide = async (dy, ms = 1400) => { window.scrollBy({ top: dy, behavior: 'smooth' }); await wait(ms); };
+    const next = async () => { await click($('#story-next'), 800); await wait(900); window.scrollTo({ top: 0, behavior: 'smooth' }); await wait(500); };
+    // the demo day: the busiest published day with ships, simulated vehicles and roadworks (a Saturday if there is one)
+    const cands = DATA.days.filter(d => !d.beyond && d.calls && d.calls.length >= 2);
+    const rank = d => (agentDay(d.date) ? 100 : 0) + (d.permits && d.permits.length ? 50 : 0) + (dateOf(d.date).getDay() === 6 ? 20 : 0) + d.calls.length;
+    const DAY = (cands.sort((a, b) => rank(b) - rank(a))[0] || DATA.days.find(d => !d.beyond)).date;
+
+    // 0. the home page: the opening wave has played; hold on the landing, then set sail
+    shot(0, 'home page'); await wait(HOLD + 1200);
+    const go = $('#l-go');
+    if (go && go.offsetParent) { await click(go, 1100); await wait(1900); }
+    // 1. when are the hard days: the calendar, the demo day picked, the other planned events
+    shot(1, 'hard days'); await wait(HOLD);
+    await click($(`.cell[data-date="${DAY}"]`), 1000); await wait(1000);
+    const ev = $('#events');
+    if (ev && ev.offsetParent) { await scrollTo(ev, 160, 1100); await moveTo(ev, 900); await wait(1500); window.scrollTo({ top: 0, behavior: 'smooth' }); await wait(800); }
+    await wait(HOLD);
+    // 2. how bad is it: the day's headline, then its limits (modelled, not measured; the backtest error)
+    shot(2, 'how bad'); await next(); await wait(HOLD);
+    await moveTo($('#day-head .tile:nth-child(2)') || $('#day-head'), 900); await wait(1800);
+    const q = $('#day-head .qwrap > button');
+    if (q && q.offsetParent) {
+      await click(q, 800); await wait(300); await click($('#qlayer .qpop .q-more'), 700); await wait(2800);
+      if (q.getAttribute('aria-expanded') === 'true') q.click();
+    }
+    await wait(HOLD);
+    // 3. watch the day: real roads, simulated vehicles and buses moving
+    shot(3, 'watch the day'); await next(); await wait(HOLD);
+    await moveTo($('.map-box'), 1200); await wait(5000); await wait(HOLD);
+    // 4. what to do: the option cards with times and owners; arrange the first marshals card
+    shot(4, 'what to do'); await next(); await wait(HOLD);
+    await glide(240, 1300);
+    const marsh = [...document.querySelectorAll('#actions .act')].find(a => a.dataset.kind === 'Marshals' && a.offsetParent) || $('#actions .act');
+    await scrollTo(marsh, 160, 800); await click(marsh && marsh.querySelector('.dec-yes')); await wait(900); await wait(HOLD);
+    // 5. does the AI help: what all the options are worth, the buses, then how sure the numbers are
+    shot(5, 'does the AI help'); await next(); await wait(HOLD);
+    await moveTo($('.vc-stats') || $('.value-card'), 1000); await wait(2800);
+    await glide(460, 1600); await wait(1400);
+    const adv = $('[data-ai="adv"]');
+    if (adv) {
+      window.scrollTo({ top: 0, behavior: 'smooth' }); await wait(900);
+      await click(adv, 900); await wait(1300);
+      await scrollTo($('.viz-sure'), 150, 1000); await moveTo($('.viz-sure'), 800); await wait(2600);
+    }
+    await wait(HOLD);
+    shot(6, 'end'); cur.remove(); document.body.classList.remove('demo-run');
+    history.replaceState(null, '', '#demo');   // reload to retake
+  }
+  if (location.hash === '#demo') setTimeout(runStoryDemo, 3200);   // after the opening wave
+  addEventListener('keydown', e => { if (e.key === 'D' && e.shiftKey && !e.target.closest('input, textarea, select')) runStoryDemo(); });
+"""
 D3_TAG = '<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>'
 assert tpl.count(D3_TAG) == 1
 
 for name, (css, js) in VARIANTS.items():
     base = "story" if name.startswith("story") else name
     if base == "story":
-        js += SPLASH_JS
+        js += SPLASH_JS + STORY_DEMO_JS
     page = tpl.replace("</style>", COMMON_CSS + (ICON_CSS if base == "story" else "") + css + "</style>", 1)
     page = page.replace(INIT, COMMON_JS.replace("__VARIANT__", repr(base)) + js, 1)
     page = page.replace("<title>Cruise-day traffic forecast</title>", f"<title>{TITLES[name]}</title>", 1)
