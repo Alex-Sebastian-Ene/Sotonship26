@@ -497,6 +497,27 @@ def base_shares(ctx: Ctx, dtype: int, closed, kick, term=True):
 P_WET = {10: 0.50, 11: 0.55, 12: 0.55, 1: 0.55}  # share of rainy days (assumed climatology)
 WET_CAPACITY = 0.93  # roads carry a little less in the wet
 WET_DEMAND = 1.03  # and a few more people drive
+DRY_DEMAND = 0.97  # and on dry days a few fewer: wet and dry days average out near the counts
+WEATHER = ext.weather_forecast()  # Open-Meteo chance of rain per date, where cached
+if WEATHER:
+    _days = [k for k, v in WEATHER["p_rain"].items() if v is not None]
+    SOURCES["weather"] = {"label": f"{WEATHER['source']}, fetched {WEATHER['fetched']}: chance of "
+                                  f"rain for {_days[0]} to {_days[-1]}; monthly climatology after",
+                         "url": "https://open-meteo.com/", "checked": WEATHER["fetched"][:10]}
+SOURCES["uni_terms"] = {"label": "University of Southampton 2026-27 term dates, read 18 Oct 2026",
+                        "url": "https://www.southampton.ac.uk/about/term-dates", "checked": "2026-10-18"}
+
+
+def p_wet(d: date) -> float:
+    """Chance of a wet day: the Open-Meteo forecast where it reaches, climatology after."""
+    p = WEATHER.get("p_rain", {}).get(d.isoformat())
+    return p if p is not None else P_WET.get(d.month, 0.5)
+
+
+def local_pre(m, dtype: int, d: date):
+    """Local traffic on the counted roads for one date (university term takes UNI_TERM)."""
+    pre = m.pre.get(dtype)
+    return None if pre is None else pre * tm.uni_term_factor(d)
 INCIDENT_P = 0.15  # chance a day has a breakdown or crash on a main road
 PERCEPTION_SD = 0.12  # how far drivers misjudge a road's travel time, shared by all its users
 MAJOR_CLASSES = {"motorway", "trunk", "primary"}
@@ -527,7 +548,7 @@ def day_multipliers(d: date, wet: bool) -> dict:
     hol = FESTIVE_DAYS.get((d.month, d.day), 1.0)
     if (d.month, d.day) in SHOPS_SHUT:
         visitors *= hol
-    w = WET_DEMAND if wet else 1.0
+    w = WET_DEMAND if wet else DRY_DEMAND
     return {"county": commute * w * hol, "outbound": commute * w * hol, "internal": w * hol,
             "through": hol, "visitors": visitors * w, "school": w, "freight": hol}
 
@@ -578,7 +599,7 @@ def forecast(task: dict) -> dict:
                   datetime.fromisoformat(c["departure"]), c["pax"]) for c in task["calls"]]
     closed, kick, full = set(task["closed"]), task["match"], task["full"]
     paired = task.get("paired", False)
-    term, shifts, pre = task.get("term", True), task.get("shifts"), m.pre.get(dtype)
+    term, shifts, pre = task.get("term", True), task.get("shifts"), local_pre(m, dtype, d)
     cap0 = capacity(ctx, closed)
     sh0 = base_shares(ctx, dtype, closed, kick, term)
     run_c = m.t0 * 0.15 / 60.0
@@ -600,7 +621,7 @@ def forecast(task: dict) -> dict:
         return cx, slow + 15.0 * np.maximum(cx - 1.0, 0.0)
 
     for _ in range(task["n"]):
-        wet = rng.random() < P_WET.get(d.month, 0.5)
+        wet = rng.random() < p_wet(d)
         cap = cap0 * (WET_CAPACITY if wet else 1.0)
         events = []
         if rng.random() < INCIDENT_P:
@@ -1031,7 +1052,7 @@ def main(argv=None) -> None:
             "delay": {c[0]: np.rint(r["delay50"][:, i]).astype(int).tolist() for i, c in enumerate(ctx.corr)},
             "delay90": {c[0]: np.rint(r["delay90"][:, i]).astype(int).tolist() for i, c in enumerate(ctx.corr)},
             "range": ranges(r["scores"]), "spread": round(r["spread"], 2),
-            "wet": P_WET.get(date.fromisoformat(task["date"]).month, 0.5), "incident": INCIDENT_P,
+            "wet": round(p_wet(date.fromisoformat(task["date"])), 2), "incident": INCIDENT_P,
             "lead": (date.fromisoformat(task["date"]) - ISSUED.date()).days,
             "timing": advice.get(task["date"]),
             "p85": {c[0]: pct(r["p85"][:, i]) for i, c in enumerate(ctx.corr)},
@@ -1118,9 +1139,9 @@ def main(argv=None) -> None:
                  "at_risk": tm.AT_RISK, "unknown_pax_range": UNKNOWN_PAX_RANGE, "model": "v0.2-demo",
                  "scale": round(m.scale, 3), "scale_ext": round(m.scale_ext, 3),
                  "scale_freight": round(m.scale_freight, 3),
-                 "capacity_notes": ctx.extra["capacity"], "uni_term": tm.UNI_TERM,
+                 "capacity_notes": ctx.extra["capacity"], "uni_term": tm.UNI_TERM, "uni_terms": [[a.isoformat(), b.isoformat()] for a, b in tm.UNI_TERMS],
                  "count_headroom": tm.COUNT_HEADROOM,
-                 "uncertainty": {"p_wet": P_WET, "wet_capacity": WET_CAPACITY, "wet_demand": WET_DEMAND,
+                 "uncertainty": {"p_wet": P_WET, "wet_capacity": WET_CAPACITY, "wet_demand": WET_DEMAND, "dry_demand": DRY_DEMAND,
                                  "incident_p": INCIDENT_P, "perception_sd": PERCEPTION_SD,
                                  "logit_beta": tm.LOGIT_BETA, "noise": tm.NOISE,
                                  "arrival_sd": TurnaroundParams().arrival_delay_sd_min}, "half_term": [x.isoformat() for x in HALF_TERM],

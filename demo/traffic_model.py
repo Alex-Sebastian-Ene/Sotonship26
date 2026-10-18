@@ -35,6 +35,7 @@ from __future__ import annotations
 import math
 import pickle
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 
 import external_data as ext
@@ -1630,7 +1631,19 @@ def delay_minutes(m: Model, x: np.ndarray) -> np.ndarray:
 
 
 MIN_CAP = 350.0  # floor for a high street with parking, bus stops and crossings (veh/h each way)
-UNI_TERM = 1.2  # assumed: July counts miss university term traffic around Highfield and Portswood
+# Local traffic on the counted roads round the university in its term, against the July 2024 counts
+# (outside term). Assumed, the team's call on 18 Oct 2026: few students drive, and WebTRIS shows no
+# term or vacation swing on the main roads, so term takes 10% off rather than adding (was +20%).
+UNI_TERM = 0.9
+# University of Southampton 2026-27 terms (southampton.ac.uk/about/term-dates, read 18 Oct 2026)
+UNI_TERMS = ((date(2026, 9, 21), date(2026, 12, 12)), (date(2027, 1, 4), date(2027, 3, 20)))
+
+
+def uni_term_factor(d: date) -> float:
+    """UNI_TERM on days in a university term, else 1 (the July counts' level)."""
+    return UNI_TERM if any(a <= d <= b for a, b in UNI_TERMS) else 1.0
+
+
 # The July 2024 counts are what the counted roads carried, not what they can carry: peak speeds
 # there were within 0-2 mph of the all-day average (Portswood Baseline Data Report, Table 3-10)
 # and buses on Portswood Road ran 0:24 to 4:22 behind timetable in the peaks (Table 3-5), which a
@@ -1654,8 +1667,8 @@ def anchor_counts(m: Model, sites: list[dict], fit_rows: list[dict], log=print) 
        value only where lower. Skipped where the zones alone already put at least the counted
        traffic on the road, since a lower capacity there would only create a false jam.
     2. Local traffic: traffic the zones do not generate (side streets, short hops) is added to
-       each link of the counted roads that carries less than the count, up to the count, raised by
-       UNI_TERM for university term. Links that already carry more get none.
+       each link of the counted roads that carries less than the count, up to the count (each
+       date scales it by uni_term_factor). Links that already carry more get none.
     """
     over = {}
     for r in fit_rows:
@@ -1706,7 +1719,6 @@ def anchor_counts(m: Model, sites: list[dict], fit_rows: list[dict], log=print) 
                         w = np.zeros(N_BINS)
                         w[a:b] = prof[a:b]
                         target += w / w.sum() * total * 4
-                target *= UNI_TERM
                 pre[:, ks] += np.maximum(target[:, None] - v[:, ks], 0.0)
         m.pre[dt] = pre
     m.pre[2] = m.pre[1] * 0.85  # Sunday: no count, take Saturday a little lower

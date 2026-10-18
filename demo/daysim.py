@@ -381,7 +381,7 @@ def sample_day(ctx: sd.Ctx, task: dict, rng: np.random.Generator,
     major_w = np.array([sum(m.length[e] for e in segs[i]["edges"]) for i in major], float)
     major_w /= major_w.sum()
 
-    wet = bool(rng.random() < sd.P_WET.get(d.month, 0.5))
+    wet = bool(rng.random() < sd.p_wet(d))
     cap = cap0 * (sd.WET_CAPACITY if wet else 1.0)
     events = []
     if rng.random() < sd.INCIDENT_P:
@@ -398,7 +398,7 @@ def sample_day(ctx: sd.Ctx, task: dict, rng: np.random.Generator,
     veh = cruise_vehicles(ctx, task["calls"], rng, params, task.get("cruise"))
     return SampledDay(task=task, date=d, dtype=dtype, params=params, wet=wet, cap=cap,
                       events=events, noise=noise, parts=parts, groups=groups, Dbg=Dbg, Dm=Dm,
-                      veh=veh, pre=m.pre.get(dtype), shares0=shares0)
+                      veh=veh, pre=sd.local_pre(m, dtype, d), shares0=shares0)
 
 
 # --- allocation one bin at a time ------------------------------------------------------------

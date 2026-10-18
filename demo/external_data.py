@@ -245,6 +245,39 @@ def msoa_totals(log=print) -> dict:
     return data
 
 
+WEATHER = ROOT / "data" / "cache" / "weather" / "open_meteo.json"
+WEATHER_URL = ("https://api.open-meteo.com/v1/forecast?latitude=50.904&longitude=-1.404"
+               "&daily=precipitation_sum,precipitation_probability_max"
+               "&timezone=Europe%2FLondon&forecast_days=16")
+WEATHER_SOURCE = "Open-Meteo forecast for Southampton (50.904, -1.404), CC BY 4.0"
+
+
+def fetch_weather(log=print) -> dict:
+    """The next 16 days' chance of rain and rainfall from Open-Meteo, cached for offline builds
+    (the Iridis compute nodes have no internet: fetch on a login node or laptop, copy the file)."""
+    from datetime import datetime
+
+    req = urllib.request.Request(WEATHER_URL, headers={"User-Agent": "sotonship26"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        raw = json.load(r)
+    daily = raw["daily"]
+    data = {"source": WEATHER_SOURCE, "url": WEATHER_URL,
+            "fetched": datetime.now().astimezone().isoformat(timespec="minutes"),
+            "p_rain": {d: (p / 100 if p is not None else None)
+                       for d, p in zip(daily["time"], daily["precipitation_probability_max"],
+                                       strict=True)},
+            "rain_mm": dict(zip(daily["time"], daily["precipitation_sum"], strict=True))}
+    WEATHER.parent.mkdir(parents=True, exist_ok=True)
+    WEATHER.write_text(json.dumps(data), encoding="utf-8")
+    log(f"weather: {len(data['p_rain'])} days from Open-Meteo, fetched {data['fetched']} -> {WEATHER}")
+    return data
+
+
+def weather_forecast() -> dict:
+    """The cached Open-Meteo forecast, or an empty one (then every date uses climatology)."""
+    return json.loads(WEATHER.read_text(encoding="utf-8")) if WEATHER.exists() else {}
+
+
 def collected(path: Path) -> str:
     return date.fromtimestamp(path.stat().st_mtime).isoformat()
 

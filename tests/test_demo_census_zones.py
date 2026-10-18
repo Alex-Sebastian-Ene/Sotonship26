@@ -37,3 +37,27 @@ def test_census_counts_are_shared_by_land_use_and_kept_whole():
 def test_motorway_gateways_name_their_next_count():
     assert set(tm.MOTORWAY_NEXT) == {"M27 west", "M27 east", "M3 north"}
     assert all(isinstance(k, int) for ids in tm.MOTORWAY_NEXT.values() for k in ids)
+
+
+def test_university_term_takes_ten_percent_off_only_in_term():
+    from datetime import date
+
+    assert tm.uni_term_factor(date(2026, 10, 19)) == pytest.approx(0.9)
+    assert tm.uni_term_factor(date(2026, 12, 12)) == pytest.approx(0.9)  # last day of term
+    assert tm.uni_term_factor(date(2026, 12, 14)) == 1.0  # Christmas vacation
+    assert tm.uni_term_factor(date(2027, 1, 4)) == pytest.approx(0.9)
+
+
+def test_wet_day_chance_uses_the_forecast_then_climatology(monkeypatch):
+    from datetime import date
+
+    import synthetic_demo as sd
+
+    monkeypatch.setattr(sd, "WEATHER", {"p_rain": {"2026-10-20": 0.88, "2026-11-01": None}})
+    assert sd.p_wet(date(2026, 10, 20)) == pytest.approx(0.88)
+    assert sd.p_wet(date(2026, 11, 1)) == sd.P_WET[11]  # no forecast that day
+    assert sd.p_wet(date(2026, 12, 5)) == sd.P_WET[12]
+    dry = sd.day_multipliers(date(2026, 10, 21), False)
+    wet = sd.day_multipliers(date(2026, 10, 21), True)
+    assert dry["internal"] == pytest.approx(sd.DRY_DEMAND)
+    assert wet["internal"] == pytest.approx(sd.WET_DEMAND)
