@@ -1,6 +1,6 @@
 # Queued traffic waits at its bottleneck (SOT-30)
 
-Written Sat 17 Oct 2026 by [seb-claude] (Claude Code), branch `seb/SOT-30-queue-at-bottleneck`,
+Written Sat 17 Oct 2026 in Alex-Sebastian's session, branch `seb/SOT-30-queue-at-bottleneck`,
 on main 3b32541, which has SOT-27 merged (`docs/west-side-counts.md`, `docs/queues.md`). Counts: DfT
 road traffic statistics, annual average daily flow 2025 (published June 2026, OGL v3), and the
 SCC/WSP Portswood counts and Bluestar run times (July 2024; Portswood Project Baseline Data

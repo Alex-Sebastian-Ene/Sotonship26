@@ -1,6 +1,6 @@
 # Backtest: learned cruise uplift on the M271
 
-Generated 2026-10-17 08:01 UTC by `demo/webtris_backtest.py` (written with Claude Code; see the README provenance section). Summary numbers for the page are in `demo/out/backtest.json`.
+Generated 2026-10-17 08:01 UTC by `demo/webtris_backtest.py` (see the README provenance section). Summary numbers for the page are in `demo/out/backtest.json`.
 
 ## Summary
 

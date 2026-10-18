@@ -151,7 +151,7 @@ on a login node and `sbatch cluster/iridis/gpu_check.slurm`.
 | `models/ppo/1889084/` | The trained PPO policy used on the page |
 | `data/webtris/` | M271 speed and flow extracts (OGL), committed for the forecast engine |
 | `tests/`, `scripts/`, `cluster/`, `configs/` | Tests, helper scripts, Iridis jobs, settings |
-| `coord/` | How the team's three Claude Code sessions coordinated through Linear |
+| `coord/` | How the team's three coding sessions coordinated through Linear |
 | `Context/` | The event's rules and track briefs |
 
 ## Data sources
@@ -203,12 +203,12 @@ opened at 20:00; the first code was committed at 21:21. Open-source libraries ar
 `pyproject.toml` and `uv.lock`.
 
 **Who did it.** The team: Keanu Czirjak (learning and evaluation), Alex-Sebastian Ene (forecast
-engine) and Edward Denton (product, data and pitch). Each worked with their own Claude Code
+engine) and Edward Denton (product, data and pitch). Each worked with their own AI coding
 session; the sessions coordinated through Linear (`coord/`). The humans chose the product, the
 data and its permitted use, and reviewed the methods and results. No one outside the team helped.
 
-**AI-generated.** Almost all code and writing in this repository was produced with Claude Code
-(Anthropic) under the team's direction, between Fri 16 and Sun 18 Oct 2026:
+**AI-generated.** Almost all code and writing in this repository was produced with an AI coding
+assistant under the team's direction, between Fri 16 and Sun 18 Oct 2026:
 
 - **Scaffold and first design:** `pyproject.toml` and its backend extras, `scripts/`, `cluster/`,
   `configs/`, the package skeleton and the parked pedestrian and waterway code. Written in Alex-Sebastian's session.

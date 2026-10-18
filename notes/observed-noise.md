@@ -1,6 +1,6 @@
 # How noisy is real traffic? Targets for the demo's noise settings
 
-Keanu's Claude Code session, Sat 17 Oct 2026. Source: National Highways WebTRIS 15-minute counts (OGL v3.0,
+Keanu's session, Sat 17 Oct 2026. Source: National Highways WebTRIS 15-minute counts (OGL v3.0,
 collected 16–17 Oct 2026). Reproduce with `PYTHONPATH=src python scripts/observed_noise.py`.
 
 `demo/traffic_model.py` (v0.3, main 8daf6c7) samples each day with assumed noise, all in log space:

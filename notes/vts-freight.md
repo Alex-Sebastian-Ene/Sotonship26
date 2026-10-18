@@ -1,6 +1,6 @@
 # Port freight ship calls from Southampton VTS (for SOT-24)
 
-Checked Sat 17 Oct 2026 by Keanu's Claude. Code: `src/sotonship26/data/vts_freight.py`, tests in
+Checked Sat 17 Oct 2026 in Keanu's session. Code: `src/sotonship26/data/vts_freight.py`, tests in
 `tests/test_vts_freight.py` (synthetic XML only). Data credit: **Southampton VTS, ABP**.
 
 ## What the feeds are

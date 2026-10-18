@@ -14,8 +14,9 @@ Sources, checked 2026-10-16 (details in ``notes/cruise-history.md``):
   ``data/raw/cruise_history/vts_snapshots/``. ABP doesn't permit redistribution, so the raw XML
   stays out of git.
 * **Third-party schedule sites** were ruled out for automated collection. cruisetimetables.com's
-  robots.txt disallows ClaudeBot. CruiseMapper's terms forbid "systematic or automated data
-  collection ... without our express written consent" and its archive starts in Jan 2026.
+  robots.txt disallows our AI assistant's crawler. CruiseMapper's terms forbid "systematic or
+  automated data collection ... without our express written consent" and its archive starts in
+  Jan 2026.
   CruiseDig only shows future months. gangwaze.com and crew-center.com sit behind bot
   challenges (Vercel and Sucuri). We don't get around any of these.
 * **Manual import.** History obtained with permission (from the council, ABP, or a site that
