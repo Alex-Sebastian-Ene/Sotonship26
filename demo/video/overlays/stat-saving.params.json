@@ -1,1 +1,1 @@
-{ "num": "−£10,724", "label": "a day vs doing nothing, on 93% of days (learned plan)", "source": "PPO run C, 260 simulated days · docs/ppo-results-gpu2.md, 2026-10-17 · marshal effect assumed" }
+{ "num": "−5.0", "label": "congested road-hours a day cut by the learned plan (held-out cruise dates)", "source": "Simulated · docs/ppo-results.md (run C re-scored, 32fe052) · −8.3%, 95% CI −5.28…−4.73 · costs ~£2,069/day in marshals+signs ≈ £413 per road-hour avoided · marshal +25% gate capacity assumed" }

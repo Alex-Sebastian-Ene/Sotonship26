@@ -53,14 +53,22 @@ OGL v3.0, collected 16–17 Oct 2026, daytime bins; test period 2025-07-01 to 20
 | M271 NB (19974) vs planner rule | skill 0.087, 90% CI −0.03…0.19, **not clear of zero** | 147 days |
 | Cruise effect, M271 backtest | MAE **877** veh/day vs 1,233 (last-day) / 1,353 (no effect); 87% in 80% band | 179 held-out days (`docs/backtest.md`) |
 | Ship list's own contribution | **~2%** per 15 min (clears zero); per-day 4% does **not** | say "per 15 minutes" |
-| **Learned plan (PPO) vs doing nothing** | **−£10,724/day**, −2.9 congested road-hours, **93%** of days | **260 simulated days**, run C, bootstrapped (`docs/ppo-results-gpu2.md`, 2026-10-17). Marshal effect assumed. |
+| **Learned plan (PPO), congestion (robust)** | **−5.0 congested road-hours/day** (−8.3%, 95% CI −5.28…−4.73) | held-out cruise dates, **simulated** (`docs/ppo-results.md`, run C re-scored at 32fe052). Delay change not significant. |
+| **Learned plan (PPO), cost (honest)** | money-only PPO **costs +£2,069/day** (marshals ~£1,708 + signs ~£804 vs £495 less delay) | ≈ **£413 per congested road-hour avoided**; worth it if the council values a road-hour above ~£410. Weighted cost score −£22,976/day (£5k/road-hour is a risk weight, not cash). |
+| **No-cost alternative: ship-timing advisor** | −£223/day, −0.34 road-hours | the free lever; PPO buys more congestion cut but costs money. |
+
+**Authoritative source = `docs/ppo-results.md`** (run C re-scored at 32fe052, what the page shows),
+Seb's call (SOT-28, 2026-10-18). Switch to `docs/ppo-results-aa8eae9.md` **only if**
+`seb/demand-census-motorways` merges before the freeze (re-score = Iridis job 1899339). All PPO
+figures are **simulated** on the demo traffic model; marshals' +25% gate capacity is assumed.
 
 **Do not quote:**
-- The **−£19.6k/day, 96%** figure from the overview/verdict embed. It's a *separate 52-run quick
-  eval* on different, higher-congestion draws (nothing-cost £1.72M vs the 260-day eval's £1.36M)
-  and it **overstates**. The authoritative number is the 260-day run C above. *Open item (Seb,
-  viz lane): regenerate `demo/ui_embeds/viz-ai/emb-verdict.html` from the 260-day eval, or label
-  its provenance clearly, needs a cluster eval run.*
+- **−£10,724/day, 93%** from `docs/ppo-results-gpu2.md`, superseded old-model run C, not what the
+  page uses. (Earlier draft of this doc quoted it in error.)
+- **−£19.6k/day, 96%** from the old overview/verdict embed, a separate 52-run quick eval that
+  overstated; `seb/ppo-numerics` already removes that embed and moves the page to held-out figures.
+- Any £ figure framed as a **"saving"**, money-only PPO is a net **cost**; the £5k/road-hour
+  weighted score is a risk valuation, not cash. Lead with congested road-hours, state the cost honestly.
 - The 17% figure from the first flow-forecast version (its baseline was a one-day lookup).
 - Skill at sites 20313 / 20605 (under 30 comparable days, noise).
 

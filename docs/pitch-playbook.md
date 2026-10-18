@@ -90,7 +90,7 @@ we talk. Target ~2:40. Must show the **real product working**.
 | 0:15 | The problem | Dock Gate 4 pin + **88%** + the 2011 quote lower-third |
 | 0:40 | Product live, pick a real two-ship Saturday → day view | Screen capture of `demo/page.html`; zoom headline + P(>85%) heatmap |
 | 1:10 | The map + the plan | Highlight the three action cards; caption "suggestions, officer approves" |
-| 1:40 | AI vs baseline, one honest number | **+6.6%** / **−£10,724/day, 93%** stat, labelled "simulated days" |
+| 1:40 | AI vs baseline, honest | **+6.6%** forecast skill, then **−5.0 congested road-hours/day** from the plan, and say it **costs** ~£2,069/day (≈£413 per road-hour avoided), labelled "simulated" |
 | 2:05 | Trust + failure | Trust-panel close-up; the refusal state |
 | 2:20 | Business + close, back on camera | **£29k/yr** anchor, Dover/Portsmouth scale card, end card + repo |
 
@@ -111,17 +111,22 @@ Screen-capture `demo/page.html` dark theme, notifications off, the demo day pre-
 | Everyday forecast vs planner rule (M3 J14) | **+6.6%** | 90% CI 0.5–12%, 355 held-out days; 84% in 80% band (`notes/flow-forecast.md`) |
 | Cruise effect on M271 (backtest) | **877** | MAE veh/day vs 1,233 (last-day baseline), 1,353 (no effect); 179 days; 87% in band (`docs/backtest.md`) |
 | Ship list's own contribution | **~2%** | per 15 min, clears zero; per-day 4% does not, say "per 15 min" |
-| **Learned plan (PPO) vs doing nothing** | **−£10,724/day** | **260 simulated days**, −2.9 congested road-hours, 93% of days (`docs/ppo-results-gpu2.md`, run C, 2026-10-17). Marshal effect assumed. |
+| **Learned plan (PPO), congestion** | **−5.0 road-hours/day** | held-out, simulated, −8.3%, 95% CI −5.28…−4.73 (`docs/ppo-results.md`, run C re-scored 32fe052). Delay change not significant. |
+| **Learned plan (PPO), cost** | **+£2,069/day (a cost)** | money-only: marshals ~£1,708 + signs ~£804 vs £495 less delay ≈ £413 per road-hour avoided. Weighted score −£22,976 (£5k/road-hour = risk weight, not cash). |
 | Scale | **88%** | of UK cruise passengers through Southampton (2024, DfT) |
 | Price anchor | **£29k/yr** | Devon CC traffic-data service (Find a Tender, Nov 2025); £40M road fix "prohibitive" |
 | Run cost | **~18** | core-hours/rebuild; static page; no data fees |
 
-> **PPO number, settled.** The authoritative figure is the **260-day run C eval**:
-> **−£10,724/day, 93% of days, −2.9 road-hours** (`docs/ppo-results-gpu2.md`, bootstrapped CIs).
-> The overview/verdict embed shows a *separate 52-run quick eval* (made later the same day on
-> different, higher-congestion draws) reading −£19.6k/96%; it **overstates** on a small sample.
-> **Quote the 260-day number in the video and README; don't quote the embed's £.** Regenerating
-> the embed from the 260-day eval is an open item for Seb (viz lane), needs a cluster eval run.
+> **PPO number, settled (Seb's call, SOT-28, 2026-10-18).** Pin to **`docs/ppo-results.md`** (run C
+> re-scored at 32fe052, what the page shows). Lead with the **robust** one: PPO cuts **5.0 congested
+> road-hours/day** on held-out dates (−8.3%, 95% CI −5.28…−4.73; delay change not significant). State
+> the **cost** honestly: money-only PPO *costs* **+£2,069/day** (marshals + signs), about **£413 per
+> congested road-hour avoided**, worth it if the council values a road-hour above ~£410. The £5k/road-hour
+> weighted score (−£22,976/day) is a risk valuation, **not cash**; never call the £ a "saving". The
+> ship-timing advisor is the no-cost lever (−£223/day, −0.34 road-hours). All **simulated**; marshals'
+> +25% gate capacity assumed. Switch to `docs/ppo-results-aa8eae9.md` **only if**
+> `seb/demand-census-motorways` merges before the freeze (re-score = Iridis job 1899339).
+> **Do not quote** the old −£10,724 (`ppo-results-gpu2.md`, superseded) or the embed's −£19.6k/96%.
 
 ## 8. Pre-record / pre-lock checklist
 
