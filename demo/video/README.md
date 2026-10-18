@@ -27,7 +27,7 @@ bash demo/video/build.sh     # renders each overlay to demo/video/out/<name>.png
 | `title.*` | Title card: product + pitch line + the three names | 0:00 open |
 | `quote.*` | Council's 2011 congestion quote, attributed | ~0:15 problem |
 | `stat.html` + `stat-scale.params.json` | **88%** of UK cruise passengers | ~0:15 problem |
-| `stat.html` + `stat-saving.params.json` | **−5.0 congested road-hours/day** from the learned plan (held-out) | ~1:40 AI-vs-baseline |
+| `stat.html` + `stat-saving.params.json` | **5.0 congested road-hours/day avoided** by the learned plan (held-out) | ~1:40 AI-vs-baseline |
 | `stat.html` + `stat-skill.params.json` | **+6.6%** forecast vs the planner rule | ~1:40 AI-vs-baseline |
 | `stat.html` + `stat-anchor.params.json` | **£29k/yr** price anchor | ~2:20 business |
 | `caption.*` | "Suggestions, an officer approves each one" chip | ~1:10 the plan |
@@ -40,13 +40,14 @@ or re-number without touching HTML/CSS.
 ## Rules these overlays keep
 
 - **Every number carries its source and date** in the `source` line (freeze-day guardrail).
-- The learned-plan stat is the **authoritative page eval** (`docs/ppo-results.md`, run C re-scored
-  at 32fe052; Seb's call, SOT-28): PPO cuts **5.0 congested road-hours/day** on held-out dates
-  (−8.3%, 95% CI −5.28…−4.73). Lead with that, **not** the £, money-only PPO *costs* +£2,069/day
-  (marshals + signs), about £413 per road-hour avoided; the £5k/road-hour weighted score is a risk
-  weight, not cash, so never call it a "saving". All simulated; marshals' +25% gate capacity assumed.
-  Do **not** quote the old −£10,724 (`ppo-results-gpu2.md`, superseded) or the embed's −£19.6k/96%.
-  See `SUBMISSION.md`.
+- The learned-plan stat is the **authoritative page eval** (`docs/ppo-results.md`; Seb's call, SOT-32).
+  Say what the plan **gains** and what it **costs**, never a negative-vs-nothing number: it **avoids
+  5.0 congested road-hours/day** on held-out dates (8.3% fewer, all 7 dates; 95% CI −5.28…−4.73) for
+  about **£2,100/day** of marshal+sign time, ≈£410 per road-hour avoided, **not a money saving**
+  (date-resampled −£330…+£4,180). The £5k/road-hour weighted score is an assumption, not cash. All
+  simulated; marshals' +25% gate capacity assumed. Do **not** quote the old −£10,724
+  (`ppo-results-gpu2.md`, superseded) or the embed's −£19.6k/96%. When job 1899759 lands (~08:15),
+  swap to `docs/ppo-results-aa8eae9.md`. See `SUBMISSION.md`.
 - The human-control caption and the "simulated days / observed, not live" captions keep
   provenance and officer-approval on screen.
 
