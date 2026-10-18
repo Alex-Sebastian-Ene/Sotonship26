@@ -392,7 +392,7 @@ footer { font-size: var(--step--1); color: var(--muted); border-top: 1px solid v
 /* PPO in numbers (charts fold) */
 #ppo-viz .fold-body { grid-template-columns: minmax(0, 1fr); }
 #ppo-viz-body { position: relative; display: grid; gap: 26px; }
-#ppo-viz-body svg { display: block; max-width: 100%; height: auto; overflow: visible; }
+#ppo-viz-body svg { display: block; width: 100%; max-width: 100%; height: auto; overflow: visible; }  /* drawn at most 720px wide, then scaled up to the panel */
 #ppo-viz-body h3 { font-size: var(--step-0); margin: 0 0 4px; }
 .viz-sure { max-width: 760px; }
 .viz-sure td.num, .viz-sure th.num { text-align: right; }
@@ -2880,8 +2880,8 @@ details.how[open] { display: grid; gap: 10px; }
   }
 
   function renderPPOViz() {
-    const host = $('#ppo-viz-body'), W = Math.max(280, Math.floor(host.clientWidth));
-    VIZ.w = W; VIZ.drawn = true;
+    const host = $('#ppo-viz-body'), avail = Math.max(280, Math.floor(host.clientWidth)), W = Math.min(avail, 720);
+    VIZ.w = avail; VIZ.drawn = true;
     const S = PPO.stats || {}, SUM = PPO.summary[VIZ.split] || PPO.summary.all, tr = PPO.train || {};
     const half = W >= 640 ? Math.floor((W - 28) / 2) : W, pols = POL_ORDER.filter(p => SUM[p]);
     const sec = (title, note, body) => `<section class="viz-sec"><h3>${esc(title)}</h3>${note ? `<p class="foot-note">${note}</p>` : ''}${body}</section>`;
