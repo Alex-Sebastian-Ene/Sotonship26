@@ -215,6 +215,12 @@ button.cell:hover { border-color: var(--ink); }
 .mon { font-family: var(--font-display); font-size: var(--step--1); font-weight: 600; }
 .cell-ships { font-size: var(--step--1); }
 .cell-tags { font-size: 0.75rem; line-height: 1.3; opacity: 0.9; }
+/* #demo player: a drawn cursor (the real one is hidden) with a pulse on each click */
+body.demo-run, body.demo-run * { cursor: none !important; }
+.demo-cursor { position: fixed; z-index: 9999; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: rgba(255, 255, 255, .92);
+  border: 2px solid #1D2B45; box-shadow: 0 2px 10px rgba(0, 0, 0, .45); pointer-events: none; }
+.demo-cursor.tap::after { content: ''; position: absolute; inset: -7px; border-radius: 50%; border: 3px solid #4CC9F0; animation: demo-tap .6s ease-out forwards; }
+@keyframes demo-tap { from { transform: scale(.5); opacity: 1; } to { transform: scale(2.2); opacity: 0; } }
 .events { display: grid; gap: 8px; }
 .events[hidden] { display: none; }
 .events h3 { font-size: var(--step-0); margin: 0; }
@@ -3464,6 +3470,99 @@ body.ai-adv .simple-only { display: none !important; }
   const agDays = AG ? Object.keys(AG.days).filter(x => BY_DATE[x]).sort() : [];
   selectDay(agDays.includes('2026-10-24') ? '2026-10-24' : agDays[0] || (BY_DATE['2026-10-24'] ? '2026-10-24' : DATA.days[0].date), false);
   requestAnimationFrame(() => { layout(); zoomTo('docks', false); });
+  // #demo: plays the seven demo shots at script speed for a screen recording (open the plain page with #demo;
+  // reload to retake). A drawn cursor glides to each target before it is clicked, and every shot holds still for
+  // two seconds at its start and end so the clips trim cleanly. Shot times are logged to the console for editing.
+  async function runDemo() {
+    if (document.body.dataset.variant || document.body.classList.contains('demo-run')) return;
+    document.body.classList.add('demo-run');
+    const wait = ms => new Promise(r => setTimeout(r, ms)), HOLD = 2000, t0 = performance.now();
+    const shot = (n, name) => console.log(`[demo] shot ${n} ${name} at ${((performance.now() - t0) / 1000).toFixed(1)} s`);
+    const cur = document.createElement('div'); cur.className = 'demo-cursor'; document.body.append(cur);
+    const centre = el => { const r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
+    const moveTo = async (el, ms = 900) => {
+      const [x, y] = centre(el);
+      cur.style.transition = `left ${ms}ms cubic-bezier(.4, 0, .2, 1), top ${ms}ms cubic-bezier(.4, 0, .2, 1)`;
+      cur.style.left = `${x}px`; cur.style.top = `${y}px`; await wait(ms + 150);
+    };
+    const click = async (el, ms) => {
+      if (!el) return;
+      await moveTo(el, ms);
+      cur.classList.remove('tap'); void cur.offsetWidth; cur.classList.add('tap'); await wait(180);
+      const [x, y] = centre(el);
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: x, clientY: y })); await wait(350);
+    };
+    const scrollTo = async (el, offset = 90, ms = 1000) => {
+      if (!el) return;
+      window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - offset, behavior: 'smooth' }); await wait(ms);
+    };
+    const glide = async (dy, ms = 1500) => { window.scrollBy({ top: dy, behavior: 'smooth' }); await wait(ms); };
+    // the demo day: the busiest published day with ships, simulated vehicles and roadworks (a Saturday if there is one)
+    const cands = DATA.days.filter(d => !d.beyond && d.calls && d.calls.length >= 2);
+    const score = d => (agentDay(d.date) ? 100 : 0) + (d.permits && d.permits.length ? 50 : 0) + (dateOf(d.date).getDay() === 6 ? 20 : 0) + d.calls.length;
+    const DAY = (cands.sort((a, b) => score(b) - score(a))[0] || DATA.days.find(d => !d.beyond)).date;
+    setTheme('harbour'); showView('briefing', true); window.scrollTo(0, 0);
+    cur.style.left = `${innerWidth * 0.6}px`; cur.style.top = `${innerHeight * 0.4}px`;
+    await wait(1200);
+
+    // 1. Product: pick the day, the forecast loads, hold on the headline
+    shot(1, 'product'); await wait(HOLD);
+    await scrollTo($('#cal'), 120, 900);
+    await click($(`.cell[data-date="${DAY}"]`));
+    await wait(700); await scrollTo($('#day-head'), 110);
+    await moveTo($('#day-head .tile:nth-child(2)') || $('#day-head'), 900);
+    await wait(2600); await wait(HOLD);
+
+    // 2. Heatmap: the chance each road is over 85% full; glide down it, click the hottest square: the map opens at that time
+    shot(2, 'heatmap'); await click($('[data-go="timeline"]')); await wait(500);
+    await scrollTo($('#heat-card'), 90); await wait(HOLD);
+    await glide(140, 1300);
+    const d = day(), p = scenP85(d, state.scenario);
+    let best = null;
+    for (const [, , id] of hmRows) (p[id] || []).forEach((v, b) => { if (!best || v > best.v) best = { v, id, b }; });
+    const cell = best && [...document.querySelectorAll('#hm .hm-cell')].find(r => +r.getAttribute('x') === HM.LW + best.b * HM.CW
+      && hmRows.some(([a, z, id]) => id === best.id && +r.getAttribute('y') >= a && +r.getAttribute('y') < z));
+    await click(cell); await wait(HOLD);
+
+    // 3. Map: real roads, simulated vehicles and buses moving through the day
+    shot(3, 'map'); await scrollTo($('.map-card'), 80, 700);
+    if (agentDay() && state.layer !== 'agents') await click($('#layer-agents'));
+    if ($('#veh-play') && /Play/.test($('#veh-play').textContent)) $('#veh-play').click();
+    await moveTo($('.map-box'), 1200); await wait(4800); await wait(HOLD);
+
+    // 4. Plan: the option cards with their times and owners; arrange the first marshals card
+    shot(4, 'plan'); await click($('[data-go="briefing"]')); await wait(500);
+    await scrollTo($('#row-actions'), 90); await wait(HOLD);
+    await glide(220, 1200);
+    const marsh = [...document.querySelectorAll('#actions .act')].find(a => a.dataset.kind === 'Marshals') || $('#actions .act');
+    await scrollTo(marsh, 160, 800);
+    await click(marsh && marsh.querySelector('.dec-yes')); await wait(700); await wait(HOLD);
+
+    // 5. Trust: the day's limits, sources and what is modelled rather than measured
+    shot(5, 'trust'); await scrollTo($('#day-head'), 110); await wait(HOLD);
+    const q = $('#day-head .qwrap > button');
+    await click(q, 800); await wait(300);
+    await click($('#qlayer .qpop .q-more'), 700); await wait(2800);
+    if (q && q.getAttribute('aria-expanded') === 'true') q.click();
+    await wait(HOLD);
+
+    // 6. Failure: a date past the published schedule is refused rather than guessed
+    shot(6, 'refusal'); await scrollTo($('#cal'), 120, 800); await wait(HOLD);
+    const beyond = [...document.querySelectorAll('.cell-beyond')][0];
+    await click(beyond, 700); await wait(300);
+    await scrollTo($('#notices .refusal') || $('#notices'), 140, 700); await wait(1600); await wait(HOLD);
+
+    // 7. Honest loss: the backtest against simple baselines, and how little the ships add
+    shot(7, 'backtest'); await click($('[data-go="insights"]')); await wait(600);
+    const bt = [...document.querySelectorAll('.card, details, section')].filter(e => e.offsetParent).find(e => /Beats all three baselines/.test(e.textContent) && !e.querySelector('.card'));
+    await scrollTo(bt, 100); await moveTo(bt || document.body, 1000); await wait(2600); await wait(HOLD);
+
+    shot(8, 'end'); cur.remove(); document.body.classList.remove('demo-run');
+    history.replaceState(null, '', '#demo');   // reload to retake
+  }
+  if (location.hash === '#demo') setTimeout(runDemo, 1500);
+  // Shift+D starts it too, for copies opened where the URL's #demo does not reach the page (an embedded artifact)
+  addEventListener('keydown', e => { if (e.key === 'D' && e.shiftKey && !e.target.closest('input, textarea, select')) runDemo(); });
 
   const VAR = 'story';
   document.body.dataset.variant = VAR;
@@ -3797,6 +3896,85 @@ body.ai-adv .simple-only { display: none !important; }
     const fonts = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
     Promise.race([fonts, new Promise(r => setTimeout(r, 1500))]).then(() => setTimeout(out, 60));
   })();
+
+  // #demo (or Shift+D): the Story's own path for a screen recording, from the opening wave to the last step. A drawn
+  // cursor glides to each target before it is clicked (the real one is hidden); every step holds still for two seconds
+  // at its start and end; step times go to the console for editing; the URL returns to #demo so a reload retakes.
+  async function runStoryDemo() {
+    if (document.body.classList.contains('demo-run')) return;
+    document.body.classList.add('demo-run');
+    const wait = ms => new Promise(r => setTimeout(r, ms)), HOLD = 2000, t0 = performance.now();
+    const shot = (n, name) => console.log(`[demo] ${n} ${name} at ${((performance.now() - t0) / 1000).toFixed(1)} s`);
+    const cur = document.createElement('div'); cur.className = 'demo-cursor'; document.body.append(cur);
+    cur.style.left = `${innerWidth * 0.62}px`; cur.style.top = `${innerHeight * 0.45}px`;
+    const centre = el => { const r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
+    const moveTo = async (el, ms = 900) => {
+      if (!el) return;
+      const [x, y] = centre(el);
+      cur.style.transition = `left ${ms}ms cubic-bezier(.4, 0, .2, 1), top ${ms}ms cubic-bezier(.4, 0, .2, 1)`;
+      cur.style.left = `${x}px`; cur.style.top = `${y}px`; await wait(ms + 150);
+    };
+    const click = async (el, ms) => {
+      if (!el) return;
+      await moveTo(el, ms);
+      cur.classList.remove('tap'); void cur.offsetWidth; cur.classList.add('tap'); await wait(180);
+      const [x, y] = centre(el);
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: x, clientY: y })); await wait(350);
+    };
+    const scrollTo = async (el, offset = 120, ms = 1000) => {
+      if (!el) return;
+      window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - offset, behavior: 'smooth' }); await wait(ms);
+    };
+    const glide = async (dy, ms = 1400) => { window.scrollBy({ top: dy, behavior: 'smooth' }); await wait(ms); };
+    const next = async () => { await click($('#story-next'), 800); await wait(900); window.scrollTo({ top: 0, behavior: 'smooth' }); await wait(500); };
+    // the demo day: the busiest published day with ships, simulated vehicles and roadworks (a Saturday if there is one)
+    const cands = DATA.days.filter(d => !d.beyond && d.calls && d.calls.length >= 2);
+    const rank = d => (agentDay(d.date) ? 100 : 0) + (d.permits && d.permits.length ? 50 : 0) + (dateOf(d.date).getDay() === 6 ? 20 : 0) + d.calls.length;
+    const DAY = (cands.sort((a, b) => rank(b) - rank(a))[0] || DATA.days.find(d => !d.beyond)).date;
+
+    // 0. the home page: the opening wave has played; hold on the landing, then set sail
+    shot(0, 'home page'); await wait(HOLD + 1200);
+    const go = $('#l-go');
+    if (go && go.offsetParent) { await click(go, 1100); await wait(1900); }
+    // 1. when are the hard days: the calendar, the demo day picked, the other planned events
+    shot(1, 'hard days'); await wait(HOLD);
+    await click($(`.cell[data-date="${DAY}"]`), 1000); await wait(1000);
+    const ev = $('#events');
+    if (ev && ev.offsetParent) { await scrollTo(ev, 160, 1100); await moveTo(ev, 900); await wait(1500); window.scrollTo({ top: 0, behavior: 'smooth' }); await wait(800); }
+    await wait(HOLD);
+    // 2. how bad is it: the day's headline, then its limits (modelled, not measured; the backtest error)
+    shot(2, 'how bad'); await next(); await wait(HOLD);
+    await moveTo($('#day-head .tile:nth-child(2)') || $('#day-head'), 900); await wait(1800);
+    const q = $('#day-head .qwrap > button');
+    if (q && q.offsetParent) {
+      await click(q, 800); await wait(300); await click($('#qlayer .qpop .q-more'), 700); await wait(2800);
+      if (q.getAttribute('aria-expanded') === 'true') q.click();
+    }
+    await wait(HOLD);
+    // 3. watch the day: real roads, simulated vehicles and buses moving
+    shot(3, 'watch the day'); await next(); await wait(HOLD);
+    await moveTo($('.map-box'), 1200); await wait(5000); await wait(HOLD);
+    // 4. what to do: the option cards with times and owners; arrange the first marshals card
+    shot(4, 'what to do'); await next(); await wait(HOLD);
+    await glide(240, 1300);
+    const marsh = [...document.querySelectorAll('#actions .act')].find(a => a.dataset.kind === 'Marshals' && a.offsetParent) || $('#actions .act');
+    await scrollTo(marsh, 160, 800); await click(marsh && marsh.querySelector('.dec-yes')); await wait(900); await wait(HOLD);
+    // 5. does the AI help: what all the options are worth, the buses, then how sure the numbers are
+    shot(5, 'does the AI help'); await next(); await wait(HOLD);
+    await moveTo($('.vc-stats') || $('.value-card'), 1000); await wait(2800);
+    await glide(460, 1600); await wait(1400);
+    const adv = $('[data-ai="adv"]');
+    if (adv) {
+      window.scrollTo({ top: 0, behavior: 'smooth' }); await wait(900);
+      await click(adv, 900); await wait(1300);
+      await scrollTo($('.viz-sure'), 150, 1000); await moveTo($('.viz-sure'), 800); await wait(2600);
+    }
+    await wait(HOLD);
+    shot(6, 'end'); cur.remove(); document.body.classList.remove('demo-run');
+    history.replaceState(null, '', '#demo');   // reload to retake
+  }
+  if (location.hash === '#demo') setTimeout(runStoryDemo, 3200);   // after the opening wave
+  addEventListener('keydown', e => { if (e.key === 'D' && e.shiftKey && !e.target.closest('input, textarea, select')) runStoryDemo(); });
 
 })();
 </script>
