@@ -83,6 +83,9 @@ body[data-view="step1"] .story-time, body[data-view="step2"] .story-time, body[d
 .story-time b { font-family: var(--font-data); font-size: 1rem; min-width: 5ch; }
 .story-time input { width: 170px; accent-color: var(--accent); }
 :root[data-theme="steam"] .story-time { border: 2px solid #1D2B45; box-shadow: 3px 3px 0 #1D2B45; }
+/* medium screens: a shorter slider, and on the day steps the step track gives way so the question still fits */
+@media (max-width: 1280px) { .story-time input { width: 120px; } }
+@media (max-width: 1100px) { body[data-view="step1"] .voyage, body[data-view="step2"] .voyage, body[data-view="step3"] .voyage { display: none; } }
 .story-q .spr { height: 46px; width: auto; flex: none; }
 .story-ico { display: inline-flex; animation: stk-pop .45s cubic-bezier(.2, 1.6, .4, 1) both; }
 .story-n { font-family: var(--font-data); color: var(--accent); }
@@ -156,7 +159,7 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 :root[data-theme="steam"] .brand-mark svg { display: none; }
 :root[data-theme="steam"] .brand-mark::after { content: ''; width: 40px; height: 32px; background: var(--ico-ship) center / contain no-repeat; }
 .deco-gull { position: fixed; z-index: 1; top: 150px; left: -80px; width: 56px; pointer-events: none; display: none; animation: fly 26s linear infinite; }
-.deco-gull .spr { display: block; width: 100%; }
+.deco-gull .spr { display: block; width: 100%; transform: scaleX(-1); }  /* the gull drawing faces left; this one flies right */
 :root[data-theme="steam"] .deco-gull { display: block; }
 @keyframes fly { from { transform: translateX(0); } to { transform: translateX(calc(100vw + 160px)); } }
 /* gulls fly curves: a steady glide across, an eased swoop up and down on a separate wrapper, and a tilt into each turn */
@@ -169,8 +172,9 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 .landing { position: fixed; inset: 0; z-index: 100; overflow: hidden; display: grid; place-items: center; color: #1D2B45; font-family: "Fredoka", "Trebuchet MS", sans-serif;
   background: linear-gradient(#FFE9C7 0%, #FFD7B0 46%, #FFC9A8 62%, #A9D9D3 62.2%, #7CC3BE 100%); transition: transform .8s cubic-bezier(.6, 0, .3, 1); }
 .landing.gone { transform: translateY(-104%); }
-.l-sun { position: absolute; left: 50%; top: 62%; width: 34vmin; height: 34vmin; margin: -17vmin 0 0 -17vmin; border-radius: 50%; background: radial-gradient(#FFF3D6, #FFB27A 70%); opacity: .9;
-  clip-path: inset(0 0 50% 0); }  /* centred on the horizon (62%): only the half above the sea shows */
+/* the sun sets on the horizon (62%): drawn as the half disc above the sea, so none of it can show below */
+.l-sun { position: absolute; left: 50%; top: calc(62% - 17vmin); width: 34vmin; height: 17vmin; margin-left: -17vmin; border-radius: 17vmin 17vmin 0 0;
+  background: radial-gradient(circle 24vmin at 50% 100%, #FFF3D6, #FFB27A 70%); opacity: .9; }
 .l-cloud { position: absolute; left: 0; height: 26px; border-radius: 20px; background: #FFF8EC; border: 2.5px solid #1D2B45; animation: drift linear infinite; }
 .l-cloud::before, .l-cloud::after { content: ''; position: absolute; bottom: 8px; border-radius: 50%; background: #FFF8EC; border: 2.5px solid #1D2B45; border-bottom-color: transparent; border-right-color: transparent; transform: rotate(45deg); }
 .l-cloud::before { left: 14px; width: 34px; height: 34px; } .l-cloud::after { left: 40px; width: 26px; height: 26px; }
@@ -180,15 +184,30 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 .l-gull .spr { display: block; width: 100%; }
 .l-gull.g1 { top: 24%; animation: cross 28s linear infinite; animation-delay: -6s; }
 .l-gull.g2 { top: 11%; width: 50px; animation: cross 36s linear infinite reverse; animation-delay: -20s; }
-.l-gull.g2 .spr { transform: scaleX(-1); --dur: .85s; }
+/* the gull drawing faces left: g1 flies right, so it is mirrored; g2 flies left as drawn */
+.l-gull.g1 .spr { transform: scaleX(-1); }
+.l-gull.g2 .spr { --dur: .85s; }
 @keyframes cross { from { transform: translateX(-12vw); } to { transform: translateX(112vw); } }
 .l-light { position: absolute; right: 1vw; bottom: 31%; width: 32vmin; z-index: 1; }
 .l-light .spr, .l-anchor .spr, .l-wheel .spr, .l-spray .spr { display: block; width: 100%; }
 .l-anchor { position: absolute; left: 3vw; bottom: 4%; width: 11vmin; z-index: 4; }
 .l-wheel { position: absolute; right: 5vw; bottom: 4%; width: 12vmin; z-index: 4; }
-.l-ship { position: absolute; left: 66%; bottom: 18%; width: min(40vmin, 360px); transform: translateX(-50%); z-index: 2; transition: transform 1.3s cubic-bezier(.5, 0, .7, .4); }
-.l-spray { position: absolute; width: 30%; left: -14%; bottom: 4%; transform: scaleX(-1); }
-.l-spray.s2 { width: 22%; left: auto; right: -6%; bottom: 2%; transform: none; }
+/* the ship scales with the screen height like the waves, so it floats at the same depth on every screen */
+/* the ship is placed by its waterline, 22% up: in the first big wave (its crests reach 24.5%, its troughs
+   21.5%), so the wave washes over the bottom of the hull on every screen */
+.landing { --sw: 40vmin; --wl: 22%; }  /* the ship's width and its waterline's height */
+.l-ship { position: absolute; left: 66%; bottom: calc(var(--wl) - var(--sw) * .1283); width: var(--sw); transform: translateX(-50%); z-index: 2; transition: transform 1.3s cubic-bezier(.5, 0, .7, .4); }
+/* the ship sits in a sea that runs the whole width of the screen, in front of its hull and behind the big
+   waves. Its surface is the waterline, y 363 of the ship's 600 by 440 drawing (77 / 600 of its width up), and it
+   is the colour of the sea behind it (the landing's gradient from 78% down), so it only shows on the hull.
+   The ship rolls less than the small ones in the story bar, so the bottom of its hull stays under the ripples. */
+.l-sea { position: absolute; left: 0; bottom: 0; width: 200%; height: var(--wl); background: linear-gradient(#96D0CA, #7CC3BE); z-index: 2;
+  pointer-events: none; animation: wave 18s linear infinite; }
+.l-sea svg { position: absolute; left: 0; bottom: calc(100% - 1.2vmin); width: 100%; height: 2.4vmin; fill: #96D0CA; }
+.l-ship .ship-svg .rock { animation-name: rock-calm; }
+@keyframes rock-calm { 0%, 100% { transform: rotate(-1deg) translateY(0); } 50% { transform: rotate(1deg) translateY(-5px); } }
+.l-spray { position: absolute; width: 30%; left: -14%; bottom: 14%; transform: scaleX(-1); }
+.l-spray.s2 { width: 22%; left: auto; right: -6%; bottom: 13%; transform: none; }
 .l-rock-spray { position: absolute; right: 30%; bottom: -12%; width: 38%; }
 .l-rock-spray .spr { display: block; width: 100%; --dur: 1.3s; }
 .landing.sail .l-ship { transform: translateX(70vw); }
@@ -223,9 +242,12 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 .l-sound.hint { animation: hint 1.6s ease-in-out infinite; }
 @keyframes hint { 50% { transform: scale(1.08); } }
 /* portrait and narrow screens: words on top, the ship below them on the horizon */
+/* tall landscape screens (1440p and up): the words grow with the ship, which scales with the screen height */
+@media (min-height: 950px) and (min-aspect-ratio: 1/1) { .l-card { zoom: 1.2; } }
+@media (min-height: 1200px) and (min-aspect-ratio: 1/1) { .l-card { zoom: 1.4; } }
 @media (max-width: 820px), (max-aspect-ratio: 1/1) {
   .l-card { place-self: start start; margin: 28px 0 0 4vw; max-width: 92vw; }
-  .l-ship { left: 46%; width: min(46vmin, 300px); bottom: 19%; }
+  .landing { --sw: 46vmin; } .l-ship { left: 46%; }
   .l-sun { left: 46%; }
   .l-light { width: 30vmin; right: 2vw; bottom: 33%; }
 }
@@ -235,9 +257,9 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
   .l-kicker, .l-sub { display: none; }
   .l-ticket { padding: 3px 12px 5px; } .l-ticket b { font-size: 1.2rem; }
   .l-go { font-size: 1.1rem; padding: 6px 20px 6px 8px; } .l-go .spr { width: 30px; }
-  .l-ship { left: 72%; width: 30vmax; bottom: 16%; } .l-sun { left: 72%; } .l-light { width: 24vmin; right: 1vw; }
+  .landing { --sw: 30vmax; } .l-ship { left: 72%; } .l-sun { left: 72%; } .l-light { width: 24vmin; right: 1vw; }
 }
-@media (max-width: 640px) { .l-light { width: 34vmin; right: 0; bottom: 34%; } .l-ship { left: 42%; bottom: 22%; }
+@media (max-width: 640px) { .l-light { width: 34vmin; right: 0; bottom: 34%; } .l-ship { left: 42%; }
   .l-card { margin: 68px 0 0; max-width: 100%; gap: 12px; } .l-tickets { gap: 8px; flex-wrap: nowrap; }
   .l-ticket { padding: 4px 11px 6px; } .l-ticket b { font-size: 1.3rem; } .l-ticket span { font-size: .72rem; white-space: nowrap; }
   .storybar { grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px 10px; } .story-q { grid-column: 1 / -1; } .voyage { width: auto; margin-right: 22px; }
@@ -267,8 +289,8 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
       <path d="${HULL}" fill="none"/>
       ${range(150, 530, 40).map(x => `<circle cx="${x}" cy="298" r="9" fill="${CREAM}" stroke-width="5"/>`).join('')}
       <g stroke-width="5" fill="none"><circle cx="96" cy="282" r="5"/><path d="M96 287 V318 M84 297 H108 M80 306 Q96 330 112 306"/></g>
-      <g class="wv"><path d="M30 404 ${range(0, 10, 1).map(() => 'q27 -20 54 0').join(' ')} V440 H30 Z" fill="#3E9E9C"/>
-      <path d="M30 404 ${range(0, 10, 1).map(() => 'q27 -20 54 0').join(' ')}" fill="none" stroke="#FFF8EC" stroke-width="6"/></g>
+      ${id === 'land' ? '' /* the landing ship sits in the full-width sea (.l-sea) */ : `<g class="wv"><path d="M30 404 ${range(0, 10, 1).map(() => 'q27 -20 54 0').join(' ')} V440 H30 Z" fill="#3E9E9C"/>
+      <path d="M30 404 ${range(0, 10, 1).map(() => 'q27 -20 54 0').join(' ')}" fill="none" stroke="#FFF8EC" stroke-width="6"/></g>`}
     </g></svg>`;
   const STEPS = [
     { q: 'When are the hard days?', ico: 'lighthouse', show: [calSec] },
@@ -375,6 +397,7 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
     <span class="l-gull g1" aria-hidden="true"><span class="gl"><span class="gl2"><span class="spr spr-gull"></span></span></span></span><span class="l-gull g2" aria-hidden="true"><span class="gl b"><span class="gl2"><span class="spr spr-gull"></span></span></span></span>
     <span class="l-light" aria-hidden="true"><span class="spr spr-lighthouse"></span><span class="l-rock-spray"><span class="spr spr-spray"></span></span></span>
     <div class="l-ship" aria-hidden="true">${SHIP_SVG('land')}<span class="l-spray"><span class="spr spr-spray"></span></span><span class="l-spray s2"><span class="spr spr-spray"></span></span></div>
+    <div class="l-sea" aria-hidden="true"><svg viewBox="0 0 2400 40" preserveAspectRatio="none"><path d="${wave(20, 8)}"/></svg></div>
     <button type="button" class="l-sound hint" id="l-sound" aria-pressed="false" aria-label="Sound"><svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="on" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="off" d="M16 9.5l5 5M21 9.5l-5 5"/></svg><span id="l-sound-t">Sound on</span></button>
     <svg class="l-waves" viewBox="0 0 2400 300" preserveAspectRatio="none" aria-hidden="true"><path class="w1" d="${wave(70, 30)}"/><path class="w2" d="${wave(140, 24)}"/><path class="w3" d="${wave(210, 18)}"/></svg>
     <span class="l-anchor" aria-hidden="true"><span class="spr spr-anchor"></span></span><span class="l-wheel" aria-hidden="true"><span class="spr spr-wheel"></span></span>
@@ -665,10 +688,74 @@ if EMBEDS:
             emb = json.dumps([{"title": t, "html": f.read_text(encoding="utf-8")} for f, t in pages]).replace("<", r"\u003c")   # no "<" inside the app's script, so nothing in the designs can end it early
             VARIANTS["story-" + key] = (VARIANTS["story"][0] + AI_CSS, VARIANTS["story"][1] + AI_JS.replace("__EMBEDS__", emb))
             TITLES["story-" + key] = "Cruise-day traffic · " + key.capitalize()
+# The Story pages open on a splash: the landing's sky and sea, drawn by the first bytes of the page (before the
+# script, fonts and data have loaded) so the screen is never half built. When the app is ready a wall of water
+# rises over the screen and drains away to show it. If the script never runs, the splash fades after 25 seconds.
+def _wave(y, a):
+    return f"M0 {y} " + " ".join(f"q 50 {-a} 100 0 t 100 0" for _ in range(12)) + " V300 H0Z"
+
+
+_CREST = "M0 50 " + " ".join("q 75 -44 150 0 t 150 0" for _ in range(8))
+_DROPS = "".join(f'<i class="sp-drop" style="--x:{x}%;--s:{sz}px;--dx:{dx}px;--d:{d}s"></i>'
+                 for x, sz, dx, d in ((8, 14, -30, .05), (19, 10, 20, .12), (31, 16, -14, 0), (44, 11, 26, .09), (56, 15, -22, .03),
+                                      (67, 10, 18, .14), (78, 16, -26, .06), (90, 12, 22, .1)))
+SPLASH = f"""<div id="splash" aria-hidden="true"><style>
+#splash {{ position: fixed; inset: 0; z-index: 400; overflow: hidden; background: linear-gradient(#FFE9C7 0%, #FFD7B0 46%, #FFC9A8 62%, #A9D9D3 62.2%, #7CC3BE 100%);
+  animation: sp-safety .6s 25s forwards; }}
+@keyframes sp-safety {{ to {{ opacity: 0; visibility: hidden; }} }}
+#splash .sp-sea {{ position: absolute; left: 0; bottom: 0; width: 200%; height: 30%; }}
+#splash .sp-sea path {{ animation: sp-roll linear infinite; }}
+#splash .sp-a {{ fill: #7CC3BE; animation-duration: 14s; }} #splash .sp-b {{ fill: #3E9E9C; animation-duration: 10s; }} #splash .sp-c {{ fill: #1D6F78; animation-duration: 7s; }}
+@keyframes sp-roll {{ to {{ transform: translateX(-50%); }} }}
+#splash .sp-word {{ position: absolute; left: 0; right: 0; top: 40%; margin: 0; text-align: center; color: #1D2B45; font: 600 1.05rem/1 "Fredoka", "Trebuchet MS", sans-serif;
+  letter-spacing: .12em; text-transform: uppercase; }}
+#splash .sp-word i {{ display: inline-block; width: .45em; height: .45em; margin-left: .3em; border-radius: 50%; background: #D8473A; animation: sp-bob .9s ease-in-out infinite alternate; }}
+#splash .sp-word i:nth-child(2) {{ animation-delay: .3s; }} #splash .sp-word i:nth-child(3) {{ animation-delay: .6s; }}
+@keyframes sp-bob {{ from {{ transform: translateY(3px); }} to {{ transform: translateY(-5px); }} }}
+/* the wall of water starts below the screen; 72% of its 160% height lifts the crest clear of the top */
+#splash .sp-wall {{ position: absolute; left: 0; top: 100%; width: 100%; height: 160%; background: linear-gradient(#3E9E9C, #1D6F78 40%, #16525A);
+  transition: transform .62s cubic-bezier(.55, 0, .85, .45); }}
+#splash .sp-crest {{ position: absolute; left: 0; bottom: calc(100% - 1px); width: 200%; height: 12vmin; animation: sp-roll 2.6s linear infinite; }}
+#splash .sp-drop {{ position: absolute; bottom: calc(100% + 6vmin); left: var(--x); width: var(--s); height: var(--s); border-radius: 50%; background: #FFF8EC; border: 2px solid #1D2B45; opacity: 0; }}
+#splash.crash .sp-wall {{ transform: translateY(-72%); }}
+#splash.crash .sp-drop {{ animation: sp-spray .7s var(--d) cubic-bezier(.2, .6, .4, 1) both; }}
+@keyframes sp-spray {{ 0% {{ opacity: 0; transform: translate(0, 0) scale(.4); }} 25% {{ opacity: 1; }} 100% {{ opacity: 0; transform: translate(var(--dx), -16vmin) scale(1); }} }}
+#splash.drain {{ background: transparent; pointer-events: none; }}
+#splash.drain .sp-sea, #splash.drain .sp-word {{ visibility: hidden; }}
+#splash.drain .sp-wall {{ transform: translateY(8%); transition: transform .9s cubic-bezier(.35, .1, .55, 1); }}
+@media (prefers-reduced-motion: reduce) {{ #splash *, #splash {{ animation: none !important; transition: none !important; }} }}
+</style>
+<svg class="sp-sea" viewBox="0 0 2400 300" preserveAspectRatio="none"><path class="sp-a" d="{_wave(70, 30)}"/><path class="sp-b" d="{_wave(140, 24)}"/><path class="sp-c" d="{_wave(210, 18)}"/></svg>
+<p class="sp-word">Setting sail<i></i><i></i><i></i></p>
+<div class="sp-wall">{_DROPS}<svg class="sp-crest" viewBox="0 0 2400 100" preserveAspectRatio="none"><path d="{_CREST} V100 H0Z" fill="#3E9E9C"/><path d="{_CREST}" fill="none" stroke="#FFF8EC" stroke-width="7" vector-effect="non-scaling-stroke"/></svg></div>
+</div>
+"""
+SPLASH_JS = r"""
+  // the opening: once the app (and its fonts) are ready, the splash's wave crashes over the screen and drains away
+  (() => {
+    const sp = document.getElementById('splash');
+    if (!sp) return;
+    const out = () => {
+      if (REDUCED) { sp.remove(); return; }
+      sp.classList.add('crash');
+      setTimeout(() => sp.classList.add('drain'), 680);
+      setTimeout(() => sp.remove(), 1700);
+    };
+    const fonts = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
+    Promise.race([fonts, new Promise(r => setTimeout(r, 1500))]).then(() => setTimeout(out, 60));
+  })();
+"""
+D3_TAG = '<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>'
+assert tpl.count(D3_TAG) == 1
+
 for name, (css, js) in VARIANTS.items():
     base = "story" if name.startswith("story") else name
+    if base == "story":
+        js += SPLASH_JS
     page = tpl.replace("</style>", COMMON_CSS + (ICON_CSS if base == "story" else "") + css + "</style>", 1)
     page = page.replace(INIT, COMMON_JS.replace("__VARIANT__", repr(base)) + js, 1)
     page = page.replace("<title>Cruise-day traffic forecast</title>", f"<title>{TITLES[name]}</title>", 1)
+    if base == "story":
+        page = page.replace(D3_TAG, SPLASH + D3_TAG, 1)   # before the first thing that waits on the network
     (OUT / f"ui-{name}.html").write_text(page, encoding="utf-8")
     print(name, round(len(page.encode()) / 1e6, 1), "MB")

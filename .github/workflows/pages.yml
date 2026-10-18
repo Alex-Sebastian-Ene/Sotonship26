@@ -8,7 +8,7 @@ name: Deploy Pages
 # or push to main; gh-pages holds no workflow of its own, so a push there deploys nothing.
 on:
   push:
-    branches: [main]
+    branches: [gh-pages]
   workflow_dispatch:
 
 permissions:
@@ -38,6 +38,6 @@ jobs:
       - uses: actions/configure-pages@v5.0.0
       - uses: actions/upload-pages-artifact@v3.0.1
         with:
-          path: _site
+          path: .
       - id: deployment
         uses: actions/deploy-pages@v4.0.5

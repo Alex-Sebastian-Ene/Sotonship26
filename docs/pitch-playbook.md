@@ -34,7 +34,7 @@ figure, and a *trust panel* shows every number's source, collection time and pub
 | Judges ask | Our answer (local evidence) |
 |---|---|
 | Problem real in Southampton? | 2.69M cruise passengers in 2024, **88% of the UK total** (DfT). Council's transport manager (2011): cruise growth "causes significant congestion, especially at weekends, by Dock Gate 4", worse when ships clash with a football match. |
-| Why now / not just react? | 8 Nov 2010: four liners backed traffic onto the public road "we were unable to clear through our traffic control computer". Once the queue forms it's too late, the levers (hold roadworks, book marshals, set signs) are pulled days ahead. |
+| Why now / not just react? | The story we open on: the **2010 Dock Gate 4 backup** (cited by the council's transport manager in 2011), on 8 Nov 2010 four liners "backed traffic onto the public road… we were unable to clear through our traffic control computer". A dock road at its limit **snaps into lockup**; once the queue forms it's too late to clear. The levers (hold roadworks, book marshals, set signs) are pulled **days ahead**, exactly where a week-ahead forecast + the learned plan (PPO) kick in. |
 | Who owns & pays? | The council, under its network-management duty (Traffic Management Act 2004 s.16). Second buyer: bus operators whose routes cross the dock roads. |
 | Second city? | Engine generalises to any scheduled road load, ferry/freight peaks at **Dover, Portsmouth**, EU turnaround ports, stadium days. Feeds (BODS, WebTRIS, DfT counts) are England-national. |
 
@@ -87,12 +87,22 @@ we talk. Target ~2:40. Must show the **real product working**.
 | Time | What | Overlay |
 |---|---|---|
 | 0:00 | Team intro to camera (all three) | Title card + pitch line |
-| 0:15 | The problem | Dock Gate 4 pin + **88%** + the 2011 quote lower-third |
+| 0:15 | The problem, the 2010 Dock Gate 4 backup | Dock Gate 4 pin + **88%** + the backup quote lower-third ("backed traffic onto the public road", cited 2011); caption "a road at its limit snaps into lockup, and then it's too late to clear" |
 | 0:40 | Product live, pick a real two-ship Saturday → day view | Screen capture of `demo/page.html`; zoom headline + P(>85%) heatmap |
 | 1:10 | The map + the plan | Highlight the three action cards; caption "suggestions, officer approves" |
 | 1:40 | AI vs baseline, honest | **+6.6%** forecast skill, then the plan **avoids 3.1 congested road-hours/day** for about **£2,500/day** of marshal+sign time (≈£830 per road-hour avoided; a cost, not a saving), while the free ship-timing advisor **saves ~£7,100/day**, all labelled "simulated" |
 | 2:05 | Trust + failure | Trust-panel close-up; the refusal state |
 | 2:20 | Business + close, back on camera | **£29k/yr** anchor, Dover/Portsmouth scale card, end card + repo |
+
+**The honest payoff line (say it as written, at 1:40).** In pure money the learned plan is a
+**cost**, +£2,545/day (95% +£682…+£4,451), and we say so on screen. What the ~£2,500/day of
+marshals and signs buys is insurance against a **2010-style Dock Gate 4 lockup**: price a congested
+road-hour at **£5,000** (an assumption the council sets, a gridlock-risk weight, not cash), and the
+plan's **3.1 avoided congested road-hours/day** are worth about **£12,800/day** net of the spend, a
+weighted score of **−£12,777/day**, roughly **5×** the money cost. That "pays off" claim is
+weighted-only; in cash the plan does not save money. The one true cash saver stays the free
+**ship-timing advisor, ~£7,100/day** (95% £3,400…£11,100), which edges PPO on the weighted score too
+(−£13,058). All **simulated**, unit costs assumed.
 
 **Remotion / Boby fit.** We record the talking + screen capture; Boby (Bun + Remotion, driven by
 its `creative` CLI) generates the overlays, title/end cards, lower-thirds (88%, council quote),
