@@ -669,6 +669,9 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
   .notice { grid-template-columns: minmax(0, 1fr); }
   .map-box { height: 420px; }
   .day-head { padding: 16px; }
+  .map-bar .seg-ctl { display: flex; flex-wrap: wrap; gap: 1px; background: var(--line-strong); }
+  .map-bar .seg-ctl button { flex: 1 1 auto; }
+  .map-bar .seg-ctl button + button { border-left: 0; }
 }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
 </style>
@@ -2328,7 +2331,7 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
   // flow = load x capacity, speed from the model's BPR curve, vehicles = flow / speed x length.
   // One dot per DOT_VEH vehicles, moving at that speed, half each way. The page has each road's
   // load, not its lanes, so capacities and free speeds are typical values per class (assumed).
-  const DOT_VEH = 4;
+  const DOT_VEH = 2;
   const ROAD_CLS = { motorway: [3600, 105], trunk: [2600, 80], primary: [1600, 48], secondary: [1200, 48],
     tertiary: [900, 40], unclassified: [600, 32] };  // vehicles an hour, km/h
   let segPoly = null, tDots = [], tKey = '', tAnim = null, tLast = 0;
