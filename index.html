@@ -976,6 +976,12 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 .ai-mode button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
 .ai-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
 .ai-bar h2 { font-size: var(--step-2); }
+.value-card { padding: 16px 18px; }
+.value-card .vc { display: grid; gap: 10px; }
+.value-card h3 { margin: 0; }
+.value-card th.num, .value-card td.num { text-align: right; }
+.value-card tr.vc-whole th, .value-card tr.vc-whole td { font-weight: 700; }
+.value-card .vc-take b { font-family: var(--font-data); }
 body:not(.ai-adv) .adv-only { display: none !important; }
 body.ai-adv .simple-only { display: none !important; }
 </style>
@@ -2261,6 +2267,46 @@ body.ai-adv .simple-only { display: none !important; }
       ${howChosen(L, C, { marshals: eff('ppo_no_marshals'), signs: eff('ppo_no_signs'), checkin: eff('ppo_no_checkin'), meter: eff('ppo_no_meter') })}`;
     host.hidden = false;
   })();
+  // What each option is worth, per simulated cruise day: hours near the limit avoided, the money-only cost
+  // (staff, operator time, passengers held and delay at our rates), money per hour avoided and the weighted score.
+  // The Story's last step shows it under its two designs.
+  function leverValueHTML() {
+    const AB = PPO && PPO.ablation && PPO.ablation.rows;
+    if (!AB || !AB.ppo) return '';
+    const C = PPO.costs || {}, m = (r, k) => (r[k] ? r[k].mean : 0);
+    const rate = { vehicle_hours: C.vehicle_hour || 15, held_pax_hours: C.held_pax_hour || 15, marshal_hours: C.marshal_hour || 120, sign_hours: C.sign_hour || 25 };
+    const money = d => Object.entries(rate).reduce((t, [k, v]) => t + d[k] * v, 0);
+    const keys = ['corridor_hours', ...Object.keys(rate)];
+    const diff = k => Object.fromEntries(keys.map(x => [x, m(AB.ppo, x) - m(AB[k], x)]));
+    const own = r => Object.fromEntries(keys.map(x => [x, m(r, x)]));
+    const gbp = v => (Math.abs(v) >= 1000 ? `£${(Math.abs(v) / 1000).toFixed(1)}k` : `£${int(Math.abs(v))}`);
+    const rows = [['The whole learned plan', own(AB.ppo), true], ['Sign messages', AB.ppo_no_signs && diff('ppo_no_signs')], ['Marshals at the gates', AB.ppo_no_marshals && diff('ppo_no_marshals')],
+      ['Check-in times', AB.ppo_no_checkin && diff('ppo_no_checkin')], ['Paced disembarkation', AB.ppo_no_meter && diff('ppo_no_meter')], ['A marshals-only rule (no AI)', AB.marshal_rule && own(AB.marshal_rule)]]
+      .filter(r => r[1]).map(([name, d, whole]) => {
+        const road = -d.corridor_hours, cost = money(d), score = road * (C.corridor_hour || 5000) - cost;
+        return { name, whole, road, cost, per: road >= 0.05 && cost > 0 ? cost / road : null, score };
+      });
+    const days = DATA.days.filter(d => !d.beyond), avg = a => a.reduce((t, v) => t + v, 0) / a.length;
+    const tim = days.filter(d => d.timing && d.timing.best < d.timing.base - 0.15).map(d => d.timing.base - d.timing.best);
+    const rw = days.filter(d => d.permits && d.permits.length && d.whatif && d.whatif.move_permit).map(d => d.score - d.whatif.move_permit.score).filter(v => v > 0);
+    const plan = rows[0], rule = rows.find(r => r.name.startsWith('A marshals-only'));
+    const tr = r => `<tr${r.whole ? ' class="vc-whole"' : ''}><th scope="row">${esc(r.name)}</th><td class="num">${r.road >= 0.05 ? fmt1(r.road) : '≈ 0'}</td>
+      <td class="num">${Math.abs(r.cost) < 50 ? '≈ £0' : (r.cost > 0 ? '−' : '+') + gbp(r.cost)}</td><td class="num">${r.per ? gbp(r.per) : '–'}</td><td class="num">${Math.abs(r.score) < 50 ? '≈ £0' : (r.score > 0 ? '+' : '−') + gbp(r.score)}</td></tr>`;
+    const what = (name, a, what2) => `<tr><th scope="row">${esc(name)}</th><td class="num">${a.length ? fmt1(avg(a)) : '–'}</td><td class="num" colspan="3">${esc(a.length ? `on ${a.length} of the ${days.length} published days (up to ${fmt1(Math.max(...a))} h); ${what2}` : 'no published day where it helps')}</td></tr>`;
+    return `<div class="vc"><h3>What each option is worth</h3>
+      <p class="muted">A day of each option, against doing nothing. <b>Money</b> counts staff, operator time, passengers held and delay at our rates (marshals £30 an hour each, £15 a vehicle-hour of delay); the <b>weighted score</b> adds £${(C.corridor_hour || 5000).toLocaleString()} for every hour a road runs above 85% of capacity, a weight we set for the risk of it locking up.</p>
+      <div class="table-scroll"><table><thead><tr><th>Option</th><th class="num">Hours near the limit avoided</th><th class="num">Money a day</th><th class="num">Money per hour avoided</th><th class="num">Weighted score a day</th></tr></thead>
+      <tbody>${rows.map(tr).join('')}
+      ${what('Retiming ships (what-if)', tim, 'money not priced: the port and cruise line agree new times')}
+      ${what('Moving roadworks (what-if)', rw, 'money not priced: the works move to another day')}</tbody></table></div>
+      <ul class="plain vc-take">
+        <li>In money alone the learned plan costs about <b>${gbp(plan.cost)} a day</b>, mostly marshals' pay. Its value is the <b>${fmt1(plan.road)} hours a day</b> of roads near their limit it removes.</li>
+        ${plan.per ? `<li>It is worth it if an hour of a road near its limit is worth more than about <b>${gbp(plan.per)}</b> to the council.</li>` : ''}
+        ${rule && rule.per ? `<li>A marshals-only rule is the cheapest per hour avoided (about <b>${gbp(rule.per)}</b>) but removes fewer hours (${fmt1(rule.road)} a day).</li>` : ''}
+        ${rw.length ? `<li>The biggest single option is moving roadworks off a cruise day: about <b>${fmt1(avg(rw))} hours</b> on the days it applies.</li>` : ''}
+      </ul>
+      <p class="foot-note">Simulated, not measured: the learned plan with and without each option on ${AB.ppo.n} sampled cruise days (${esc(String(PPO.ablation.made || '').replace('T', ' '))}); retiming and roadworks from the forecast's what-if runs on the published days.</p></div>`;
+  }
   // How each kind of option is chosen: the forecast's own suggestions (thresholds on the risk the ships add, and
   // what-if runs) and the learned plan's levers, with what the learned plan sees, is scored on and cannot do.
   // Each option states its benefit and cost: the learned plan's levers from its with-and-without runs (E), ship
@@ -3618,6 +3664,9 @@ body.ai-adv .simple-only { display: none !important; }
   advBar.addEventListener('click', e => { const b = e.target.closest('[data-ai]'); if (b) aiMode(b.dataset.ai === 'adv'); });
   aiSec.querySelector('.ai-bar').classList.remove('simple-only');
   const frames = AI_EMBEDS.map((e, i) => { const f = $('#ai-f' + i); f.srcdoc = e.html; return f; });
+  // under the two designs: what each option is worth (from the page's own data)
+  const valHTML = typeof leverValueHTML === 'function' ? leverValueHTML() : '';
+  if (valHTML) { const vc = document.createElement('div'); vc.className = 'ai-card value-card'; vc.innerHTML = valHTML; aiSec.append(vc); }
   const themeOf = () => document.documentElement.dataset.theme || 'harbour';
   function sizeFrames() {
     frames.forEach(f => { try { const d = f.contentDocument; if (!d || !d.documentElement) return; d.documentElement.dataset.theme = themeOf(); const h = d.documentElement.scrollHeight; if (h > 40) f.style.height = h + 'px'; } catch (err) { /* not ready */ } });
