@@ -62,20 +62,27 @@ def gull(n=8):
     a = np.array(im).astype(float)
     h, w = a.shape[:2]
     yy, xx = np.mgrid[0:h, 0:w].astype(float)
-    # left wing tip (left of the beak) and right wing fold; the part of the left wing above the head
-    # tucks out of sight behind it as the wings close
-    wl = np.clip((36 - xx) / 8, 0, 1)
-    wr = np.clip((xx - 104) / 18, 0, 1)
-    band = np.clip((42 - yy) / 8, 0, 1) * np.clip((86 - xx) / 10, 0, 1) * (xx >= 30)
-    pivot = np.where(xx < 100, 84.0, 99.0)
+    # each wing folds down towards its shoulder: the far wing is everything left of the head (x < 56) and
+    # folds towards y 95 behind the head; the near wing (x > 100) folds towards the top of the back, y 99.
+    # Every edge is a ramp, so no frame has a seam
+    wl = np.clip((56 - xx) / 6, 0, 1)
+    wr = np.clip((xx - 100) / 16, 0, 1)
+    pivot = np.where(xx < 78, 95.0, 99.0)
     weight = np.maximum(wl, wr) * (yy < pivot)
+    # the beak sits in front of the far wing: it is lifted off (its place filled with the wing's grey) before
+    # the wing folds, and laid back on top, so the folding wing never drags a copy of it
+    r = np.hypot((xx - 51) / 15, (yy - 71) / 10.5)
+    ring = (r > 1.15) & (r < 1.4) & (xx < 46) & (a[..., 3] > 200)
+    wing = a.copy()
+    wing[r < 1.12] = np.median(a[ring], axis=0)
+    beak = a * np.clip((1.12 - r) / 0.08, 0, 1)[..., None]
     frames = []
     for i in range(n):
-        s = 0.6 + 0.4 * math.cos(2 * math.pi * i / n)          # 1 = wings up, 0.2 = folded
+        s = 0.725 + 0.275 * math.cos(2 * math.pi * i / n)      # 1 = wings up, 0.45 = folded
         k = 1 - weight * (1 - s)
-        fr = np.array(sample(a, xx, pivot + (yy - pivot) / k)).astype(float)
-        fr[..., 3] *= 1 - band * (1 - s) / 0.8
-        frames.append(Image.fromarray(fr.astype(np.uint8)))
+        fr = sample(wing, xx, pivot + (yy - pivot) / k)
+        fr.alpha_composite(Image.fromarray(beak.astype(np.uint8)))
+        frames.append(fr)
     return frames, 0.7
 
 

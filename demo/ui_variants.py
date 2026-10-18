@@ -190,17 +190,17 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 .l-anchor { position: absolute; left: 3vw; bottom: 4%; width: 11vmin; z-index: 4; }
 .l-wheel { position: absolute; right: 5vw; bottom: 4%; width: 12vmin; z-index: 4; }
 /* the ship scales with the screen height like the waves, so it floats at the same depth on every screen */
-/* the ship is placed by its waterline, the middle of the first big wave (23% up; its crests reach 24.5%, its
-   troughs 21.5%), so the wave washes over the bottom of the hull on every screen */
-.landing { --sw: 40vmin; --wl: 23%; }  /* the ship's width and its waterline's height */
+/* the ship is placed by its waterline, 22% up: in the first big wave (its crests reach 24.5%, its troughs
+   21.5%), so the wave washes over the bottom of the hull on every screen */
+.landing { --sw: 40vmin; --wl: 22%; }  /* the ship's width and its waterline's height */
 .l-ship { position: absolute; left: 66%; bottom: calc(var(--wl) - var(--sw) * .1283); width: var(--sw); transform: translateX(-50%); z-index: 2; transition: transform 1.3s cubic-bezier(.5, 0, .7, .4); }
 /* the ship sits in a sea that runs the whole width of the screen, in front of its hull and behind the big
    waves. Its surface is the waterline, y 363 of the ship's 600 by 440 drawing (77 / 600 of its width up), and it
-   is the colour of the sea behind it (the landing's gradient from 77% down), so it only shows on the hull.
+   is the colour of the sea behind it (the landing's gradient from 78% down), so it only shows on the hull.
    The ship rolls less than the small ones in the story bar, so the bottom of its hull stays under the ripples. */
-.l-sea { position: absolute; left: 0; bottom: 0; width: 200%; height: var(--wl); background: linear-gradient(#97D0CB, #7CC3BE); z-index: 2;
+.l-sea { position: absolute; left: 0; bottom: 0; width: 200%; height: var(--wl); background: linear-gradient(#96D0CA, #7CC3BE); z-index: 2;
   pointer-events: none; animation: wave 18s linear infinite; }
-.l-sea svg { position: absolute; left: 0; bottom: calc(100% - 1.2vmin); width: 100%; height: 2.4vmin; fill: #97D0CB; }
+.l-sea svg { position: absolute; left: 0; bottom: calc(100% - 1.2vmin); width: 100%; height: 2.4vmin; fill: #96D0CA; }
 .l-ship .ship-svg .rock { animation-name: rock-calm; }
 @keyframes rock-calm { 0%, 100% { transform: rotate(-1deg) translateY(0); } 50% { transform: rotate(1deg) translateY(-5px); } }
 .l-spray { position: absolute; width: 30%; left: -14%; bottom: 14%; transform: scaleX(-1); }
