@@ -180,14 +180,16 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 .l-cloud::before { left: 14px; width: 34px; height: 34px; } .l-cloud::after { left: 40px; width: 26px; height: 26px; }
 .l-cloud.c1 { top: 9%; width: 110px; animation-duration: 70s; animation-delay: -20s; } .l-cloud.c2 { top: 23%; width: 90px; animation-duration: 95s; animation-delay: -60s; } .l-cloud.c3 { top: 15%; width: 130px; animation-duration: 120s; animation-delay: -95s; }
 @keyframes drift { from { transform: translateX(-20vw); } to { transform: translateX(120vw); } }
-.l-gull { position: absolute; width: 72px; z-index: 1; }
+/* the landing is a grid that centres its children, so the gulls are pinned to its left edge; each flight starts and
+   ends wholly off screen, so no gull appears or vanishes in the middle of the sky */
+.l-gull { position: absolute; left: 0; width: 72px; z-index: 1; }
 .l-gull .spr { display: block; width: 100%; }
 .l-gull.g1 { top: 24%; animation: cross 28s linear infinite; animation-delay: -6s; }
 .l-gull.g2 { top: 11%; width: 50px; animation: cross 36s linear infinite reverse; animation-delay: -20s; }
 /* the gull drawing faces left: g1 flies right, so it is mirrored; g2 flies left as drawn */
 .l-gull.g1 .spr { transform: scaleX(-1); }
 .l-gull.g2 .spr { --dur: .85s; }
-@keyframes cross { from { transform: translateX(-12vw); } to { transform: translateX(112vw); } }
+@keyframes cross { from { transform: translateX(-120px); } to { transform: translateX(calc(100vw + 40px)); } }
 .l-light { position: absolute; right: 1vw; bottom: 31%; width: 32vmin; z-index: 1; }
 .l-light .spr, .l-anchor .spr, .l-wheel .spr, .l-spray .spr { display: block; width: 100%; }
 .l-anchor { position: absolute; left: 3vw; bottom: 4%; width: 11vmin; z-index: 4; }
