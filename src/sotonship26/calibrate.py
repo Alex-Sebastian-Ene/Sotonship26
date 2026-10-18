@@ -7,12 +7,12 @@ study over those knobs, writes the winner to ``runs/calibration/best.json`` and 
 ``CalibrationResult`` exposing ``fitted_params()`` and ``backtest_table()``.
 
 The simulator is dependency-injected as a ``Simulator`` callable, not imported, so this module
-runs today against any model that maps knobs to per-site/bin uplift and swaps straight onto
-Seb's SOT-10 ``forecast_day(day, params: SimParams)`` the moment it lands. Until then the only
-real target -- a parametric ``simulate_uplift`` over the WebTRIS sites -- does not exist in
-``src/`` (SOT-10 is Backlog), so the generated ``best.json`` (gitignored, not committed) is
-produced from the synthetic
-stand-in in this module and is labelled ``"source": "synthetic"``.
+runs against any model that maps knobs to per-site/bin uplift. SOT-10 has landed: the real
+target is ``forecast.simulator.simulator`` over the demo's ``SPACE``, wired up in
+``calibrate_demo`` (that run needs the demo context pickle, so it happens on Seb's laptop or
+Iridis and writes ``best.json`` with ``"source": "data"``). The synthetic stand-in below stays
+as the offline proof of the harness -- it needs no feed data, so it is what the tests fit, and
+anything it writes is labelled ``"source": "synthetic"``.
 
 Observed uplift comes from ``sotonship26.data.observed.observed_uplift(flows, days)``:
 columns site_id, date, tod_bin, uplift_veh, is_cruise_day, ... (SOT-7).
