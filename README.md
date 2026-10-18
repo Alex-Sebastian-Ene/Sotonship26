@@ -1,5 +1,7 @@
 # Sotonship26: cruise-day traffic forecast for Southampton
 
+**We help Southampton City Council's traffic officers decide where to put marshals, sign messages and roadworks holds on cruise days around the Southampton docks, using a probabilistic traffic forecast and a learned plan built on public data.**
+
 Southampton City Council's traffic team has to decide, days ahead, which cruise turnaround days and
 hours need marshals at the dock gates, a sign message or a hold on roadworks. This project turns
 the port's published ship schedule and public traffic data into a probabilistic forecast for each
@@ -19,10 +21,10 @@ and a bad guess means gridlock on the A33 and dock approaches, late buses and an
 Sotonship forecasts it: for every road corridor and 15-minute slot we give the probability of
 congestion and the extra traffic a ship adds, as a 10/50/90% range, built from the cruise schedule,
 football fixtures, school terms, roadworks and port freight, run over the real road network and
-checked against observed traffic. A reinforcement-learning agent then picks the cheapest mitigation
-plan, and on backtested days it beats doing nothing, a simple rule and the current advisor
-(simulated days; see [docs/backtest.md](docs/backtest.md)). It scales to any UK port city with open traffic
-and transit feeds, Liverpool, Dover, Portsmouth.
+checked against observed traffic. A learned plan (PPO) then suggests marshals and signs: on
+simulated held-out days it avoids about 3 congested road-hours a day for roughly £2,500 a day of
+staff time, and a no-cost ship-timing advisor saves about £7,100 a day. Every suggestion needs an
+officer's approval.
 
 ## How it works
 
@@ -86,11 +88,27 @@ flowchart TD
 | --- | --- | --- |
 | Cruise effect on the M271, 179 held-out days (Jan–Jun 2026) | Error 877 vehicles a day against 1,233 for the last comparable cruise day and 1,353 for no cruise effect. 87% of days inside the 80% band. Most of the gain is the calendar; the ship data adds 2% per 15 minutes. | [docs/backtest.md](docs/backtest.md) |
 | Everyday traffic, M3 J14, 355 held-out days | Ridge regression beats a five-week year-ago median by 6.6% (90% interval 0.5–12%), refitted only on counts published 105 days earlier. It does not beat that rule on the M271. | [notes/flow-forecast.md](notes/flow-forecast.md) |
-| Decision policy (PPO), 260 simulated test days | −2.9 congested road-hours and −£10,724 a day against doing nothing; cheaper on 93% of days. Most of the gain is marshals, whose effect is assumed. | [docs/agents-and-ppo.md](docs/agents-and-ppo.md) |
+| Decision policy (PPO), 7 held-out cruise dates, 140 simulated days | Avoids 3.1 congested road-hours a day (95% interval 2.2–3.9; better on all 7 dates and 96% of days), with total delay unchanged, for about £2,500 a day of marshal and sign time (95% £682–£4,451), about £830 per road-hour avoided. In money alone it is a cost, not a saving. The ship-timing advisor saves about £7,100 a day (95% £3,400–£11,100) and avoids 1.2 road-hours; a simple 85% rule doesn't help. All simulated; unit costs and the effect of marshals and signs are assumed. | [docs/ppo-results-aa8eae9.md](docs/ppo-results-aa8eae9.md), [docs/ppo-robust-aa8eae9.md](docs/ppo-robust-aa8eae9.md) |
 | Checks on the model | Fits to DfT and council counts, a bus run-time check on Portswood Road, and a microsimulation (SUMO) cross-check | [docs/west-side-counts.md](docs/west-side-counts.md), [docs/queues.md](docs/queues.md), [docs/sumo-check.md](docs/sumo-check.md) |
 
 All results come from public counts or simulation, and each write-up states its sample, dates and
 limits.
+
+## Limits, and what happens when it fails
+
+- **Outside coverage.** A date past the published ship schedule gets an "Outside coverage" notice
+  and no forecast, rather than a guess. Ships with no published passenger figure are flagged and
+  given a wider range.
+- **Data age.** The schedule is provisional: most calls only get clock times about six days ahead.
+  WebTRIS counts are published about 105 days late, so the everyday model is refitted on older counts.
+- **Known losses.** On the M271 the everyday model loses to a five-week year-ago median, and the
+  ship list adds only about 2% per 15 minutes over the calendar. See [docs/backtest.md](docs/backtest.md)
+  and [notes/flow-forecast.md](notes/flow-forecast.md).
+- **Assumed effects.** What marshals and signs do to capacity, and the cost weights (including
+  £5,000 per congested road-hour, a risk weight rather than money), are our assumptions.
+- **Simulated, and labelled.** Traffic on the page is modelled, not measured; the page says which
+  numbers are published, observed or modelled, with the source and collection time of each.
+- **Business case and a second city:** [docs/brief.md](docs/brief.md).
 
 ## Build the forecast page
 
@@ -187,6 +205,14 @@ published.
 Ports (Southampton VTS), used for personal reference with ABP acknowledged as its terms allow. Raw
 pages, call lists and built pages are never committed.
 
+**Public data, personal data and AI services.** Every input is public or openly licensed, with the
+permission shown in the table above. The one licensed, non-open input is the Digimap aerial
+photography, analysed by our own code and never published. We used no personal data: bus readings are
+vehicle positions from a public feed, kept only as aggregates (raw sightings stay in gitignored
+`data/raw/buses/`), and camera stills are counted and not stored. We used no non-public council
+information, so none was sent to any external AI service; every council figure comes from a published
+document.
+
 **Limits of the cruise backtest.**
 - Past calls are provisional plans captured on four dates, not actual berthings.
 - Days no capture covers (Jul 2024, Jan to Aug 2025) are left out rather than counted as
@@ -197,8 +223,8 @@ pages, call lists and built pages are never committed.
 
 What existed before the event, who did what, and which parts were written with AI.
 
-**Before the event.** No code. The repository was created at 19:03 on Fri 16 Oct 2026 with a
-licence and a `.gitignore`, and the event's own brief was added at 19:27 (`Context/`). Hacking
+**Before the event.** No code. The empty repository (a licence and a `.gitignore`, no code) was
+opened at 19:03 on Fri 16 Oct 2026, and the event's own brief was added at 19:27 (`Context/`). Hacking
 opened at 20:00; the first code was committed at 21:21. Open-source libraries are listed in
 `pyproject.toml` and `uv.lock`.
 

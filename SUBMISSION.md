@@ -109,12 +109,13 @@ Pick one; all three are real and reproducible.
 
 ## README coverage (judging asks the README cover these)
 
-- [x] Setup (`## Setup`): uv, Python 3.12, torch extras, Iridis, ROCm
+- [x] Setup (`## Build the forecast page`): uv, Python 3.12, torch extras, Iridis, ROCm
 - [x] Data sources (`## Data sources`): every source dated + licensed
 - [x] What the AI does (`## Provenance`): per-module AI-generated log
-- [x] Tests: `uv run --extra <extra> pytest` under `## Running`
+- [x] Tests: `uv run --extra <extra> pytest` under `## Build the forecast page`
 - [x] Limits: per-view synthetic/observed labels + `docs/backtest.md`
-- [ ] Provenance "Existed before the event" + "Who helped", **fill before lock** (team)
+- [x] Provenance "Before the event" + "Who did it" (README `## Provenance`)
+- [x] One-sentence pitch at the top of the README; limits and failure behaviour under `## Limits, and what happens when it fails`
 
 ## Freeze-day guardrails
 

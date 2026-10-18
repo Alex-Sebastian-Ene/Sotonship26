@@ -5,9 +5,7 @@ Edward Denton.
 
 ## In one sentence
 
-We tell Southampton City Council's traffic team, a week ahead and with honest odds, which cruise
-days and hours need marshals at the dock gates, a sign message or a hold on roadworks, using the
-port's published ship schedule and public traffic data.
+We help Southampton City Council's traffic officers decide where to put marshals, sign messages and roadworks holds on cruise days around the Southampton docks, using a probabilistic traffic forecast and a learned plan built on public data.
 
 ## The problem
 
@@ -106,14 +104,14 @@ The design choices behind each step, and why: [decisions.md](decisions.md).
   - Refits use only counts National Highways had published by then, about 105 days late.
   - On the M271 it does not beat the year-ago rule, and we say so.
   - [notes/flow-forecast.md](../notes/flow-forecast.md)
-- **Decision policy.** On 260 simulated test days (new random draws on 7 held-out and 6 training
-  dates), PPO cuts congested road-hours by 2.9 a day
-  and total cost by £10,724 a day against doing nothing, and is cheaper on 93% of days. Two
-  caveats:
-  - Most of the gain comes from marshals, whose effect is assumed.
-  - The ship-timing advisor is better on delay alone.
+- **Decision policy.** On 7 held-out cruise dates (140 simulated days), PPO avoids 3.1 congested
+  road-hours a day (95% interval 2.2–3.9; better on all 7 dates), with total delay unchanged, for
+  about £2,500 a day of marshal and sign time, about £830 per road-hour avoided. Caveats:
+  - In money alone it is a cost, not a saving. The ship-timing advisor saves about £7,100 a day and
+    avoids 1.2 road-hours.
+  - The effect of marshals and signs, and the cost weights, are assumed. All simulated.
 
-  [agents-and-ppo.md](agents-and-ppo.md)
+  [ppo-results-aa8eae9.md](ppo-results-aa8eae9.md), [ppo-robust-aa8eae9.md](ppo-robust-aa8eae9.md)
 
 ## Limits
 
