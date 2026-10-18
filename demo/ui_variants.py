@@ -649,6 +649,10 @@ AI_CSS = """
 .value-card tr.vc-whole th, .value-card tr.vc-whole td { font-weight: 700; }
 .value-card .vc-take b { font-family: var(--font-data); }
 .vc-total { display: grid; gap: 8px; padding: 12px 14px; border-radius: 12px; background: var(--sunk); }
+.vc-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.vc-stat { display: grid; }
+.vc-stat b { font: 750 2.4rem/1.05 var(--font-data); }
+.vc-stat span { color: var(--muted); font-weight: 600; font-size: var(--step--1); }
 .vc-big { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
 .vc-big b { font: 750 2rem/1.05 var(--font-data); }
 .vc-big span { color: var(--muted); font-weight: 600; }
