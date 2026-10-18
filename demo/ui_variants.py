@@ -228,6 +228,9 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 .l-sound.hint { animation: hint 1.6s ease-in-out infinite; }
 @keyframes hint { 50% { transform: scale(1.08); } }
 /* portrait and narrow screens: words on top, the ship below them on the horizon */
+/* tall landscape screens (1440p and up): the words grow with the ship, which scales with the screen height */
+@media (min-height: 950px) and (min-aspect-ratio: 1/1) { .l-card { zoom: 1.2; } }
+@media (min-height: 1200px) and (min-aspect-ratio: 1/1) { .l-card { zoom: 1.4; } }
 @media (max-width: 820px), (max-aspect-ratio: 1/1) {
   .l-card { place-self: start start; margin: 28px 0 0 4vw; max-width: 92vw; }
   .l-ship { left: 46%; width: 46vmin; bottom: 19%; }
