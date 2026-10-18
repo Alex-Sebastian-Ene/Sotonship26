@@ -188,7 +188,7 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 .l-wheel { position: absolute; right: 5vw; bottom: 4%; width: 12vmin; z-index: 4; }
 /* the ship scales with the screen height like the waves, so it floats at the same depth on every screen */
 .l-ship { position: absolute; left: 66%; bottom: 18%; width: 40vmin; transform: translateX(-50%); z-index: 2; transition: transform 1.3s cubic-bezier(.5, 0, .7, .4); }
-.l-ship .ship-svg { display: block; clip-path: inset(0 0 16.8% 0); }  /* waterline at y 366 of 440: the wave troughs that pass
+.l-ship .ship-svg { display: block; clip-path: inset(-60% -30% 16.8% -30%); }  /* waterline at y 366 of 440 (the negative insets leave room for the steam): the wave troughs that pass
    under the ship show sea, not the bottom of the hull */
 .l-spray { position: absolute; width: 30%; left: -14%; bottom: 4%; transform: scaleX(-1); }
 .l-spray.s2 { width: 22%; left: auto; right: -6%; bottom: 2%; transform: none; }
@@ -226,6 +226,9 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 .l-sound.hint { animation: hint 1.6s ease-in-out infinite; }
 @keyframes hint { 50% { transform: scale(1.08); } }
 /* portrait and narrow screens: words on top, the ship below them on the horizon */
+/* tall landscape screens (1440p and up): the words grow with the ship, which scales with the screen height */
+@media (min-height: 950px) and (min-aspect-ratio: 1/1) { .l-card { zoom: 1.2; } }
+@media (min-height: 1200px) and (min-aspect-ratio: 1/1) { .l-card { zoom: 1.4; } }
 @media (max-width: 820px), (max-aspect-ratio: 1/1) {
   .l-card { place-self: start start; margin: 28px 0 0 4vw; max-width: 92vw; }
   .l-ship { left: 46%; width: 46vmin; bottom: 19%; }
