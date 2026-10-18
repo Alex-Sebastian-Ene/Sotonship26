@@ -397,7 +397,9 @@ def sample_day(ctx: sd.Ctx, task: dict, rng: np.random.Generator,
     for key, (bins, odw) in parts.items():  # peak spreading, as the forecast does
         w = tm.purpose_window(key)
         Dw[w] = Dw.get(w, 0.0) + np.outer(bins, odw)
-    Dbg, spread_f = tm.spread_peaks(m, Dw, cap, shares0, pre)
+    # ppo_gpu passes a placeholder for shares0 (it routes on the GPU); spreading needs real ones
+    sh = shares0 if np.ndim(shares0) == 3 and len(shares0) == N_BINS else base_shares(ctx, task)
+    Dbg, spread_f = tm.spread_peaks(m, Dw, cap, sh, pre)
     Dm = tm.match_demand(m, sd.kickoff_hours(kick), rng) if kick else np.zeros_like(Dbg)
     # no calls draws nothing, as forecast() skips sample_cruise then
     veh = cruise_vehicles(ctx, task["calls"], rng, params, task.get("cruise"))
