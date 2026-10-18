@@ -156,7 +156,7 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 :root[data-theme="steam"] .brand-mark svg { display: none; }
 :root[data-theme="steam"] .brand-mark::after { content: ''; width: 40px; height: 32px; background: var(--ico-ship) center / contain no-repeat; }
 .deco-gull { position: fixed; z-index: 1; top: 150px; left: -80px; width: 56px; pointer-events: none; display: none; animation: fly 26s linear infinite; }
-.deco-gull .spr { display: block; width: 100%; }
+.deco-gull .spr { display: block; width: 100%; transform: scaleX(-1); }  /* the gull drawing faces left; this one flies right */
 :root[data-theme="steam"] .deco-gull { display: block; }
 @keyframes fly { from { transform: translateX(0); } to { transform: translateX(calc(100vw + 160px)); } }
 /* gulls fly curves: a steady glide across, an eased swoop up and down on a separate wrapper, and a tilt into each turn */
@@ -181,7 +181,9 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 .l-gull .spr { display: block; width: 100%; }
 .l-gull.g1 { top: 24%; animation: cross 28s linear infinite; animation-delay: -6s; }
 .l-gull.g2 { top: 11%; width: 50px; animation: cross 36s linear infinite reverse; animation-delay: -20s; }
-.l-gull.g2 .spr { transform: scaleX(-1); --dur: .85s; }
+/* the gull drawing faces left: g1 flies right, so it is mirrored; g2 flies left as drawn */
+.l-gull.g1 .spr { transform: scaleX(-1); }
+.l-gull.g2 .spr { --dur: .85s; }
 @keyframes cross { from { transform: translateX(-12vw); } to { transform: translateX(112vw); } }
 .l-light { position: absolute; right: 1vw; bottom: 31%; width: 32vmin; z-index: 1; }
 .l-light .spr, .l-anchor .spr, .l-wheel .spr, .l-spray .spr { display: block; width: 100%; }
