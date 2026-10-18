@@ -1,0 +1,8 @@
+{
+  "name": "sotonship26-pitch-video",
+  "private": true,
+  "description": "Renders the pitch video: live-page capture, animated scenes, narration mix",
+  "dependencies": {
+    "puppeteer-core": "23.11.1"
+  }
+}

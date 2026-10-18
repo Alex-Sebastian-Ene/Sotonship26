@@ -1,0 +1,66 @@
+[
+ [
+  "hook",
+  "Eighth of November, 2010. Four cruise liners in Southampton at once. Traffic backed onto the public road, and the council's control computer couldn't clear it."
+ ],
+ [
+  "problem",
+  "It's not a one-off. Southampton handles eighty-eight percent of Britain's cruise passengers, funnelled through a few dock gates. The council's own transport manager says cruise ships cause significant congestion at Dock Gate 4, worse with a home football match. This May, a gas scare gridlocked the terminal roads and held the Queen Anne four and a half hours late."
+ ],
+ [
+  "money",
+  "Delay costs money. Government rates put a car-hour at sixteen pounds and a lorry-hour at over a hundred. A thousand cars held for fifteen minutes is four thousand pounds, before late buses and missed sailings."
+ ],
+ [
+  "user",
+  "Imagine you're a traffic officer at Southampton City Council. It's Monday. Saturday brings two ships and a home match. Do you book marshals? Hold the roadworks? Today, you guess. And once the queue forms, it's too late."
+ ],
+ [
+  "idea",
+  "So we built this. We help council traffic officers decide where to put marshals, signs and roadworks holds on cruise days around the Southampton docks, using a probabilistic traffic forecast and a learned plan, built on public data."
+ ],
+ [
+  "demo1",
+  "It runs on the port's real ship schedule. The calendar colours six weeks of calls by how much the ships add to congestion."
+ ],
+ [
+  "demo2",
+  "Pick a day. You get congested road-hours, a likely range and the worst moment, each number with its source."
+ ],
+ [
+  "demo3",
+  "The map plays the day minute by minute, with simulated traffic on the real road network."
+ ],
+ [
+  "demo4",
+  "Then, what to do: marshals at a named gate, a sign message, a roadworks move. The officer approves or rejects each one."
+ ],
+ [
+  "demo5",
+  "And does the AI actually help? The page shows the evidence, including where it doesn't."
+ ],
+ [
+  "ai",
+  "The AI is the product. Our forecast has nearly thirty percent less error than the last comparable day. And a reinforcement-learning plan, tested on unseen dates, avoids about three congested road-hours a day, for about two and a half thousand pounds of marshal time. All simulated, and labelled so."
+ ],
+ [
+  "fail",
+  "It's honest about its limits. Ask for a date past the published schedule, and it refuses instead of guessing."
+ ],
+ [
+  "business",
+  "The council pays, under its duty to manage the network. The data is free, and a nightly rebuild costs a few pounds. We'd charge under thirty thousand a year. Our ship-timing advice alone saves about seven thousand pounds of delay a day in simulation, so five busy days cover the year. The alternative was a forty-million-pound road."
+ ],
+ [
+  "data",
+  "Every input is public: the port's ship schedule, National Highways and DfT traffic counts, OpenStreetMap, live bus positions, Census 2021, fixtures and weather."
+ ],
+ [
+  "scale",
+  "Next city? Any scheduled surge: ferries at Dover and Portsmouth, stadiums, European cruise ports. The limits: a few days of calibration per city, and our traffic feeds are England-only."
+ ],
+ [
+  "close",
+  "Plan the cruise day days ahead, not when the queue forms. Try it now at soton yard dot keanu c dot net."
+ ]
+]

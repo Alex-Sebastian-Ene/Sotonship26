@@ -1,0 +1,15 @@
+# Built or downloaded; regenerate with the steps in README.md
+node_modules/
+package-lock.json
+live.html
+frames/
+out/
+stills/
+vo/
+vot/
+capture.json
+timeline.json
+pitch-run.html
+vo_mix.wav
+*.mp4
+*.jpg
