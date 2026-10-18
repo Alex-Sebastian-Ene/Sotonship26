@@ -23,6 +23,15 @@
 #splash.crash .sp-wall { transform: translateY(-72%); }
 #splash.crash .sp-drop { animation: sp-spray .7s var(--d) cubic-bezier(.2, .6, .4, 1) both; }
 @keyframes sp-spray { 0% { opacity: 0; transform: translate(0, 0) scale(.4); } 25% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx), -16vmin) scale(1); } }
+/* as the wave covers the screen it bursts into foam, which flies up and falls away while the water drains */
+#splash .sp-burst { position: absolute; inset: 0; pointer-events: none; }
+#splash .sp-foam { position: absolute; width: var(--s); height: var(--s); margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2); border-radius: 50%;
+  background: #FFF8EC; border: 3px solid #1D2B45; opacity: 0; }
+#splash .sp-foam.t { background: #7CC3BE; }
+#splash.crash .sp-foam { animation: sp-burst 1.25s calc(.42s + var(--d)) cubic-bezier(.15, .7, .45, 1) both; }
+@keyframes sp-burst { 0% { opacity: 0; transform: translate(0, 4vmin) scale(.2); } 12% { opacity: 1; }
+  45% { opacity: 1; transform: translate(calc(var(--dx) * .7), var(--dy)) scale(1); }
+  100% { opacity: 0; transform: translate(var(--dx), calc(var(--dy) + 30vmin)) scale(.7); } }
 #splash.drain { background: transparent; pointer-events: none; }
 #splash.drain .sp-sea, #splash.drain .sp-word { visibility: hidden; }
 #splash.drain .sp-wall { transform: translateY(8%); transition: transform .9s cubic-bezier(.35, .1, .55, 1); }
@@ -31,6 +40,7 @@
 <svg class="sp-sea" viewBox="0 0 2400 300" preserveAspectRatio="none"><path class="sp-a" d="M0 70 q 50 -30 100 0 t 100 0 q 50 -30 100 0 t 100 0 q 50 -30 100 0 t 100 0 q 50 -30 100 0 t 100 0 q 50 -30 100 0 t 100 0 q 50 -30 100 0 t 100 0 q 50 -30 100 0 t 100 0 q 50 -30 100 0 t 100 0 q 50 -30 100 0 t 100 0 q 50 -30 100 0 t 100 0 q 50 -30 100 0 t 100 0 q 50 -30 100 0 t 100 0 V300 H0Z"/><path class="sp-b" d="M0 140 q 50 -24 100 0 t 100 0 q 50 -24 100 0 t 100 0 q 50 -24 100 0 t 100 0 q 50 -24 100 0 t 100 0 q 50 -24 100 0 t 100 0 q 50 -24 100 0 t 100 0 q 50 -24 100 0 t 100 0 q 50 -24 100 0 t 100 0 q 50 -24 100 0 t 100 0 q 50 -24 100 0 t 100 0 q 50 -24 100 0 t 100 0 q 50 -24 100 0 t 100 0 V300 H0Z"/><path class="sp-c" d="M0 210 q 50 -18 100 0 t 100 0 q 50 -18 100 0 t 100 0 q 50 -18 100 0 t 100 0 q 50 -18 100 0 t 100 0 q 50 -18 100 0 t 100 0 q 50 -18 100 0 t 100 0 q 50 -18 100 0 t 100 0 q 50 -18 100 0 t 100 0 q 50 -18 100 0 t 100 0 q 50 -18 100 0 t 100 0 q 50 -18 100 0 t 100 0 q 50 -18 100 0 t 100 0 V300 H0Z"/></svg>
 <p class="sp-word">Setting sail<i></i><i></i><i></i></p>
 <div class="sp-wall"><i class="sp-drop" style="--x:8%;--s:14px;--dx:-30px;--d:0.05s"></i><i class="sp-drop" style="--x:19%;--s:10px;--dx:20px;--d:0.12s"></i><i class="sp-drop" style="--x:31%;--s:16px;--dx:-14px;--d:0s"></i><i class="sp-drop" style="--x:44%;--s:11px;--dx:26px;--d:0.09s"></i><i class="sp-drop" style="--x:56%;--s:15px;--dx:-22px;--d:0.03s"></i><i class="sp-drop" style="--x:67%;--s:10px;--dx:18px;--d:0.14s"></i><i class="sp-drop" style="--x:78%;--s:16px;--dx:-26px;--d:0.06s"></i><i class="sp-drop" style="--x:90%;--s:12px;--dx:22px;--d:0.1s"></i><svg class="sp-crest" viewBox="0 0 2400 100" preserveAspectRatio="none"><path d="M0 50 q 75 -44 150 0 t 150 0 q 75 -44 150 0 t 150 0 q 75 -44 150 0 t 150 0 q 75 -44 150 0 t 150 0 q 75 -44 150 0 t 150 0 q 75 -44 150 0 t 150 0 q 75 -44 150 0 t 150 0 q 75 -44 150 0 t 150 0 V100 H0Z" fill="#3E9E9C"/><path d="M0 50 q 75 -44 150 0 t 150 0 q 75 -44 150 0 t 150 0 q 75 -44 150 0 t 150 0 q 75 -44 150 0 t 150 0 q 75 -44 150 0 t 150 0 q 75 -44 150 0 t 150 0 q 75 -44 150 0 t 150 0 q 75 -44 150 0 t 150 0" fill="none" stroke="#FFF8EC" stroke-width="7" vector-effect="non-scaling-stroke"/></svg></div>
+<div class="sp-burst"><i class="sp-foam" style="left:6%;top:34%;--s:30px;--dx:-40px;--dy:-14vmin;--d:0.02s"></i><i class="sp-foam t" style="left:14%;top:58%;--s:20px;--dx:-24px;--dy:-10vmin;--d:0.1s"></i><i class="sp-foam" style="left:22%;top:26%;--s:36px;--dx:-18px;--dy:-18vmin;--d:0.05s"></i><i class="sp-foam" style="left:30%;top:48%;--s:24px;--dx:10px;--dy:-12vmin;--d:0.14s"></i><i class="sp-foam t" style="left:38%;top:18%;--s:18px;--dx:-12px;--dy:-9vmin;--d:0.08s"></i><i class="sp-foam" style="left:44%;top:40%;--s:40px;--dx:6px;--dy:-20vmin;--d:0s"></i><i class="sp-foam" style="left:52%;top:62%;--s:22px;--dx:22px;--dy:-11vmin;--d:0.12s"></i><i class="sp-foam" style="left:58%;top:24%;--s:28px;--dx:30px;--dy:-16vmin;--d:0.04s"></i><i class="sp-foam t" style="left:66%;top:46%;--s:34px;--dx:18px;--dy:-19vmin;--d:0.09s"></i><i class="sp-foam" style="left:73%;top:20%;--s:22px;--dx:40px;--dy:-12vmin;--d:0.03s"></i><i class="sp-foam" style="left:80%;top:54%;--s:30px;--dx:26px;--dy:-15vmin;--d:0.13s"></i><i class="sp-foam" style="left:87%;top:30%;--s:38px;--dx:44px;--dy:-18vmin;--d:0.06s"></i><i class="sp-foam t" style="left:94%;top:50%;--s:20px;--dx:30px;--dy:-10vmin;--d:0.11s"></i><i class="sp-foam" style="left:10%;top:74%;--s:26px;--dx:-30px;--dy:-13vmin;--d:0.16s"></i><i class="sp-foam" style="left:48%;top:80%;--s:30px;--dx:-8px;--dy:-15vmin;--d:0.18s"></i><i class="sp-foam" style="left:84%;top:76%;--s:24px;--dx:20px;--dy:-12vmin;--d:0.15s"></i></div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M24 12h8l-1 16h-6zM36 12h8l-1 16h-6z' fill='%23E4573F' stroke='%231D2B45' stroke-width='3' stroke-linejoin='round'/%3E%3Crect x='16' y='27' width='34' height='11' rx='2' fill='%23FFF6E6' stroke='%231D2B45' stroke-width='3'/%3E%3Cpath d='M6 38h52l-6 14H13z' fill='%23FFF6E6' stroke='%231D2B45' stroke-width='3' stroke-linejoin='round'/%3E%3Cpath d='M9 45h46' stroke='%231D2B45' stroke-width='4'/%3E%3Cpath d='M3 58q7-6 14 0t14 0t14 0t14 0' fill='none' stroke='%233E9E9C' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
@@ -3482,7 +3492,7 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
       if (REDUCED) { sp.remove(); return; }
       sp.classList.add('crash');
       setTimeout(() => sp.classList.add('drain'), 680);
-      setTimeout(() => sp.remove(), 1700);
+      setTimeout(() => sp.remove(), 1950);
     };
     const fonts = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
     Promise.race([fonts, new Promise(r => setTimeout(r, 1500))]).then(() => setTimeout(out, 60));
