@@ -763,6 +763,7 @@ details.how[open] { display: grid; gap: 10px; }
         <div class="plan-tools">
           <div class="seg-ctl" role="group" aria-label="Show" id="f-state"><button data-f="all" aria-pressed="true">All</button><button data-f="open" aria-pressed="false">Open</button><button data-f="done" aria-pressed="false" aria-label="Arranged" title="Arranged">✓</button><button data-f="declined" aria-pressed="false" aria-label="Not needed" title="Not needed">✗</button></div>
           <div class="kind-chips" id="f-kind" role="group" aria-label="Filter by kind"></div>
+          <button type="button" class="v-more" id="accept-all">Accept all</button>
           <button type="button" class="v-more" id="sel-mode" aria-pressed="false">Select</button>
         </div>
         <div class="bulk" id="bulk" hidden><strong id="bulk-n"></strong>
@@ -1696,6 +1697,10 @@ details.how[open] { display: grid; gap: 10px; }
     if (!on) document.querySelectorAll('.act.sel').forEach(c => c.classList.remove('sel'));
     updateBulk();
   });
+  $('#accept-all').addEventListener('click', () => {
+    planCards().filter(c => !c.hidden && !isDone(c)).forEach(c => setDecision(c, 'yes', true));
+    updatePlan(); applyFilters(); updateBulk();
+  });
   $('#bulk').addEventListener('click', e => {
     const b = e.target.closest('[data-bulk]'); if (!b) return;
     const sel = [...document.querySelectorAll('.act.sel')];
@@ -2481,12 +2486,7 @@ details.how[open] { display: grid; gap: 10px; }
       if (PPO.ablation) verdict += ' Most of its score saving comes from marshals at the dock gates, whose effect is our assumption.';
     }
     const more = R.actions.length > 4 && !renderPPO.all ? `<button type="button" class="v-more" id="ppo-more">Show all ${R.actions.length} steps</button>` : '';
-    el.innerHTML = `${acts ? `<ul class="acts${more ? ' clamped' : ''}">${acts}</ul>${more}` : '<p>On most sampled days the learned policy does nothing on this day.</p>'}
-      <div class="fx-strip"><div class="fx"><span class="k">Congested road-hours</span><span class="v">${fmt1(E.corridor_hours.nothing)}<i>→</i>${fmt1(E.corridor_hours.ppo)}</span></div>
-        <div class="fx"><span class="k">Delay, vehicle-hours</span><span class="v">${int(E.vehicle_hours.nothing)}<i>→</i>${int(E.vehicle_hours.ppo)}</span></div>
-        <div class="fx"><span class="k">Marshals, gate-hours</span><span class="v">${fmt1(E.marshal_hours.ppo)}</span></div>
-        ${E.held_pax_hours.ppo >= 1 ? `<div class="fx"><span class="k">Passengers held, hours</span><span class="v">${int(E.held_pax_hours.ppo)}</span></div>` : ''}
-        <p class="foot-note">Without the plan, then with it, averaged over ${R.k} sampled days of this date.</p></div>`;
+    el.innerHTML = `${acts ? `<ul class="acts${more ? ' clamped' : ''}">${acts}</ul>${more}` : '<p>On most sampled days the learned policy does nothing on this day.</p>'}`;
     $('#ppo-why').innerHTML = `Trained by reinforcement learning (PPO) on simulated days; each step needs its owner's approval. ${verdict} The port and cruise lines own disembarkation and check-in, and the council owns the signs.`;
     if ($('#ppo-more')) $('#ppo-more').addEventListener('click', () => { renderPPO.all = true; renderPPO(); });
     refreshPlan();
