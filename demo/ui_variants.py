@@ -693,7 +693,8 @@ AI_JS = r"""
     advBar.querySelectorAll('[data-ai]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.ai === 'adv') === adv)));
     aiSec.querySelector('h2').textContent = adv ? 'Every statistic behind the answer' : 'What the plan is worth';
     if (adv) { const v = $('#ppo-viz'); if (v && !v.open) { v.open = true; v.dispatchEvent(new Event('toggle')); } const b = $('#bus-live'); if (b && !b.open) b.open = true; }
-    else sizeFrames();
+    // the charts were drawn while this view was hidden (at their 280px minimum): redraw them at the width they now have
+    requestAnimationFrame(() => { if (adv && typeof renderPPOViz === 'function' && $('#ppo-viz') && $('#ppo-viz').open && $('#ppo-viz-body').clientWidth > 300) renderPPOViz(); sizeFrames(); });
   }
   advBar.addEventListener('click', e => { const b = e.target.closest('[data-ai]'); if (b) aiMode(b.dataset.ai === 'adv'); });
   aiSec.querySelector('.ai-bar').classList.remove('simple-only');
