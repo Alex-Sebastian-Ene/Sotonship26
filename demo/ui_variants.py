@@ -648,6 +648,22 @@ AI_CSS = """
 .value-card th.num, .value-card td.num { text-align: right; }
 .value-card tr.vc-whole th, .value-card tr.vc-whole td { font-weight: 700; }
 .value-card .vc-take b { font-family: var(--font-data); }
+.vc-total { display: grid; gap: 8px; padding: 12px 14px; border-radius: 12px; background: var(--sunk); }
+.vc-big { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.vc-big b { font: 750 2rem/1.05 var(--font-data); }
+.vc-big span { color: var(--muted); font-weight: 600; }
+.vc-bar { display: flex; height: 40px; border-radius: 10px; overflow: hidden; background: var(--surface); }
+.vc-bar i { display: grid; place-items: center; color: #fff; font-style: normal; font: 700 .9rem var(--font-data); min-width: 3px; }
+.vc-bar i + i { box-shadow: inset 2px 0 0 var(--surface); }
+.vc-keys { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: var(--step--1); }
+.vc-keys i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.vc-moves > summary { cursor: pointer; font-weight: 650; }
+.vc-defs { display: grid; grid-template-columns: minmax(130px, max-content) minmax(0, 1fr); gap: 4px 14px; margin: 4px 0 0; font-size: var(--step--1); }
+.vc-defs dt { font-weight: 700; }
+.vc-defs dd { margin: 0; color: var(--muted); }
+@media (max-width: 560px) { .vc-defs { grid-template-columns: minmax(0, 1fr); } .vc-defs dd { margin-bottom: 4px; } }
+.vc-moves h4 { margin: 8px 0 4px; font-size: var(--step--1); }
+.vc-moves li { font-size: var(--step--1); }
 body:not(.ai-adv) .adv-only { display: none !important; }
 body.ai-adv .simple-only { display: none !important; }
 """
@@ -675,7 +691,7 @@ AI_JS = r"""
   const frames = AI_EMBEDS.map((e, i) => { const f = $('#ai-f' + i); f.srcdoc = e.html; return f; });
   // under the two designs: what each option is worth (from the page's own data)
   const valHTML = typeof leverValueHTML === 'function' ? leverValueHTML() : '';
-  if (valHTML) { const vc = document.createElement('div'); vc.className = 'ai-card value-card'; vc.innerHTML = valHTML; aiSec.append(vc); }
+  if (valHTML) { const vc = document.createElement('div'); vc.className = 'ai-card value-card'; vc.innerHTML = valHTML; aiSec.querySelector('.ai-bar').after(vc); }
   const themeOf = () => document.documentElement.dataset.theme || 'harbour';
   function sizeFrames() {
     frames.forEach(f => { try { const d = f.contentDocument; if (!d || !d.documentElement) return; d.documentElement.dataset.theme = themeOf(); const h = d.documentElement.scrollHeight; if (h > 40) f.style.height = h + 'px'; } catch (err) { /* not ready */ } });
