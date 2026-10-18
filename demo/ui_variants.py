@@ -169,7 +169,8 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 .landing { position: fixed; inset: 0; z-index: 100; overflow: hidden; display: grid; place-items: center; color: #1D2B45; font-family: "Fredoka", "Trebuchet MS", sans-serif;
   background: linear-gradient(#FFE9C7 0%, #FFD7B0 46%, #FFC9A8 62%, #A9D9D3 62.2%, #7CC3BE 100%); transition: transform .8s cubic-bezier(.6, 0, .3, 1); }
 .landing.gone { transform: translateY(-104%); }
-.l-sun { position: absolute; left: 50%; top: 62%; width: 34vmin; height: 34vmin; margin: -17vmin 0 0 -17vmin; border-radius: 50%; background: radial-gradient(#FFF3D6, #FFB27A 70%); opacity: .9; }
+.l-sun { position: absolute; left: 50%; top: 62%; width: 34vmin; height: 34vmin; margin: -17vmin 0 0 -17vmin; border-radius: 50%; background: radial-gradient(#FFF3D6, #FFB27A 70%); opacity: .9;
+  clip-path: inset(0 0 50% 0); }  /* centred on the horizon (62%): only the half above the sea shows */
 .l-cloud { position: absolute; left: 0; height: 26px; border-radius: 20px; background: #FFF8EC; border: 2.5px solid #1D2B45; animation: drift linear infinite; }
 .l-cloud::before, .l-cloud::after { content: ''; position: absolute; bottom: 8px; border-radius: 50%; background: #FFF8EC; border: 2.5px solid #1D2B45; border-bottom-color: transparent; border-right-color: transparent; transform: rotate(45deg); }
 .l-cloud::before { left: 14px; width: 34px; height: 34px; } .l-cloud::after { left: 40px; width: 26px; height: 26px; }
