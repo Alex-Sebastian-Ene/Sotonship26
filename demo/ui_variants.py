@@ -642,6 +642,12 @@ AI_CSS = """
 .ai-mode button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
 .ai-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
 .ai-bar h2 { font-size: var(--step-2); }
+.value-card { padding: 16px 18px; }
+.value-card .vc { display: grid; gap: 10px; }
+.value-card h3 { margin: 0; }
+.value-card th.num, .value-card td.num { text-align: right; }
+.value-card tr.vc-whole th, .value-card tr.vc-whole td { font-weight: 700; }
+.value-card .vc-take b { font-family: var(--font-data); }
 body:not(.ai-adv) .adv-only { display: none !important; }
 body.ai-adv .simple-only { display: none !important; }
 """
@@ -667,6 +673,9 @@ AI_JS = r"""
   advBar.addEventListener('click', e => { const b = e.target.closest('[data-ai]'); if (b) aiMode(b.dataset.ai === 'adv'); });
   aiSec.querySelector('.ai-bar').classList.remove('simple-only');
   const frames = AI_EMBEDS.map((e, i) => { const f = $('#ai-f' + i); f.srcdoc = e.html; return f; });
+  // under the two designs: what each option is worth (from the page's own data)
+  const valHTML = typeof leverValueHTML === 'function' ? leverValueHTML() : '';
+  if (valHTML) { const vc = document.createElement('div'); vc.className = 'ai-card value-card'; vc.innerHTML = valHTML; aiSec.append(vc); }
   const themeOf = () => document.documentElement.dataset.theme || 'harbour';
   function sizeFrames() {
     frames.forEach(f => { try { const d = f.contentDocument; if (!d || !d.documentElement) return; d.documentElement.dataset.theme = themeOf(); const h = d.documentElement.scrollHeight; if (h > 40) f.style.height = h + 'px'; } catch (err) { /* not ready */ } });
