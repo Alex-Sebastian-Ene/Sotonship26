@@ -2013,18 +2013,20 @@ details.how[open] { display: grid; gap: 10px; }
     // the six weeks: the learned plan on every published cruise day, plus each retiming and roadworks move
     const cruise = days.filter(d => d.calls && d.calls.length), N = cruise.length, sum = a => a.reduce((t, v) => t + v, 0);
     const W = C.corridor_hour || 5000;
-    const parts = [['Roadworks moved', sum(rw), sum(rw) * W, '#E8A33D'], ['AI plan', plan.road * N, plan.score * N, '#2A78D6'],
-      ['Ship times', sum(tim), sum(tim) * W, '#1A9E6E']].filter(x => x[2] > 0);
+    const parts = [['Roadworks moved off cruise days', sum(rw), sum(rw) * W, '#E8A33D'], ['AI plan', plan.road * N, plan.score * N, '#2A78D6'],
+      ['Ship times changed', sum(tim), sum(tim) * W, '#1A9E6E']].filter(x => x[2] > 0);
     const totalH = sum(parts.map(x => x[1])), totalV = sum(parts.map(x => x[2]));
+    // one basis throughout: totals over the published weeks; the AI plan's levers are its share on each cruise day times the cruise days
+    const weeks = Math.round(days.length / 7), lev = n => rows.find(r => r.name === n);
     const big = (v, l) => `<div class="vc-stat"><b>${v}</b><span>${l}</span></div>`;
-    const figure = `<div class="vc-total"><div class="vc-stats">${big(`${gbp(totalV / days.length)}`, 'a day, all options')}${big(gbp(totalV), `in ${Math.round(days.length / 7)} weeks`)}${big(`${int(totalH)} h`, 'fewer road-hours at the limit')}</div>
+    const figure = `<div class="vc-total"><div class="vc-stats">${big(gbp(totalV), `value over the next ${weeks} weeks`)}${big(int(totalH), 'fewer hours of roads at their limit')}${big(gbp(totalV / days.length), 'a day on average')}</div>
       <div class="vc-bar">${parts.map(([n, h, v, c]) => `<i style="width:${(v / totalV * 100).toFixed(1)}%;background:${c}" title="${esc(n)}: ${gbp(v)}, ${int(h)} road-hours"><b>${v / totalV > .12 ? gbp(v) : ''}</b></i>`).join('')}</div>
       <div class="vc-keys">${parts.map(([n, h, v, c]) => `<span><i style="background:${c}"></i>${esc(n)}</span>`).join('')}</div></div>`;
     // where to move: each ship's new times, and each permit's works off its cruise days onto days in its window without ships
     const shipMoves = days.filter(d => d.timing && d.timing.best < d.timing.base - 0.15).map(d => {
       const mv = d.timing.shifts.map((sh, i) => [sh, d.calls[i]]).filter(([sh, c]) => c && (sh[0] || sh[1]))
-        .map(([sh, c]) => `${esc(c.ship)}${sh[0] ? ` off ${sh[0] > 0 ? '+' : '−'}${Math.abs(sh[0])} min` : ''}${sh[1] ? ` check-in ${sh[1] > 0 ? '+' : '−'}${Math.abs(sh[1])} min` : ''}`);
-      return `<li><b>${esc(shortDate(d.date))}</b> ${mv.join('; ')} <span class="muted">−${fmt1(d.timing.base - d.timing.best)} h</span></li>`;
+        .map(([sh, c]) => `${esc(c.ship)}${sh[0] ? ` disembarks ${Math.abs(sh[0])} min ${sh[0] > 0 ? 'later' : 'earlier'}` : ''}${sh[0] && sh[1] ? ',' : ''}${sh[1] ? ` check-in ${Math.abs(sh[1])} min ${sh[1] > 0 ? 'later' : 'earlier'}` : ''}`);
+      return `<li><b>${esc(shortDate(d.date))}</b>: ${mv.join('; ')}</li>`;
     });
     const works = DATA.permits.map(pm => {
       const inWin = days.filter(d => d.date >= pm.from && d.date <= pm.to);
@@ -2032,31 +2034,30 @@ details.how[open] { display: grid; gap: 10px; }
       if (!hit.length) return '';
       const quiet = inWin.filter(d => !(d.calls && d.calls.length)).map(d => shortDate(d.date));
       const road = CORR[pm.corridor] ? CORR[pm.corridor].name : pm.corridor;
-      return `<li><b>${esc(road)}</b> pause ${hit.map(d => esc(shortDate(d.date))).join(', ')}${quiet.length ? `, work ${esc(quiet.slice(0, 3).join(', '))}` : ''}</li>`;
+      return `<li><b>${esc(road)}</b>: pause on ${hit.map(d => esc(shortDate(d.date))).join(', ')}${quiet.length ? `; work on ${esc(quiet.slice(0, 3).join(', '))} instead` : ''}</li>`;
     }).filter(Boolean);
     const se = (r, k) => (r && r[k] ? r[k].se : 0);
     const E = Object.fromEntries([['marshals', 'ppo_no_marshals'], ['signs', 'ppo_no_signs'], ['checkin', 'ppo_no_checkin'], ['meter', 'ppo_no_meter']].filter(([, k]) => AB[k]).map(([n, k]) => {
       const d = diff(k), r = rows.find(x => x.name === { marshals: 'Marshals at the gates', signs: 'Sign messages', checkin: 'Check-in times', meter: 'Paced disembarkation' }[n]);
       return [n, { road: -d.corridor_hours, pm: 1.96 * Math.hypot(se(AB.ppo, 'corridor_hours'), se(AB[k], 'corridor_hours')), delay: d.vehicle_hours, gate: d.marshal_hours, sign: d.sign_hours, held: d.held_pax_hours, score: r ? r.score : 0 }];
     }));
-    const short = { 'The whole learned plan': 'AI plan, all', 'Sign messages': 'Signs', 'Marshals at the gates': 'Marshals', 'Check-in times': 'Check-in', 'Paced disembarkation': 'Paced exit', 'A marshals-only rule (no AI)': 'Marshals rule, no AI' };
-    const tr = r => `<tr${r.whole ? ' class="vc-whole"' : ''}><th scope="row">${esc(short[r.name] || r.name)}</th><td class="num">${r.road >= 0.05 ? fmt1(r.road) : '0'}</td>
-      <td class="num">${Math.abs(r.score) < 50 ? '£0' : (r.score > 0 ? '' : '−') + gbp(r.score)}</td><td class="num">${r.per ? gbp(r.per) : '–'}</td></tr>`;
-    const what = (name, a) => `<tr><th scope="row">${esc(name)}</th><td class="num">${a.length ? fmt1(avg(a)) : '–'}</td><td class="num">${a.length ? gbp(avg(a) * W) : '–'}</td><td class="num">–</td></tr>`;
-    return `<div class="vc">${figure}
-      <div class="table-scroll"><table><thead><tr><th>A day of</th><th class="num">Road-hours saved</th><th class="num">Value</th><th class="num">£ per hour saved</th></tr></thead>
-      <tbody>${rows.map(tr).join('')}${what('Ship times (when used)', tim)}${what('Roadworks moved (when used)', rw)}</tbody></table></div>
+    // the table: six-week totals, one row per part of the bar, the AI plan's levers under it, and a total that matches the headline
+    const row = (name, h, v, cls) => `<tr${cls ? ` class="${cls}"` : ''}><th scope="row">${esc(name)}</th><td class="num">${h >= 0.5 ? int(h) : '0'}</td><td class="num">${Math.abs(v) < 500 ? '£0' : (v < 0 ? '−' : '') + gbp(v)}</td></tr>`;
+    const levRows = [['Sign messages', 'Signs'], ['Marshals at the gates', 'Marshals'], ['Check-in times', 'Check-in times'], ['Paced disembarkation', 'Paced disembarkation']]
+      .map(([n, label]) => lev(n) ? row(label, lev(n).road * N, lev(n).score * N, 'vc-sub') : '').join('');
+    const table = `<div class="table-scroll"><table class="vc-table"><thead><tr><th>Next ${weeks} weeks</th><th class="num">Hours saved</th><th class="num">Value</th></tr></thead><tbody>
+      ${row('Roadworks moved off cruise days', sum(rw), sum(rw) * W)}${row(`AI plan, on the ${N} cruise days`, plan.road * N, plan.score * N)}${levRows}${row('Ship times changed', sum(tim), sum(tim) * W)}
+      ${row('Total', totalH, totalV, 'vc-whole')}</tbody></table></div>`;
+    return `<div class="vc">${figure}${table}
       ${shipMoves.length || works.length ? `<details class="vc-moves"><summary>Which ships and works to move</summary>
-        ${shipMoves.length ? `<ul class="plain">${shipMoves.join('')}</ul>` : ''}${works.length ? `<ul class="plain">${works.join('')}</ul>` : ''}</details>` : ''}
+        ${works.length ? `<h4>Roadworks</h4><ul class="plain">${works.join('')}</ul>` : ''}${shipMoves.length ? `<h4>Ship times</h4><ul class="plain">${shipMoves.join('')}</ul>` : ''}</details>` : ''}
       <details class="vc-moves"><summary>What the numbers mean</summary><dl class="vc-defs">
-        <dt>Road-hour at the limit</dt><dd>A road above 85% of capacity for an hour.</dd>
-        <dt>Value</dt><dd>£${W.toLocaleString()} per road-hour saved (our risk weight), less staff and delay (£${C.vehicle_hour || 15} a vehicle-hour; marshals £30 an hour).</dd>
-        <dt>£ per hour saved</dt><dd>Staff and delay only, per road-hour saved.</dd>
-        <dt>AI plan</dt><dd>Signs, marshals, check-in and paced exit, set every 15 minutes; applied to the ${N} cruise days.</dd>
-        <dt>Ship times, roadworks</dt><dd>The forecast's what-if runs; staff and delay not priced.</dd>
+        <dt>Hours saved</dt><dd>Hours of a road running above 85% of its capacity, avoided.</dd>
+        <dt>Value</dt><dd>£${W.toLocaleString()} per hour saved, a weight we set for the risk of a road locking up, less staff and delay. The AI plan's staff and delay come to ${gbp(plan.cost * N)}; for ship times and roadworks they are not priced.</dd>
+        <dt>AI plan</dt><dd>Signs, marshals, check-in times and paced disembarkation, set every 15 minutes. Its levers overlap a little, so they add up to about the plan.</dd>
       </dl></details>
-      ${howChosen(PPO.levers || {}, C, E)}
-      <p class="foot-note">Simulated, not measured: ${AB.ppo.n} sampled cruise days (${esc(String(PPO.ablation.made || '').replace('T', ' '))}) and ${days.length} published days. Parts overlap a little.</p></div>`;
+      <div class="adv-only">${howChosen(PPO.levers || {}, C, E)}</div>
+      <p class="foot-note">Simulated, not measured: AI plan from ${AB.ppo.n} sampled cruise days (${esc(String(PPO.ablation.made || '').replace('T', ' '))}); roadworks and ship times from the forecast's what-if runs on the ${days.length} published days.</p></div>`;
   }
   // How each kind of option is chosen: the forecast's own suggestions (thresholds on the risk the ships add, and
   // what-if runs) and the learned plan's levers, with what the learned plan sees, is scored on and cannot do.

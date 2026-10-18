@@ -646,7 +646,12 @@ AI_CSS = """
 .value-card .vc { display: grid; gap: 10px; }
 .value-card h3 { margin: 0; }
 .value-card th.num, .value-card td.num { text-align: right; }
-.value-card tr.vc-whole th, .value-card tr.vc-whole td { font-weight: 700; }
+.value-card tr.vc-whole th, .value-card tr.vc-whole td { font-weight: 750; border-top: 2px solid var(--line-strong); }
+.value-card tr.vc-sub th { padding-left: 22px; font-weight: 500; color: var(--muted); }
+.value-card tr.vc-sub td { color: var(--muted); }
+.vc-table { max-width: 640px; width: 100%; }
+.vc-table th, .vc-table td { white-space: normal; }
+.vc-table td.num, .vc-table th.num { white-space: nowrap; width: 1%; }
 .value-card .vc-take b { font-family: var(--font-data); }
 .vc-total { display: grid; gap: 8px; padding: 12px 14px; border-radius: 12px; background: var(--sunk); }
 .vc-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
@@ -675,9 +680,9 @@ AI_JS = r"""
   /* Does the AI help?: an overview of two designs, and an Advanced view with every statistic */
   const AI_EMBEDS = __EMBEDS__;
   const aiSec = document.createElement('section'); aiSec.className = 'sec ai-simple';
-  aiSec.innerHTML = `<div class="ai-bar"><h2>The learned plan, and the buses on the day</h2>
+  aiSec.innerHTML = `<div class="ai-bar"><h2>What the plan is worth</h2>
     <div class="ai-mode" role="group" aria-label="View"><button type="button" data-ai="simple" aria-pressed="true">Overview</button><button type="button" data-ai="adv" aria-pressed="false">Advanced view</button></div></div>
-    ${AI_EMBEDS.map((e, i) => `<div class="ai-card simple-only"><iframe class="ai-frame" title="${esc(e.title)}" id="ai-f${i}"></iframe></div>`).join('')}`;
+    ${AI_EMBEDS.map((e, i) => `<div class="ai-card ${i === 0 ? 'adv-only' : 'simple-only'}"><iframe class="ai-frame" title="${esc(e.title)}" id="ai-f${i}"></iframe></div>`).join('')}`;
   $('#day').before(aiSec);   // top of the step, above the observed buses fold that lives in the day section
   aiSec.dataset.views = 'step4';
   [methodSec, '#ppo-viz', '#bus-live'].forEach(x => { const el = typeof x === 'string' ? $(x) : x; if (el) el.classList.add('adv-only'); });
@@ -686,7 +691,7 @@ AI_JS = r"""
   function aiMode(adv) {
     document.body.classList.toggle('ai-adv', adv);
     advBar.querySelectorAll('[data-ai]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.ai === 'adv') === adv)));
-    aiSec.querySelector('h2').textContent = adv ? 'Every statistic behind the answer' : 'The learned plan, and the buses on the day';
+    aiSec.querySelector('h2').textContent = adv ? 'Every statistic behind the answer' : 'What the plan is worth';
     if (adv) { const v = $('#ppo-viz'); if (v && !v.open) { v.open = true; v.dispatchEvent(new Event('toggle')); } const b = $('#bus-live'); if (b && !b.open) b.open = true; }
     else sizeFrames();
   }
