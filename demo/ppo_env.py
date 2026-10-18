@@ -58,6 +58,7 @@ NOTHING_OPEN = OPEN_SHIFT.index(0)
 SIGN_FACTOR = 1.3  # assumed: signed links look 30% slower to drivers choosing a route
 MARSHAL_CAP = 1.25  # assumed: marshals add 25% to a gate's access capacity
 MAX_HOLD_BINS = 6  # 90 minutes
+CONGESTION_EXTRA = ("excess_load_hours", "corridor_hours_75", "corridor_hours_95", "corridor_hours_100")
 COSTS = {"corridor_hour": 5000.0, "vehicle_hour": 15.0, "held_pax_hour": 15.0,
          "marshal_hour": 120.0, "sign_hour": 25.0}
 REWARD_SCALE = 10_000.0
@@ -182,7 +183,8 @@ class CruiseDayEnv(gym.Env):
         self.pool = np.zeros((self.nT, H, len(self.cod)))
         self.ppool = np.zeros((self.nT, H))
         self.totals = {k: 0.0 for k in ("corridor_hours", "vehicle_hours", "queue_hours",
-                                        "held_pax_hours", "marshal_hours", "sign_hours", "cost")}
+                                        "held_pax_hours", "marshal_hours", "sign_hours", "cost",
+                                        *CONGESTION_EXTRA)}
         self.log = []
         self.base_cost = self._nothing_costs() if self.baseline else np.zeros(N_BINS)
         return self._obs(), {"date": date_, "day_seed": day_seed}
@@ -235,6 +237,11 @@ class CruiseDayEnv(gym.Env):
              "vehicle_hours": running + queue, "queue_hours": queue,
              "held_pax_hours": held_pax * 0.25, "marshal_hours": marshals * 0.25,
              "sign_hours": signs * 0.25}
+        # congestion beyond the 85% count, recorded only (not in the reward): how far over 85% each
+        # corridor is, summed (continuous), and the corridor-hours at other thresholds
+        c["excess_load_hours"] = float(np.maximum(cx - tm.AT_RISK, 0.0).sum()) * 0.25
+        for t in (75, 95, 100):
+            c[f"corridor_hours_{t}"] = float((cx > t / 100).sum()) * 0.25
         c["cost"] = (COSTS["corridor_hour"] * c["corridor_hours"]
                      + COSTS["vehicle_hour"] * c["vehicle_hours"]
                      + COSTS["held_pax_hour"] * c["held_pax_hours"]
