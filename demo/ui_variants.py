@@ -83,6 +83,9 @@ body[data-view="step1"] .story-time, body[data-view="step2"] .story-time, body[d
 .story-time b { font-family: var(--font-data); font-size: 1rem; min-width: 5ch; }
 .story-time input { width: 170px; accent-color: var(--accent); }
 :root[data-theme="steam"] .story-time { border: 2px solid #1D2B45; box-shadow: 3px 3px 0 #1D2B45; }
+/* medium screens: a shorter slider, and on the day steps the step track gives way so the question still fits */
+@media (max-width: 1280px) { .story-time input { width: 120px; } }
+@media (max-width: 1100px) { body[data-view="step1"] .voyage, body[data-view="step2"] .voyage, body[data-view="step3"] .voyage { display: none; } }
 .story-q .spr { height: 46px; width: auto; flex: none; }
 .story-ico { display: inline-flex; animation: stk-pop .45s cubic-bezier(.2, 1.6, .4, 1) both; }
 .story-n { font-family: var(--font-data); color: var(--accent); }
