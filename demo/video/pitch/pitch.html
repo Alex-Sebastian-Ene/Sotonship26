@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Cruise-day traffic: pitch video</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&family=Fredoka:wght@600;700&display=swap">
+<style>
+:root { --bg: #08121F; --bg2: #0E1E33; --card: #12263F; --line: #24405F; --ink: #EAF2FB; --muted: #8FA6C2; --acc: #4FD1E8; --amb: #F2B544; --red: #E5554F; --ok: #4CC38A; }
+* { box-sizing: border-box; margin: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); color: var(--ink); font-family: "Space Grotesk", system-ui, sans-serif; }
+body::before { content: ""; position: absolute; inset: 0; background: radial-gradient(1200px 700px at 80% -10%, #12345a 0%, transparent 60%), radial-gradient(900px 600px at -10% 110%, #0f2b40 0%, transparent 60%); }
+.sec { position: absolute; inset: 0; display: none; padding: 120px 140px 190px; }
+.brand { position: absolute; top: 44px; left: 60px; font: 600 22px "IBM Plex Mono", monospace; color: var(--muted); letter-spacing: .04em; z-index: 5; display: flex; gap: 14px; align-items: center; }
+.brand b { color: var(--acc); font-weight: 600; }
+.dots { position: absolute; top: 50px; right: 60px; display: flex; gap: 10px; z-index: 5; }
+.dots i { width: 34px; height: 6px; border-radius: 3px; background: #1f3654; }
+.dots i.on { background: var(--acc); }
+.sub { position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); max-width: 1760px; text-align: center; font: 500 31px/1.3 "Space Grotesk"; color: #fff; background: rgba(4, 10, 20, .72); padding: 12px 28px; border-radius: 14px; z-index: 6; }
+.sub:empty { display: none; }
+.src { position: absolute; left: 140px; right: 140px; bottom: 168px; font: 500 19px/1.35 "IBM Plex Mono", monospace; color: var(--muted); }
+.eyebrow { font: 600 26px "IBM Plex Mono"; letter-spacing: .14em; text-transform: uppercase; color: var(--acc); margin-bottom: 18px; }
+h1 { font: 700 96px/1.02 "Space Grotesk"; letter-spacing: -.02em; }
+h2 { font: 700 68px/1.08 "Space Grotesk"; letter-spacing: -.015em; }
+.big { font: 700 150px/1 "Space Grotesk"; letter-spacing: -.03em; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 34px 38px; }
+.row { display: flex; gap: 34px; }
+.col { flex: 1; }
+.muted { color: var(--muted); }
+.acc { color: var(--acc); } .amb { color: var(--amb); } .red { color: var(--red); } .ok { color: var(--ok); }
+q, .quote { font: 500 40px/1.3 "Space Grotesk"; color: #fff; quotes: "“" "”"; }
+.tag { display: inline-block; font: 600 22px "IBM Plex Mono"; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+/* title */
+#s-title { display: grid; place-items: center; text-align: center; padding: 0; }
+#s-title h1 { font: 700 130px "Fredoka"; color: #fff; text-shadow: 0 6px 0 #0b2742; }
+#s-title p { font: 500 36px "Space Grotesk"; color: var(--acc); margin-top: 18px; }
+/* hook */
+#s-hook .date { font: 700 120px "Space Grotesk"; }
+#road { position: absolute; left: 0; right: 0; bottom: 230px; height: 260px; }
+/* problem */
+.stat3 .card { min-height: 520px; display: flex; flex-direction: column; gap: 18px; }
+.stat3 .num { font: 700 120px/1 "Space Grotesk"; }
+/* money */
+.eq { display: flex; align-items: center; gap: 28px; font: 700 64px "Space Grotesk"; margin-top: 40px; }
+.eq .op { color: var(--muted); font-weight: 500; }
+.chip { display: inline-flex; align-items: center; gap: 12px; padding: 14px 22px; border-radius: 16px; background: #0c1b2e; border: 1px solid var(--line); font: 600 30px "Space Grotesk"; }
+/* user */
+.week { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; margin-top: 40px; }
+.wd { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; min-height: 180px; font: 600 28px "Space Grotesk"; }
+.wd.sat { border: 3px solid var(--amb); background: #2a2412; }
+.wd small { display: block; font: 500 22px "IBM Plex Mono"; color: var(--muted); margin-top: 10px; }
+.qs { display: flex; gap: 24px; margin-top: 44px; }
+.qs .chip { font-size: 40px; padding: 18px 30px; }
+/* idea */
+.sentence { font: 600 64px/1.32 "Space Grotesk"; color: #5d7593; }
+.sentence span { transition: none; border-radius: 10px; padding: 0 6px; }
+.sentence span.hl { color: #fff; background: rgba(79, 209, 232, .14); box-shadow: inset 0 -6px 0 var(--acc); }
+.sentence sup { font: 600 24px "IBM Plex Mono"; color: var(--acc); margin-left: 4px; }
+/* demo */
+#s-demo { padding: 0; }
+.browser { position: absolute; left: 110px; top: 112px; width: 1440px; height: 860px; border-radius: 18px; overflow: hidden; background: #000; box-shadow: 0 30px 80px rgba(0, 0, 0, .55); border: 1px solid #2b4566; }
+.bar { height: 50px; background: #13243a; display: flex; align-items: center; gap: 10px; padding: 0 18px; }
+.bar i { width: 14px; height: 14px; border-radius: 50%; background: #2b4566; }
+.url { margin-left: 18px; flex: 1; height: 32px; border-radius: 10px; background: #0b1828; font: 500 20px/32px "IBM Plex Mono"; color: var(--muted); padding: 0 16px; }
+.url b { color: var(--ok); font-weight: 500; }
+.view { position: absolute; top: 50px; left: 0; width: 1440px; height: 810px; overflow: hidden; }
+.view img { position: absolute; left: 0; top: 0; width: 1440px; height: 810px; transform-origin: 0 0; }
+.side { position: absolute; left: 1590px; top: 130px; width: 290px; display: flex; flex-direction: column; gap: 16px; }
+.step { padding: 18px 20px; border-radius: 16px; border: 1px solid var(--line); background: #0c1b2e; color: #5d7593; font: 600 25px/1.25 "Space Grotesk"; }
+.step small { display: block; font: 600 18px "IBM Plex Mono"; letter-spacing: .1em; margin-bottom: 6px; }
+.step.on { color: #fff; border-color: var(--acc); background: #10304a; }
+.step.on small { color: var(--acc); }
+.step.fail.on { border-color: var(--amb); background: #2a2412; }
+.step.fail.on small { color: var(--amb); }
+/* ai */
+.bars { display: flex; flex-direction: column; gap: 22px; margin-top: 26px; }
+.brow { display: grid; grid-template-columns: 330px 1fr 150px; align-items: center; gap: 20px; font: 600 28px "Space Grotesk"; }
+.btrack { height: 46px; background: #0c1b2e; border-radius: 10px; overflow: hidden; }
+.bfill { height: 100%; width: 0; border-radius: 10px; background: #3a5677; }
+.bfill.us { background: var(--acc); }
+.bval { font: 600 30px "IBM Plex Mono"; text-align: right; }
+/* business */
+.biz .card { min-height: 470px; }
+.biz h3 { font: 600 26px "IBM Plex Mono"; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 18px; }
+.biz .num { font: 700 84px/1 "Space Grotesk"; margin: 6px 0 12px; }
+.li { font: 500 28px/1.45 "Space Grotesk"; }
+.days { display: flex; gap: 12px; margin-top: 18px; align-items: flex-end; }
+.days i { width: 52px; height: 52px; border-radius: 12px; background: #1d3553; display: grid; place-items: center; font-style: normal; font-size: 28px; }
+.days i.on { background: var(--ok); color: #062014; }
+/* data */
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; margin-top: 30px; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 24px 26px; min-height: 190px; }
+.tile b { display: block; font: 700 32px/1.15 "Space Grotesk"; margin-bottom: 10px; }
+.tile span { font: 500 21px/1.35 "IBM Plex Mono"; color: var(--muted); }
+.promise { margin-top: 30px; font: 600 34px "Space Grotesk"; color: var(--ok); }
+/* scale */
+.cities { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 30px; }
+.cities .chip { font-size: 38px; }
+.lim { margin-top: 44px; }
+.lim .li { font-size: 34px; }
+/* close */
+#s-close { display: grid; place-items: center; text-align: center; }
+.cta { display: inline-flex; align-items: center; gap: 56px; margin-top: 46px; }
+.qr { width: 300px; height: 300px; border-radius: 18px; padding: 0; background: #fff; }
+.url-big { font: 700 92px "Space Grotesk"; color: var(--acc); margin-top: 26px; }
+</style></head><body>
+<div class="brand"><b>⚓ Cruise-day traffic</b> · Southampton docks</div>
+<div class="dots" id="dots"></div>
+
+<section class="sec" id="s-title"><div><h1 data-f="0">Cruise-day traffic</h1><p data-f=".15">A week-ahead plan for Southampton's dock roads</p></div></section>
+
+<section class="sec" id="s-hook">
+  <div class="eyebrow" data-f="0">Southampton · Full Council minutes</div>
+  <div class="date" data-f=".02">8 November 2010</div>
+  <div class="quote" style="max-width:1450px;margin-top:28px" data-f=".3"><q>Four liners in the port… This created a back up onto the public highway that we were unable to clear through our traffic control computer.</q></div>
+  <svg id="road" viewBox="0 0 1920 260"></svg>
+  <div class="src" data-f=".3">Southampton City Council, printed minutes of Full Council, 17 Nov 2010, pp. 44–45</div>
+</section>
+
+<section class="sec" id="s-problem">
+  <div class="eyebrow" data-f="0">The problem</div>
+  <h2 data-f=".0">A few dock gates, a city's worth of cruise traffic</h2>
+  <div class="row stat3" style="margin-top:44px">
+    <div class="card col" data-f=".05"><div class="num acc"><span data-count="88" data-f=".08">0</span>%</div><div class="li">of UK cruise passengers sail from Southampton: <b>2.69 million</b> in 2024</div><div class="tag" style="margin-top:auto">DfT sea passenger statistics, Jul 2025</div></div>
+    <div class="card col" data-f=".3"><div class="eyebrow amb" style="margin:0">Dock Gate 4</div><div class="quote" style="font-size:33px"><q>Cruise passengers… cause significant congestion, especially at weekends, by Dock Gate 4… exacerbated when 2 or more large cruise ships coincide with a football match</q></div><div class="tag" style="margin-top:auto">SCC Transport Manager, Scrutiny Panel C, 2011</div></div>
+    <div class="card col" data-f=".68"><div class="num red"><span data-count="4.5" data-dec="1" data-f=".7">0</span> h</div><div class="li">Queen Anne's late departure, 11 May 2026, after a gas scare gridlocked the terminal roads</div><div class="tag" style="margin-top:auto">Cruise Hive, 11 May 2026</div></div>
+  </div>
+</section>
+
+<section class="sec" id="s-money">
+  <div class="eyebrow" data-f="0">What a jam costs</div>
+  <div class="row" style="gap:28px">
+    <div class="chip" data-f=".05">🚗 <span>£<span data-count="15.56" data-dec="2" data-f=".05">0</span> per car-hour</span></div>
+    <div class="chip" data-f=".2">🚛 <span>£<span data-count="102.91" data-dec="2" data-f=".2">0</span> per lorry-hour</span></div>
+  </div>
+  <div class="eq" data-f=".42"><span>1,000 cars</span><span class="op">×</span><span>15 min</span><span class="op">=</span><span class="amb">£<span data-count="3890" data-f=".5">0</span></span><span class="tag">illustrative</span></div>
+  <div class="li" style="font-size:38px;margin-top:46px" data-f=".7">…before late buses, missed sailings, and calls worth <b class="acc">£1.9–2.5 m</b> each to the region.</div>
+  <div class="src" data-f=".05">Values of time: DfT TAG data book (weekend, 2023 prices). Call value: ABP, 23 Dec 2025. The 1,000 cars × 15 min day is illustrative.</div>
+</section>
+
+<section class="sec" id="s-user">
+  <div class="eyebrow" data-f="0">Imagine you are…</div>
+  <h2 data-f=".0">A traffic officer at Southampton City Council. <span class="muted">It's Monday.</span></h2>
+  <div class="week" data-f=".2">
+    <div class="wd">Mon<small>today</small></div><div class="wd">Tue</div><div class="wd">Wed</div><div class="wd">Thu</div><div class="wd">Fri</div>
+    <div class="wd sat" data-f=".25">Sat<small>🚢 🚢 two ships</small><small>⚽ home match</small></div>
+  </div>
+  <div class="qs"><div class="chip" data-f=".38">Book marshals?</div><div class="chip" data-f=".46">Hold the roadworks?</div><div class="chip" data-f=".54">Set the signs?</div></div>
+  <div class="li" style="font-size:44px;margin-top:40px" data-f=".66">Today: <b class="amb">a guess.</b> Once the queue forms, <b class="red">it's too late.</b></div>
+</section>
+
+<section class="sec" id="s-idea">
+  <div class="eyebrow" data-f="0">The idea, in one sentence</div>
+  <div class="sentence" style="margin-top:20px">We help <span data-hl=".12">council traffic officers<sup>WHO</sup></span> <span data-hl=".26">decide where to put marshals, signs and roadworks holds<sup>WHAT</sup></span> <span data-hl=".5">on cruise days around the Southampton docks<sup>WHERE</sup></span>, using <span data-hl=".66">a probabilistic traffic forecast and a learned plan, built on public data<sup>HOW</sup></span>.</div>
+</section>
+
+<section class="sec" id="s-demo">
+  <div class="browser"><div class="bar"><i></i><i></i><i></i><div class="url"><b>https://</b>sotonyard.keanuc.net</div></div>
+    <div class="view"><img id="dimg" alt=""></div></div>
+  <div class="side" id="dside">
+    <div class="step" data-k="demo1"><small>1 · CALENDAR</small>Six weeks of real ship calls, coloured by impact</div>
+    <div class="step" data-k="demo2"><small>2 · HOW BAD</small>Congested road-hours, range, worst moment</div>
+    <div class="step" data-k="demo3"><small>3 · WATCH THE DAY</small>Simulated traffic on the real road network</div>
+    <div class="step" data-k="demo4"><small>4 · WHAT TO DO</small>The officer approves ✓ or rejects ✗</div>
+    <div class="step" data-k="demo5"><small>5 · DOES THE AI HELP?</small>The evidence, losses included</div>
+    <div class="step fail" data-k="fail"><small>FAILURE, ON PURPOSE</small>No schedule → no forecast. It refuses to guess.</div>
+  </div>
+</section>
+
+<section class="sec" id="s-ai">
+  <div class="eyebrow" data-f="0">AI at the core, against a baseline</div>
+  <div class="row" style="margin-top:10px">
+    <div class="col card" data-f=".02"><div class="li muted">Cruise-day forecast error (MAE, vehicles/day, M271)</div>
+      <div class="bars">
+        <div class="brow"><span>No cruise effect</span><div class="btrack"><div class="bfill" data-bar="100" data-f=".06"></div></div><span class="bval">1,353</span></div>
+        <div class="brow"><span>Last comparable day</span><div class="btrack"><div class="bfill" data-bar="91.1" data-f=".1"></div></div><span class="bval">1,233</span></div>
+        <div class="brow"><span class="acc">Our forecast</span><div class="btrack"><div class="bfill us" data-bar="64.8" data-f=".16"></div></div><span class="bval acc">877</span></div>
+      </div>
+      <div class="li" style="margin-top:22px"><b class="acc">−29%</b> error · 179-day backtest · 87% inside the forecast band</div></div>
+    <div class="col card" data-f=".42"><div class="li muted">Learned plan (PPO), dates it never trained on</div>
+      <div class="big acc" style="margin-top:18px"><span data-count="3.1" data-dec="1" data-f=".45">0</span></div>
+      <div class="li" style="font-size:34px">congested road-hours avoided a day</div>
+      <div class="li" style="margin-top:20px">for ≈ <b class="amb">£2,500/day</b> of marshal and sign time (≈ £830 per road-hour)</div>
+      <div class="tag" style="margin-top:20px;border-color:var(--amb);color:var(--amb)">SIMULATED · unit costs assumed</div></div>
+  </div>
+  <div class="src" data-f=".05">docs/backtest.md (M271, 179 days) · docs/ppo-results-aa8eae9.md (7 held-out dates, 140 simulated days, 95% CI 2.2–3.9)</div>
+</section>
+
+<section class="sec" id="s-business">
+  <div class="eyebrow" data-f="0">Who pays, and why it pays back</div>
+  <div class="row biz">
+    <div class="card col" data-f=".02"><h3>Buyer</h3><div class="li"><b>Southampton City Council</b>, under its network-management duty</div><div class="tag" style="margin-top:16px">Traffic Management Act 2004 s.16</div><div class="li" style="margin-top:22px">Second buyer: bus operators on the dock roads</div></div>
+    <div class="card col" data-f=".14"><h3>Cost to run</h3><div class="li">Data: <b class="ok">£0</b>, all public</div><div class="li">Nightly rebuild: <b>~18 core-hours</b>, a few £</div><div class="li">Hosting: a static page</div><h3 style="margin-top:26px">Our price</h3><div class="num">&lt; £30k<span style="font-size:40px" class="muted">/yr</span></div><div class="tag">Devon CC traffic data: £29k/yr</div></div>
+    <div class="card col" data-f=".42"><h3>Value</h3><div class="num ok">£<span data-count="7100" data-f=".45">0</span><span style="font-size:40px" class="muted">/day</span></div><div class="li">delay saved by the ship-timing advice (simulated)</div>
+      <div class="days" data-f=".6"><i data-on=".62">1</i><i data-on=".66">2</i><i data-on=".7">3</i><i data-on=".74">4</i><i data-on=".78">5</i></div><div class="li" style="margin-top:10px">5 busy days ≈ <b class="ok">£35k</b> &gt; the licence</div>
+      <div class="li" style="margin-top:14px" data-f=".86">vs a <b class="red">£40 m</b> road the council called "prohibitive"</div></div>
+  </div>
+  <div class="src" data-f=".05">Price is our proposal, anchored on Devon CC (Find a Tender, Nov 2025). Advisor saving: docs/ppo-results-aa8eae9.md, 95% £3.4k–£11.1k/day, simulated. £40 m M271 extension: SCC Scrutiny Panel C, 2011.</div>
+</section>
+
+<section class="sec" id="s-data">
+  <div class="eyebrow" data-f="0">Data used: all public</div>
+  <div class="tiles">
+    <div class="tile" data-f=".04"><b>Port ship schedule</b><span>Southampton VTS public pages, read 18 Oct 07:20; not redistributed</span></div>
+    <div class="tile" data-f=".1"><b>Motorway counts</b><span>National Highways WebTRIS · OGL v3</span></div>
+    <div class="tile" data-f=".16"><b>Road traffic counts</b><span>DfT road traffic statistics · OGL v3</span></div>
+    <div class="tile" data-f=".22"><b>Road network</b><span>OpenStreetMap · ODbL</span></div>
+    <div class="tile" data-f=".3"><b>Live bus positions</b><span>Bus Open Data Service via bustimes.org · OGL v3; aggregates only</span></div>
+    <div class="tile" data-f=".38"><b>Homes &amp; jobs</b><span>Census 2021 (ONS) · OGL v3</span></div>
+    <div class="tile" data-f=".44"><b>Fixtures</b><span>Southampton FC home matches, public fixture list</span></div>
+    <div class="tile" data-f=".5"><b>Weather</b><span>Open-Meteo forecast · CC BY 4.0</span></div>
+  </div>
+  <div class="promise" data-f=".62">✓ No personal data &nbsp;·&nbsp; ✓ No non-public council data &nbsp;·&nbsp; ✓ Every number shows source &amp; time</div>
+</section>
+
+<section class="sec" id="s-scale">
+  <div class="eyebrow" data-f="0">A second city</div>
+  <h2 data-f="0">Any scheduled surge on a few roads</h2>
+  <div class="cities"><div class="chip" data-f=".1">⛴ Dover</div><div class="chip" data-f=".16">⛴ Portsmouth</div><div class="chip" data-f=".22">🏟 Stadium days</div><div class="chip" data-f=".28">🚢 EU cruise ports</div></div>
+  <div class="lim card" data-f=".38"><div class="eyebrow amb">The limits</div>
+    <div class="li">• A few days of calibration against local counts per city</div>
+    <div class="li" data-f=".5">• WebTRIS, DfT counts and BODS cover England only</div>
+    <div class="li" data-f=".6">• Southampton is 88% of UK cruise: for cruise alone, one big UK customer</div></div>
+</section>
+
+<section class="sec" id="s-close"><div>
+  <div class="sentence" style="font-size:58px;color:#fff;max-width:1500px" data-f="0">Plan the cruise day <span class="acc">days ahead</span>, not when the queue forms.</div>
+  <div class="cta" data-f=".2"><svg class="qr" viewBox="0 0 33 33" shape-rendering="crispEdges"><rect width="33" height="33" fill="#fff"/><g fill="#08121F"><rect x="2" y="2" width="1.02" height="1.02"/><rect x="3" y="2" width="1.02" height="1.02"/><rect x="4" y="2" width="1.02" height="1.02"/><rect x="5" y="2" width="1.02" height="1.02"/><rect x="6" y="2" width="1.02" height="1.02"/><rect x="7" y="2" width="1.02" height="1.02"/><rect x="8" y="2" width="1.02" height="1.02"/><rect x="10" y="2" width="1.02" height="1.02"/><rect x="12" y="2" width="1.02" height="1.02"/><rect x="13" y="2" width="1.02" height="1.02"/><rect x="24" y="2" width="1.02" height="1.02"/><rect x="25" y="2" width="1.02" height="1.02"/><rect x="26" y="2" width="1.02" height="1.02"/><rect x="27" y="2" width="1.02" height="1.02"/><rect x="28" y="2" width="1.02" height="1.02"/><rect x="29" y="2" width="1.02" height="1.02"/><rect x="30" y="2" width="1.02" height="1.02"/><rect x="2" y="3" width="1.02" height="1.02"/><rect x="8" y="3" width="1.02" height="1.02"/><rect x="11" y="3" width="1.02" height="1.02"/><rect x="12" y="3" width="1.02" height="1.02"/><rect x="13" y="3" width="1.02" height="1.02"/><rect x="14" y="3" width="1.02" height="1.02"/><rect x="18" y="3" width="1.02" height="1.02"/><rect x="21" y="3" width="1.02" height="1.02"/><rect x="22" y="3" width="1.02" height="1.02"/><rect x="24" y="3" width="1.02" height="1.02"/><rect x="30" y="3" width="1.02" height="1.02"/><rect x="2" y="4" width="1.02" height="1.02"/><rect x="4" y="4" width="1.02" height="1.02"/><rect x="5" y="4" width="1.02" height="1.02"/><rect x="6" y="4" width="1.02" height="1.02"/><rect x="8" y="4" width="1.02" height="1.02"/><rect x="12" y="4" width="1.02" height="1.02"/><rect x="13" y="4" width="1.02" height="1.02"/><rect x="14" y="4" width="1.02" height="1.02"/><rect x="15" y="4" width="1.02" height="1.02"/><rect x="17" y="4" width="1.02" height="1.02"/><rect x="18" y="4" width="1.02" height="1.02"/><rect x="19" y="4" width="1.02" height="1.02"/><rect x="20" y="4" width="1.02" height="1.02"/><rect x="21" y="4" width="1.02" height="1.02"/><rect x="22" y="4" width="1.02" height="1.02"/><rect x="24" y="4" width="1.02" height="1.02"/><rect x="26" y="4" width="1.02" height="1.02"/><rect x="27" y="4" width="1.02" height="1.02"/><rect x="28" y="4" width="1.02" height="1.02"/><rect x="30" y="4" width="1.02" height="1.02"/><rect x="2" y="5" width="1.02" height="1.02"/><rect x="4" y="5" width="1.02" height="1.02"/><rect x="5" y="5" width="1.02" height="1.02"/><rect x="6" y="5" width="1.02" height="1.02"/><rect x="8" y="5" width="1.02" height="1.02"/><rect x="10" y="5" width="1.02" height="1.02"/><rect x="11" y="5" width="1.02" height="1.02"/><rect x="16" y="5" width="1.02" height="1.02"/><rect x="17" y="5" width="1.02" height="1.02"/><rect x="18" y="5" width="1.02" height="1.02"/><rect x="20" y="5" width="1.02" height="1.02"/><rect x="21" y="5" width="1.02" height="1.02"/><rect x="24" y="5" width="1.02" height="1.02"/><rect x="26" y="5" width="1.02" height="1.02"/><rect x="27" y="5" width="1.02" height="1.02"/><rect x="28" y="5" width="1.02" height="1.02"/><rect x="30" y="5" width="1.02" height="1.02"/><rect x="2" y="6" width="1.02" height="1.02"/><rect x="4" y="6" width="1.02" height="1.02"/><rect x="5" y="6" width="1.02" height="1.02"/><rect x="6" y="6" width="1.02" height="1.02"/><rect x="8" y="6" width="1.02" height="1.02"/><rect x="10" y="6" width="1.02" height="1.02"/><rect x="12" y="6" width="1.02" height="1.02"/><rect x="15" y="6" width="1.02" height="1.02"/><rect x="16" y="6" width="1.02" height="1.02"/><rect x="18" y="6" width="1.02" height="1.02"/><rect x="20" y="6" width="1.02" height="1.02"/><rect x="24" y="6" width="1.02" height="1.02"/><rect x="26" y="6" width="1.02" height="1.02"/><rect x="27" y="6" width="1.02" height="1.02"/><rect x="28" y="6" width="1.02" height="1.02"/><rect x="30" y="6" width="1.02" height="1.02"/><rect x="2" y="7" width="1.02" height="1.02"/><rect x="8" y="7" width="1.02" height="1.02"/><rect x="10" y="7" width="1.02" height="1.02"/><rect x="12" y="7" width="1.02" height="1.02"/><rect x="13" y="7" width="1.02" height="1.02"/><rect x="15" y="7" width="1.02" height="1.02"/><rect x="16" y="7" width="1.02" height="1.02"/><rect x="17" y="7" width="1.02" height="1.02"/><rect x="19" y="7" width="1.02" height="1.02"/><rect x="20" y="7" width="1.02" height="1.02"/><rect x="21" y="7" width="1.02" height="1.02"/><rect x="24" y="7" width="1.02" height="1.02"/><rect x="30" y="7" width="1.02" height="1.02"/><rect x="2" y="8" width="1.02" height="1.02"/><rect x="3" y="8" width="1.02" height="1.02"/><rect x="4" y="8" width="1.02" height="1.02"/><rect x="5" y="8" width="1.02" height="1.02"/><rect x="6" y="8" width="1.02" height="1.02"/><rect x="7" y="8" width="1.02" height="1.02"/><rect x="8" y="8" width="1.02" height="1.02"/><rect x="10" y="8" width="1.02" height="1.02"/><rect x="12" y="8" width="1.02" height="1.02"/><rect x="14" y="8" width="1.02" height="1.02"/><rect x="16" y="8" width="1.02" height="1.02"/><rect x="18" y="8" width="1.02" height="1.02"/><rect x="20" y="8" width="1.02" height="1.02"/><rect x="22" y="8" width="1.02" height="1.02"/><rect x="24" y="8" width="1.02" height="1.02"/><rect x="25" y="8" width="1.02" height="1.02"/><rect x="26" y="8" width="1.02" height="1.02"/><rect x="27" y="8" width="1.02" height="1.02"/><rect x="28" y="8" width="1.02" height="1.02"/><rect x="29" y="8" width="1.02" height="1.02"/><rect x="30" y="8" width="1.02" height="1.02"/><rect x="10" y="9" width="1.02" height="1.02"/><rect x="11" y="9" width="1.02" height="1.02"/><rect x="14" y="9" width="1.02" height="1.02"/><rect x="16" y="9" width="1.02" height="1.02"/><rect x="19" y="9" width="1.02" height="1.02"/><rect x="20" y="9" width="1.02" height="1.02"/><rect x="2" y="10" width="1.02" height="1.02"/><rect x="6" y="10" width="1.02" height="1.02"/><rect x="8" y="10" width="1.02" height="1.02"/><rect x="9" y="10" width="1.02" height="1.02"/><rect x="10" y="10" width="1.02" height="1.02"/><rect x="14" y="10" width="1.02" height="1.02"/><rect x="15" y="10" width="1.02" height="1.02"/><rect x="16" y="10" width="1.02" height="1.02"/><rect x="17" y="10" width="1.02" height="1.02"/><rect x="18" y="10" width="1.02" height="1.02"/><rect x="19" y="10" width="1.02" height="1.02"/><rect x="20" y="10" width="1.02" height="1.02"/><rect x="21" y="10" width="1.02" height="1.02"/><rect x="22" y="10" width="1.02" height="1.02"/><rect x="23" y="10" width="1.02" height="1.02"/><rect x="24" y="10" width="1.02" height="1.02"/><rect x="25" y="10" width="1.02" height="1.02"/><rect x="26" y="10" width="1.02" height="1.02"/><rect x="27" y="10" width="1.02" height="1.02"/><rect x="30" y="10" width="1.02" height="1.02"/><rect x="3" y="11" width="1.02" height="1.02"/><rect x="4" y="11" width="1.02" height="1.02"/><rect x="5" y="11" width="1.02" height="1.02"/><rect x="6" y="11" width="1.02" height="1.02"/><rect x="7" y="11" width="1.02" height="1.02"/><rect x="12" y="11" width="1.02" height="1.02"/><rect x="13" y="11" width="1.02" height="1.02"/><rect x="19" y="11" width="1.02" height="1.02"/><rect x="20" y="11" width="1.02" height="1.02"/><rect x="24" y="11" width="1.02" height="1.02"/><rect x="25" y="11" width="1.02" height="1.02"/><rect x="26" y="11" width="1.02" height="1.02"/><rect x="27" y="11" width="1.02" height="1.02"/><rect x="28" y="11" width="1.02" height="1.02"/><rect x="29" y="11" width="1.02" height="1.02"/><rect x="30" y="11" width="1.02" height="1.02"/><rect x="2" y="12" width="1.02" height="1.02"/><rect x="4" y="12" width="1.02" height="1.02"/><rect x="8" y="12" width="1.02" height="1.02"/><rect x="9" y="12" width="1.02" height="1.02"/><rect x="10" y="12" width="1.02" height="1.02"/><rect x="11" y="12" width="1.02" height="1.02"/><rect x="12" y="12" width="1.02" height="1.02"/><rect x="14" y="12" width="1.02" height="1.02"/><rect x="15" y="12" width="1.02" height="1.02"/><rect x="16" y="12" width="1.02" height="1.02"/><rect x="17" y="12" width="1.02" height="1.02"/><rect x="20" y="12" width="1.02" height="1.02"/><rect x="22" y="12" width="1.02" height="1.02"/><rect x="26" y="12" width="1.02" height="1.02"/><rect x="30" y="12" width="1.02" height="1.02"/><rect x="4" y="13" width="1.02" height="1.02"/><rect x="6" y="13" width="1.02" height="1.02"/><rect x="9" y="13" width="1.02" height="1.02"/><rect x="11" y="13" width="1.02" height="1.02"/><rect x="12" y="13" width="1.02" height="1.02"/><rect x="14" y="13" width="1.02" height="1.02"/><rect x="15" y="13" width="1.02" height="1.02"/><rect x="17" y="13" width="1.02" height="1.02"/><rect x="18" y="13" width="1.02" height="1.02"/><rect x="19" y="13" width="1.02" height="1.02"/><rect x="22" y="13" width="1.02" height="1.02"/><rect x="23" y="13" width="1.02" height="1.02"/><rect x="26" y="13" width="1.02" height="1.02"/><rect x="27" y="13" width="1.02" height="1.02"/><rect x="29" y="13" width="1.02" height="1.02"/><rect x="30" y="13" width="1.02" height="1.02"/><rect x="4" y="14" width="1.02" height="1.02"/><rect x="7" y="14" width="1.02" height="1.02"/><rect x="8" y="14" width="1.02" height="1.02"/><rect x="9" y="14" width="1.02" height="1.02"/><rect x="11" y="14" width="1.02" height="1.02"/><rect x="13" y="14" width="1.02" height="1.02"/><rect x="14" y="14" width="1.02" height="1.02"/><rect x="15" y="14" width="1.02" height="1.02"/><rect x="19" y="14" width="1.02" height="1.02"/><rect x="21" y="14" width="1.02" height="1.02"/><rect x="22" y="14" width="1.02" height="1.02"/><rect x="23" y="14" width="1.02" height="1.02"/><rect x="29" y="14" width="1.02" height="1.02"/><rect x="4" y="15" width="1.02" height="1.02"/><rect x="5" y="15" width="1.02" height="1.02"/><rect x="7" y="15" width="1.02" height="1.02"/><rect x="10" y="15" width="1.02" height="1.02"/><rect x="11" y="15" width="1.02" height="1.02"/><rect x="12" y="15" width="1.02" height="1.02"/><rect x="14" y="15" width="1.02" height="1.02"/><rect x="15" y="15" width="1.02" height="1.02"/><rect x="16" y="15" width="1.02" height="1.02"/><rect x="18" y="15" width="1.02" height="1.02"/><rect x="19" y="15" width="1.02" height="1.02"/><rect x="20" y="15" width="1.02" height="1.02"/><rect x="23" y="15" width="1.02" height="1.02"/><rect x="24" y="15" width="1.02" height="1.02"/><rect x="25" y="15" width="1.02" height="1.02"/><rect x="26" y="15" width="1.02" height="1.02"/><rect x="27" y="15" width="1.02" height="1.02"/><rect x="28" y="15" width="1.02" height="1.02"/><rect x="29" y="15" width="1.02" height="1.02"/><rect x="30" y="15" width="1.02" height="1.02"/><rect x="3" y="16" width="1.02" height="1.02"/><rect x="4" y="16" width="1.02" height="1.02"/><rect x="6" y="16" width="1.02" height="1.02"/><rect x="7" y="16" width="1.02" height="1.02"/><rect x="8" y="16" width="1.02" height="1.02"/><rect x="9" y="16" width="1.02" height="1.02"/><rect x="10" y="16" width="1.02" height="1.02"/><rect x="11" y="16" width="1.02" height="1.02"/><rect x="13" y="16" width="1.02" height="1.02"/><rect x="14" y="16" width="1.02" height="1.02"/><rect x="18" y="16" width="1.02" height="1.02"/><rect x="20" y="16" width="1.02" height="1.02"/><rect x="22" y="16" width="1.02" height="1.02"/><rect x="23" y="16" width="1.02" height="1.02"/><rect x="25" y="16" width="1.02" height="1.02"/><rect x="27" y="16" width="1.02" height="1.02"/><rect x="28" y="16" width="1.02" height="1.02"/><rect x="30" y="16" width="1.02" height="1.02"/><rect x="2" y="17" width="1.02" height="1.02"/><rect x="5" y="17" width="1.02" height="1.02"/><rect x="7" y="17" width="1.02" height="1.02"/><rect x="11" y="17" width="1.02" height="1.02"/><rect x="12" y="17" width="1.02" height="1.02"/><rect x="13" y="17" width="1.02" height="1.02"/><rect x="16" y="17" width="1.02" height="1.02"/><rect x="19" y="17" width="1.02" height="1.02"/><rect x="21" y="17" width="1.02" height="1.02"/><rect x="24" y="17" width="1.02" height="1.02"/><rect x="29" y="17" width="1.02" height="1.02"/><rect x="30" y="17" width="1.02" height="1.02"/><rect x="2" y="18" width="1.02" height="1.02"/><rect x="3" y="18" width="1.02" height="1.02"/><rect x="8" y="18" width="1.02" height="1.02"/><rect x="12" y="18" width="1.02" height="1.02"/><rect x="13" y="18" width="1.02" height="1.02"/><rect x="14" y="18" width="1.02" height="1.02"/><rect x="15" y="18" width="1.02" height="1.02"/><rect x="16" y="18" width="1.02" height="1.02"/><rect x="17" y="18" width="1.02" height="1.02"/><rect x="18" y="18" width="1.02" height="1.02"/><rect x="19" y="18" width="1.02" height="1.02"/><rect x="22" y="18" width="1.02" height="1.02"/><rect x="23" y="18" width="1.02" height="1.02"/><rect x="25" y="18" width="1.02" height="1.02"/><rect x="29" y="18" width="1.02" height="1.02"/><rect x="2" y="19" width="1.02" height="1.02"/><rect x="4" y="19" width="1.02" height="1.02"/><rect x="10" y="19" width="1.02" height="1.02"/><rect x="11" y="19" width="1.02" height="1.02"/><rect x="13" y="19" width="1.02" height="1.02"/><rect x="20" y="19" width="1.02" height="1.02"/><rect x="24" y="19" width="1.02" height="1.02"/><rect x="25" y="19" width="1.02" height="1.02"/><rect x="26" y="19" width="1.02" height="1.02"/><rect x="27" y="19" width="1.02" height="1.02"/><rect x="29" y="19" width="1.02" height="1.02"/><rect x="30" y="19" width="1.02" height="1.02"/><rect x="5" y="20" width="1.02" height="1.02"/><rect x="6" y="20" width="1.02" height="1.02"/><rect x="8" y="20" width="1.02" height="1.02"/><rect x="9" y="20" width="1.02" height="1.02"/><rect x="11" y="20" width="1.02" height="1.02"/><rect x="15" y="20" width="1.02" height="1.02"/><rect x="16" y="20" width="1.02" height="1.02"/><rect x="17" y="20" width="1.02" height="1.02"/><rect x="19" y="20" width="1.02" height="1.02"/><rect x="20" y="20" width="1.02" height="1.02"/><rect x="23" y="20" width="1.02" height="1.02"/><rect x="24" y="20" width="1.02" height="1.02"/><rect x="26" y="20" width="1.02" height="1.02"/><rect x="28" y="20" width="1.02" height="1.02"/><rect x="30" y="20" width="1.02" height="1.02"/><rect x="4" y="21" width="1.02" height="1.02"/><rect x="5" y="21" width="1.02" height="1.02"/><rect x="7" y="21" width="1.02" height="1.02"/><rect x="10" y="21" width="1.02" height="1.02"/><rect x="12" y="21" width="1.02" height="1.02"/><rect x="14" y="21" width="1.02" height="1.02"/><rect x="15" y="21" width="1.02" height="1.02"/><rect x="17" y="21" width="1.02" height="1.02"/><rect x="18" y="21" width="1.02" height="1.02"/><rect x="19" y="21" width="1.02" height="1.02"/><rect x="20" y="21" width="1.02" height="1.02"/><rect x="21" y="21" width="1.02" height="1.02"/><rect x="22" y="21" width="1.02" height="1.02"/><rect x="24" y="21" width="1.02" height="1.02"/><rect x="26" y="21" width="1.02" height="1.02"/><rect x="29" y="21" width="1.02" height="1.02"/><rect x="30" y="21" width="1.02" height="1.02"/><rect x="2" y="22" width="1.02" height="1.02"/><rect x="3" y="22" width="1.02" height="1.02"/><rect x="4" y="22" width="1.02" height="1.02"/><rect x="6" y="22" width="1.02" height="1.02"/><rect x="7" y="22" width="1.02" height="1.02"/><rect x="8" y="22" width="1.02" height="1.02"/><rect x="9" y="22" width="1.02" height="1.02"/><rect x="11" y="22" width="1.02" height="1.02"/><rect x="12" y="22" width="1.02" height="1.02"/><rect x="13" y="22" width="1.02" height="1.02"/><rect x="14" y="22" width="1.02" height="1.02"/><rect x="15" y="22" width="1.02" height="1.02"/><rect x="19" y="22" width="1.02" height="1.02"/><rect x="22" y="22" width="1.02" height="1.02"/><rect x="23" y="22" width="1.02" height="1.02"/><rect x="24" y="22" width="1.02" height="1.02"/><rect x="25" y="22" width="1.02" height="1.02"/><rect x="26" y="22" width="1.02" height="1.02"/><rect x="27" y="22" width="1.02" height="1.02"/><rect x="30" y="22" width="1.02" height="1.02"/><rect x="10" y="23" width="1.02" height="1.02"/><rect x="11" y="23" width="1.02" height="1.02"/><rect x="15" y="23" width="1.02" height="1.02"/><rect x="16" y="23" width="1.02" height="1.02"/><rect x="18" y="23" width="1.02" height="1.02"/><rect x="21" y="23" width="1.02" height="1.02"/><rect x="22" y="23" width="1.02" height="1.02"/><rect x="26" y="23" width="1.02" height="1.02"/><rect x="30" y="23" width="1.02" height="1.02"/><rect x="2" y="24" width="1.02" height="1.02"/><rect x="3" y="24" width="1.02" height="1.02"/><rect x="4" y="24" width="1.02" height="1.02"/><rect x="5" y="24" width="1.02" height="1.02"/><rect x="6" y="24" width="1.02" height="1.02"/><rect x="7" y="24" width="1.02" height="1.02"/><rect x="8" y="24" width="1.02" height="1.02"/><rect x="10" y="24" width="1.02" height="1.02"/><rect x="14" y="24" width="1.02" height="1.02"/><rect x="18" y="24" width="1.02" height="1.02"/><rect x="19" y="24" width="1.02" height="1.02"/><rect x="20" y="24" width="1.02" height="1.02"/><rect x="21" y="24" width="1.02" height="1.02"/><rect x="22" y="24" width="1.02" height="1.02"/><rect x="24" y="24" width="1.02" height="1.02"/><rect x="26" y="24" width="1.02" height="1.02"/><rect x="27" y="24" width="1.02" height="1.02"/><rect x="28" y="24" width="1.02" height="1.02"/><rect x="30" y="24" width="1.02" height="1.02"/><rect x="2" y="25" width="1.02" height="1.02"/><rect x="8" y="25" width="1.02" height="1.02"/><rect x="12" y="25" width="1.02" height="1.02"/><rect x="14" y="25" width="1.02" height="1.02"/><rect x="16" y="25" width="1.02" height="1.02"/><rect x="19" y="25" width="1.02" height="1.02"/><rect x="22" y="25" width="1.02" height="1.02"/><rect x="26" y="25" width="1.02" height="1.02"/><rect x="29" y="25" width="1.02" height="1.02"/><rect x="30" y="25" width="1.02" height="1.02"/><rect x="2" y="26" width="1.02" height="1.02"/><rect x="4" y="26" width="1.02" height="1.02"/><rect x="5" y="26" width="1.02" height="1.02"/><rect x="6" y="26" width="1.02" height="1.02"/><rect x="8" y="26" width="1.02" height="1.02"/><rect x="10" y="26" width="1.02" height="1.02"/><rect x="11" y="26" width="1.02" height="1.02"/><rect x="13" y="26" width="1.02" height="1.02"/><rect x="14" y="26" width="1.02" height="1.02"/><rect x="15" y="26" width="1.02" height="1.02"/><rect x="16" y="26" width="1.02" height="1.02"/><rect x="17" y="26" width="1.02" height="1.02"/><rect x="18" y="26" width="1.02" height="1.02"/><rect x="20" y="26" width="1.02" height="1.02"/><rect x="21" y="26" width="1.02" height="1.02"/><rect x="22" y="26" width="1.02" height="1.02"/><rect x="23" y="26" width="1.02" height="1.02"/><rect x="24" y="26" width="1.02" height="1.02"/><rect x="25" y="26" width="1.02" height="1.02"/><rect x="26" y="26" width="1.02" height="1.02"/><rect x="27" y="26" width="1.02" height="1.02"/><rect x="29" y="26" width="1.02" height="1.02"/><rect x="30" y="26" width="1.02" height="1.02"/><rect x="2" y="27" width="1.02" height="1.02"/><rect x="4" y="27" width="1.02" height="1.02"/><rect x="5" y="27" width="1.02" height="1.02"/><rect x="6" y="27" width="1.02" height="1.02"/><rect x="8" y="27" width="1.02" height="1.02"/><rect x="11" y="27" width="1.02" height="1.02"/><rect x="12" y="27" width="1.02" height="1.02"/><rect x="13" y="27" width="1.02" height="1.02"/><rect x="19" y="27" width="1.02" height="1.02"/><rect x="20" y="27" width="1.02" height="1.02"/><rect x="21" y="27" width="1.02" height="1.02"/><rect x="22" y="27" width="1.02" height="1.02"/><rect x="23" y="27" width="1.02" height="1.02"/><rect x="29" y="27" width="1.02" height="1.02"/><rect x="2" y="28" width="1.02" height="1.02"/><rect x="4" y="28" width="1.02" height="1.02"/><rect x="5" y="28" width="1.02" height="1.02"/><rect x="6" y="28" width="1.02" height="1.02"/><rect x="8" y="28" width="1.02" height="1.02"/><rect x="14" y="28" width="1.02" height="1.02"/><rect x="16" y="28" width="1.02" height="1.02"/><rect x="17" y="28" width="1.02" height="1.02"/><rect x="20" y="28" width="1.02" height="1.02"/><rect x="21" y="28" width="1.02" height="1.02"/><rect x="27" y="28" width="1.02" height="1.02"/><rect x="28" y="28" width="1.02" height="1.02"/><rect x="29" y="28" width="1.02" height="1.02"/><rect x="30" y="28" width="1.02" height="1.02"/><rect x="2" y="29" width="1.02" height="1.02"/><rect x="8" y="29" width="1.02" height="1.02"/><rect x="13" y="29" width="1.02" height="1.02"/><rect x="14" y="29" width="1.02" height="1.02"/><rect x="15" y="29" width="1.02" height="1.02"/><rect x="16" y="29" width="1.02" height="1.02"/><rect x="17" y="29" width="1.02" height="1.02"/><rect x="18" y="29" width="1.02" height="1.02"/><rect x="22" y="29" width="1.02" height="1.02"/><rect x="23" y="29" width="1.02" height="1.02"/><rect x="24" y="29" width="1.02" height="1.02"/><rect x="26" y="29" width="1.02" height="1.02"/><rect x="27" y="29" width="1.02" height="1.02"/><rect x="29" y="29" width="1.02" height="1.02"/><rect x="30" y="29" width="1.02" height="1.02"/><rect x="2" y="30" width="1.02" height="1.02"/><rect x="3" y="30" width="1.02" height="1.02"/><rect x="4" y="30" width="1.02" height="1.02"/><rect x="5" y="30" width="1.02" height="1.02"/><rect x="6" y="30" width="1.02" height="1.02"/><rect x="7" y="30" width="1.02" height="1.02"/><rect x="8" y="30" width="1.02" height="1.02"/><rect x="10" y="30" width="1.02" height="1.02"/><rect x="11" y="30" width="1.02" height="1.02"/><rect x="12" y="30" width="1.02" height="1.02"/><rect x="16" y="30" width="1.02" height="1.02"/><rect x="22" y="30" width="1.02" height="1.02"/><rect x="24" y="30" width="1.02" height="1.02"/><rect x="26" y="30" width="1.02" height="1.02"/><rect x="29" y="30" width="1.02" height="1.02"/></g></svg><div style="text-align:left"><div class="li muted" style="font-size:30px">Scan or visit</div><div class="url-big" style="margin-top:6px">sotonyard.keanuc.net</div></div></div>
+  <div class="tag" style="margin-top:34px" data-f=".45">Simulated figures are labelled · sources and code in the repository</div>
+</div></section>
+
+<div class="sub" id="sub"></div>
+<script>
+const TL = __TL__;
+const $ = s => document.querySelector(s);
+const ease = x => { x = Math.max(0, Math.min(1, x)); return 1 - Math.pow(1 - x, 3); };
+const nf = (v, dec) => v.toLocaleString('en-GB', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+const S = TL.scenes;
+$('#dots').innerHTML = S.filter(s => s.id !== 'title').map(() => '<i></i>').join('');
+
+// the hook's road: cars arrive and queue at the gate
+const road = $('#road'); const GATE = 1500, CARS = 26;
+road.innerHTML = `<rect x="0" y="120" width="1920" height="90" fill="#16273c"/><line x1="0" y1="165" x2="1920" y2="165" stroke="#2c4767" stroke-width="4" stroke-dasharray="30 26"/>
+  <rect x="${GATE + 40}" y="70" width="16" height="150" fill="#E5554F"/><text x="${GATE + 70}" y="100" fill="#F2B544" font-family="IBM Plex Mono" font-weight="600" font-size="30">DOCK GATE 4</text>
+  ${Array.from({ length: CARS }, (_, i) => `<rect class="car" rx="8" y="${i % 2 ? 176 : 128}" width="64" height="30"/>`).join('')}`;
+const cars = [...road.querySelectorAll('.car')];
+function drawRoad(t) {
+  cars.forEach((c, i) => {
+    const lane = i % 2, k = Math.floor(i / 2), stop = GATE - 20 - k * 82;
+    const x = Math.min(-80 - i * 70 + t * 520, stop);
+    c.setAttribute('x', x); c.setAttribute('fill', x >= stop - 1 ? '#E5554F' : '#8FA6C2');
+  });
+}
+// subtitles: split a line into sentences shown in proportion to their length
+function subAt(text, t, dur) {
+  const parts = text.match(/[^.?!]+[.?!]?/g).map(s => s.trim()).filter(Boolean);
+  const tot = parts.reduce((a, s) => a + s.length, 0); let acc = 0;
+  const fix = x => x.replace('soton yard dot keanu c dot net', 'sotonyard.keanuc.net').replace('eighty-eight percent', '88%');
+  for (const s of parts) { acc += s.length / tot * dur; if (t < acc) return fix(s); }
+  return t < dur + .25 ? fix(parts[parts.length - 1]) : '';
+}
+const frames = TL.frames;
+function capTime(T) {
+  for (const m of TL.dmap) { const v1 = m.v0 + (m.c1 - m.c0) / m.r; if (T < v1) return m.c0 + Math.max(0, T - m.v0) * m.r; }
+  const m = TL.dmap[TL.dmap.length - 1]; return m.c1;
+}
+function frameAt(c) { let lo = 0, hi = frames.length - 1; while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (frames[mid][1] <= c) lo = mid; else hi = mid - 1; } return frames[lo][0]; }
+// where to look in the demo, per step: scale and the point (in page px of 1920x1080) to put top-left
+const ZOOM = { start: [1, 0, 0], demo1: [1.12, 160, 0], demo2: [1.35, 230, 110], demo3: [1.3, 250, 250], demo4: [1.2, 150, 150], demo5: [1.25, 230, 160], fail: [1.6, 250, 110] };
+let lastSrc = '';
+async function seek(T) {
+  let si = S.findIndex(s => T >= s.t0 && T < s.t1); if (si < 0) si = S.length - 1;
+  const s = S[si], t = T - s.t0, d = s.t1 - s.t0;
+  document.querySelectorAll('.sec').forEach(x => x.style.display = 'none');
+  const sec = $('#s-' + s.id); sec.style.display = s.id === 'title' || s.id === 'close' ? 'grid' : 'block';
+  sec.style.opacity = Math.min(ease(t / .35), ease((d - t) / .3) * (si === S.length - 1 ? 0 : 1) + (si === S.length - 1 ? 1 : 0));
+  [...$('#dots').children].forEach((x, i) => x.classList.toggle('on', i < si));
+  sec.querySelectorAll('[data-f]').forEach(el => { const p = ease((t - (+el.dataset.f) * d) / .5); el.style.opacity = p; el.style.transform = `translateY(${(1 - p) * 26}px)`; });
+  sec.querySelectorAll('[data-count]').forEach(el => { const dec = +(el.dataset.dec || 0); el.textContent = nf(+el.dataset.count * ease((t - (+el.dataset.f) * d) / 1.2), dec); });
+  sec.querySelectorAll('[data-bar]').forEach(el => { el.style.width = (+el.dataset.bar * ease((t - (+el.dataset.f) * d) / 1)) + '%'; });
+  sec.querySelectorAll('[data-hl]').forEach(el => el.classList.toggle('hl', t >= +el.dataset.hl * d));
+  sec.querySelectorAll('[data-on]').forEach(el => el.classList.toggle('on', t >= +el.dataset.on * d));
+  if (s.id === 'hook') drawRoad(t);
+  let sub = '';
+  if (s.text && s.id !== 'idea' && s.id !== 'close') sub = subAt(s.text, t, TL.D[s.id]);
+  if (s.id === 'demo') {
+    let cur = null; for (const x of s.sub) if (T >= x.t0) cur = x;
+    if (cur) { const tt = T - cur.t0; if (tt < TL.D[cur.k] + .25) sub = subAt(cur.text, tt, TL.D[cur.k]); }
+    sec.querySelectorAll('.step').forEach(x => x.classList.toggle('on', cur && x.dataset.k === cur.k));
+    // zoom: ease from the previous step's framing to this one's
+    const idx = cur ? s.sub.indexOf(cur) : -1, prevK = idx > 0 ? s.sub[idx - 1].k : 'start', k = cur ? cur.k : 'start';
+    const a = ZOOM[prevK], b = ZOOM[k], p = cur ? ease((T - cur.t0 - .4) / 1.1) : 1;
+    const z = a.map((v, i) => v + (b[i] - v) * p); z[1] = Math.min(z[1], 1920 - 1920 / z[0]); z[2] = Math.min(z[2], 1080 - 1080 / z[0]);
+    const img = $('#dimg'); img.style.transform = `scale(${z[0]}) translate(${-z[1] * 1440 / 1920}px, ${-z[2] * 810 / 1080}px)`;
+    const src = frameAt(capTime(T));
+    if (src !== lastSrc) { img.src = src; lastSrc = src; try { await img.decode(); } catch (e) {} }
+  }
+  $('#sub').textContent = sub;
+}
+window.seek = seek; window.TOTAL = TL.total;
+</script></body></html>
