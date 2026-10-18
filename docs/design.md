@@ -1,8 +1,9 @@
 # Cruise-day traffic forecast: design plan
 
-**Status:** proposal for team discussion, Fri 16 Oct 2026 22:30. It replaces the streets + waterway
-design in the README. No code has changed yet. Drafted with Claude Code; record that in the README
-provenance section.
+**Status:** the plan the team agreed on Fri 16 Oct 2026 at 22:30, kept as written. It replaced the
+first streets-and-waterway design. What was built differs in places (a static page instead of
+Streamlit, a 15-minute dynamic model instead of PathFinder negotiation, PPO for the decision
+layer); [decisions.md](decisions.md) records each choice and why. Drafted with Claude Code.
 
 ## 1. The product
 
@@ -121,7 +122,7 @@ is routed, so V/C = (background + cruise) / capacity.
 and background scale.
 
 **What it learns from:** observed 15-minute traffic on the approach roads on past cruise days. The
-data spike (`notes/data-spike.md`) picks the source; National Highways WebTRIS on the M271 is the
+data spike (SOT-5) picks the source; National Highways WebTRIS on the M271 is the
 lead candidate.
 
 **Target:** cruise uplift, meaning observed flow minus the median for the same weekday and time on
