@@ -25,6 +25,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, fields
 from datetime import datetime
 from pathlib import Path
+from statistics import median
 from zoneinfo import ZoneInfo
 
 API_ROOT = "https://bustimes.org"
@@ -127,7 +128,7 @@ def area_of(s: Sighting) -> str | None:
 
 @dataclass(frozen=True)
 class Profile:
-    key: str  # a line name, or an area name
+    key: str  # a line name, an area name, or "all"
     hour: int  # local hour of day, or -1 for the whole collection window
     n: int  # bus journeys seen (each journey counts once per key and hour)
     mean_min: float
@@ -140,33 +141,102 @@ def _pct(xs: list[float], q: float) -> float:
     return xs[min(len(xs) - 1, int(q * len(xs)))]
 
 
+# bustimes.org's delay is only as good as its match between a bus and a timetabled trip. These
+# readings are not lateness and are left out before anything is summarised (``clean``):
+MAX_ABS_DELAY_S = 3600.0  # over an hour late or early: matched to the wrong trip or day
+MAX_STALE_S = 600.0  # position over 10 minutes old when fetched: the bus stopped reporting
+STILL_M, STILL_S = 40.0, 600.0  # within 40 m for 10 minutes: laid over at a stand or parked
+JUMP_SLACK_S = 120.0  # the delay moves in steps at stops; allow two minutes of slack
+
+
+def _metres(a: Sighting, b: Sighting) -> float:
+    dy = (a.lat - b.lat) * 111_320.0
+    dx = (a.lon - b.lon) * 111_320.0 * 0.63  # cos(50.9 deg)
+    return (dx * dx + dy * dy) ** 0.5
+
+
+def clean(rows: Iterable[Sighting]) -> tuple[list[Sighting], dict[str, int]]:
+    """The readings that measure lateness, and how many were left out for each reason.
+
+    * ``repeat``: the same report fetched again (the bus hadn't reported between polls).
+    * ``no_delay``: bustimes.org gave no delay.
+    * ``over_an_hour``: more than an hour late or early.
+    * ``stale``: the position was over 10 minutes old when fetched.
+    * ``laid_over``: the bus had stood within 40 m for 10 minutes or more, so it was at a stand
+      or parked and its delay against the last trip keeps growing without meaning anything.
+    * ``rematched``: the delay of one journey moved more than the bus could: up by more than the
+      time that passed (a bus can't fall behind faster than standing still), or down by more than
+      twice the time that passed plus five minutes. bustimes.org then switched the bus to another
+      trip, so none of that journey's readings can be trusted.
+    """
+    dropped: dict[str, int] = defaultdict(int)
+    seen: set[tuple[str, datetime]] = set()
+    journeys: dict[tuple[str, str], list[Sighting]] = defaultdict(list)
+    for r in rows:
+        if (r.vehicle, r.observed_at) in seen:
+            dropped["repeat"] += 1
+            continue
+        seen.add((r.vehicle, r.observed_at))
+        if r.delay_s is None:
+            dropped["no_delay"] += 1
+        elif abs(r.delay_s) > MAX_ABS_DELAY_S:
+            dropped["over_an_hour"] += 1
+        elif (r.collected_at - r.observed_at).total_seconds() > MAX_STALE_S:
+            dropped["stale"] += 1
+        else:
+            journeys[(r.vehicle, r.journey)].append(r)
+    out = []
+    for (_, journey), rs in journeys.items():
+        rs.sort(key=lambda r: r.observed_at)
+        kept, anchor = [], rs[0]
+        for r in rs:
+            if _metres(r, anchor) > STILL_M:
+                anchor = r
+            if (r.observed_at - anchor.observed_at).total_seconds() >= STILL_S:
+                dropped["laid_over"] += 1
+            else:
+                kept.append(r)
+        # without a journey id a vehicle's trips run together, so its delay resets between trips
+        if journey and any(_jumped(a, b) for a, b in zip(kept, kept[1:], strict=False)):
+            dropped["rematched"] += len(kept)
+            continue
+        out.extend(kept)
+    return out, dict(dropped)
+
+
+def _jumped(a: Sighting, b: Sighting) -> bool:
+    dt = (b.observed_at - a.observed_at).total_seconds()
+    dd = b.delay_s - a.delay_s
+    return dd > dt + JUMP_SLACK_S or dd < -(2 * dt + 300.0)
+
+
 def profiles(rows: Iterable[Sighting], by: str = "line", min_n: int = 3, hourly: bool = True,
-             max_abs_delay_s: float = 3 * 3600) -> list[Profile]:
-    """Lateness per line (``by="line"``) or per area (``by="area"``) and hour.
+             max_abs_delay_s: float = MAX_ABS_DELAY_S) -> list[Profile]:
+    """Lateness per line (``by="line"``), per area (``by="area"``) or over every bus
+    (``by="all"``), and hour. Pass readings through ``clean`` first.
 
     A bus is polled every minute or so, so the same journey shows up many times; each journey
-    counts once per key and hour, with its latest delay in that hour, so slow buses don't weigh
-    more than quick ones. ``hourly=False`` pools the whole window (hour -1). Delays over three
-    hours are treated as bad matches and left out."""
-    last: dict[tuple[str, int, str], tuple[datetime, float]] = {}
+    counts once per key and hour, with the median of its delays in that hour, so slow buses don't
+    weigh more than quick ones and one odd reading doesn't set a journey's figure.
+    ``hourly=False`` pools the whole window (hour -1)."""
+    seen: dict[tuple[str, int, str], list[float]] = defaultdict(list)
     for r in rows:
         if r.delay_s is None or abs(r.delay_s) > max_abs_delay_s:
             continue
-        key = r.line if by == "line" else area_of(r)
+        key = r.line if by == "line" else "all" if by == "all" else area_of(r)
         if key is None:
             continue
         k = (key, r.observed_at.astimezone(LONDON).hour if hourly else -1, r.journey or r.vehicle)
-        if k not in last or r.observed_at > last[k][0]:
-            last[k] = (r.observed_at, r.delay_s)
+        seen[k].append(r.delay_s)
     groups: dict[tuple[str, int], list[float]] = defaultdict(list)
-    for (key, hour, _), (_, d) in last.items():
-        groups[(key, hour)].append(d / 60)
+    for (key, hour, _), ds in seen.items():
+        groups[(key, hour)].append(median(ds) / 60)
     out = []
     for (key, hour), xs in sorted(groups.items()):
         if len(xs) < min_n:
             continue
         xs.sort()
-        out.append(Profile(key, hour, len(xs), sum(xs) / len(xs), _pct(xs, 0.5), _pct(xs, 0.9),
+        out.append(Profile(key, hour, len(xs), sum(xs) / len(xs), median(xs), _pct(xs, 0.9),
                            sum(x >= 5 for x in xs) / len(xs)))
     return out
 
