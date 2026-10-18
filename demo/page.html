@@ -223,6 +223,7 @@ button.cell:hover { border-color: var(--ink); }
 .seg-ctl button { border: 0; background: var(--surface); padding: 5px 11px; cursor: pointer; font-size: var(--step--1); font-weight: 600; }
 .seg-ctl button + button { border-left: 1px solid var(--line-strong); }
 .seg-ctl button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.seg-ctl button.elsewhere::after { content: ' ›'; color: var(--muted); }
 .map-box { position: relative; height: clamp(380px, 60vh, 620px); background: var(--land); overflow: hidden; }
 .map-box svg { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
 .map-box svg:active { cursor: grabbing; }
@@ -2137,11 +2138,22 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
   }
   function chips(dates) { return `<span class="chips">${dates.map(x => `<button class="chip" data-goto="${x}">${esc(shortDate(x))}</button>`).join('')}</span>`; }
   function wireChips(el) { el.querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => selectDay(b.dataset.goto, true))); }
+  // vehicles are simulated for a few days only: on any other day the button opens the nearest of them
+  function nearestAgentDay() {
+    const days = Object.keys(AG.days).sort(), t = Date.parse(state.date);
+    return days.reduce((a, d) => (Math.abs(Date.parse(d) - t) < Math.abs(Date.parse(a) - t) ? d : a), days[0]);
+  }
+  if (AG) $('#layer-agents').addEventListener('click', e => {
+    if (agentDay()) return;
+    e.stopImmediatePropagation();      // a capturing listener on the button runs before the layer handlers
+    selectDay(nearestAgentDay(), true);
+    setTimeout(() => { if (agentDay() && state.layer !== 'agents') $('#layer-agents').click(); }, 60);
+  }, true);
   function renderVehicles() {
     if (!AG) return;
     const A = agentDay(), btn = $('#layer-agents');
-    btn.hidden = false; btn.disabled = !A;
-    btn.title = A ? '' : 'Vehicles are simulated for a few days only';
+    btn.hidden = false; btn.disabled = false; btn.classList.toggle('elsewhere', !A);
+    btn.title = A ? '' : `Vehicles are simulated for ${Object.keys(AG.days).sort().map(shortDate).join(', ')} only: opens ${shortDate(nearestAgentDay())}`;
     if (!A && state.layer === 'agents') {
       state.layer = 'load';
       document.querySelectorAll('[data-layer]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.layer === 'load')));
