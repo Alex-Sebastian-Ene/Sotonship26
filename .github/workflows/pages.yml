@@ -1,12 +1,10 @@
 name: Deploy Pages
 
-# Builds the live site from the real demo page on main and deploys it to GitHub Pages.
-# The demo page (demo/page.html) is fully self-contained (inline CSS/JS/data; only d3 and
-# Google Fonts are loaded from CDNs), so the site is just that file served as index.html
-# plus the CNAME for the custom domain.
+# Deploys the static site held on the gh-pages branch (placeholder now, built demo page later).
+# Source branch kept separate from main so the demo artifact never touches application code.
 on:
   push:
-    branches: [main]
+    branches: [gh-pages]
   workflow_dispatch:
 
 permissions:
@@ -26,14 +24,11 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4.2.2
-      - name: Assemble site
-        run: |
-          mkdir -p _site
-          cp demo/page.html _site/index.html
-          printf 'sotonyard.keanuc.net\n' > _site/CNAME
+        with:
+          ref: gh-pages
       - uses: actions/configure-pages@v5.0.0
       - uses: actions/upload-pages-artifact@v3.0.1
         with:
-          path: _site
+          path: .
       - id: deployment
         uses: actions/deploy-pages@v4.0.5
