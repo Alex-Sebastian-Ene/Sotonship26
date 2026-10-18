@@ -1,9 +1,11 @@
 name: Deploy Pages
 
-# Builds the live site from the real demo page on main and deploys it to GitHub Pages.
-# The demo page (demo/page.html) is fully self-contained (inline CSS/JS/data; only d3 and
-# Google Fonts are loaded from CDNs), so the site is just that file served as index.html
-# plus the CNAME for the custom domain.
+# Deploys the built forecast page held on the gh-pages branch. demo/page.html on main is only the
+# template (its data block is the __DEMO_DATA__ placeholder); the working page is built from the
+# Iridis forecast, agent and PPO outputs, which are not in git, by demo/synthetic_demo.py,
+# demo/page_extras.py and demo/ui_variants.py (the Story page), then committed to gh-pages as
+# index.html beside the CNAME. After updating gh-pages, run this workflow by hand (Actions > Deploy Pages)
+# or push to main; gh-pages holds no workflow of its own, so a push there deploys nothing.
 on:
   push:
     branches: [main]
@@ -26,11 +28,13 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4.2.2
-      - name: Assemble site
+        with:
+          ref: gh-pages
+      - name: Check the page is built
         run: |
-          mkdir -p _site
-          cp demo/page.html _site/index.html
-          printf 'sotonyard.keanuc.net\n' > _site/CNAME
+          test -s index.html && test -s CNAME
+          if grep -q '__DEMO_DATA__' index.html; then echo "index.html is the unbuilt template"; exit 1; fi
+          mkdir -p _site && cp index.html CNAME _site/
       - uses: actions/configure-pages@v5.0.0
       - uses: actions/upload-pages-artifact@v3.0.1
         with:
