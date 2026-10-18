@@ -188,6 +188,8 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 .l-wheel { position: absolute; right: 5vw; bottom: 4%; width: 12vmin; z-index: 4; }
 /* the ship scales with the screen height like the waves, so it floats at the same depth on every screen */
 .l-ship { position: absolute; left: 66%; bottom: 18%; width: 40vmin; transform: translateX(-50%); z-index: 2; transition: transform 1.3s cubic-bezier(.5, 0, .7, .4); }
+.l-ship .ship-svg { display: block; clip-path: inset(0 0 16.8% 0); }  /* waterline at y 366 of 440: the wave troughs that pass
+   under the ship show sea, not the bottom of the hull */
 .l-spray { position: absolute; width: 30%; left: -14%; bottom: 4%; transform: scaleX(-1); }
 .l-spray.s2 { width: 22%; left: auto; right: -6%; bottom: 2%; transform: none; }
 .l-rock-spray { position: absolute; right: 30%; bottom: -12%; width: 38%; }
