@@ -280,6 +280,12 @@ assistant under the team's direction, between Fri 16 and Sun 18 Oct 2026:
   cut out of their white backgrounds by script. The landing page's sound is synthesised in the
   browser: gull cries, waves, a horn and "Drunken Sailor", a traditional tune in the public
   domain; no recordings are used.
+- **Pitch video and submission text:**
+  - `demo/video/pitch/` (Edward's session): the scene designs, the narration script, the
+    live-page capture and the encode. The narration is a synthetic voice (Microsoft Edge neural
+    voice `en-GB-RyanNeural`, via the `edge-tts` package); the QR code is generated locally.
+  - `demo/video/` overlays and build script, `docs/pitch-playbook.md` and `SUBMISSION.md`
+    (Keanu's sessions).
 - **Trained models:** the PPO policy in `models/ppo/` was trained by Stable-Baselines3 on our
   simulator. The microsimulation check uses Eclipse SUMO 1.28.0 (EPL-2.0). The vehicle detector
   uses pre-trained YOLO weights (not committed).
