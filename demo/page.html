@@ -754,6 +754,7 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
             <button data-layer="load" aria-pressed="true">How full</button>
             <button data-layer="cruise" aria-pressed="false">Cruise traffic</button>
             <button data-layer="queue" aria-pressed="false">Queues</button>
+            <button data-layer="traffic" aria-pressed="false">Traffic</button>
             <button data-layer="agents" aria-pressed="false" id="layer-agents" hidden>Vehicles</button>
           </div>
           <label class="foot-note" for="scenario">Plan</label>
@@ -1028,6 +1029,8 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
       casing: cs.getPropertyValue('--casing').trim(), accent: cs.getPropertyValue('--accent').trim(),
       ink: cs.getPropertyValue('--ink').trim(), busHi: cs.getPropertyValue('--bus-hi').trim(),
       font: cs.getPropertyValue('--font-data').trim() || 'sans-serif',
+      queue: cs.getPropertyValue('--queue').trim(), warn: cs.getPropertyValue('--l2').trim(),
+      dot: cs.getPropertyValue('--ink').trim(),
     };
   }
   function ramp(stops, x) {
@@ -1358,6 +1361,7 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
     if (L === 'cruise') html = `<span><svg width="44" height="10" aria-hidden="true"><line x1="2" y1="5" x2="42" y2="5" stroke="var(--cruise)" stroke-width="2"/></svg> 50</span><span><svg width="44" height="12" aria-hidden="true"><line x1="3" y1="6" x2="41" y2="6" stroke="var(--cruise)" stroke-width="6" stroke-linecap="round"/></svg> 200 cruise vehicles per hour</span>`;
     else html = `<span class="ramp">${[0.3, 0.6, 0.78, 0.92, 1.1, 1.3].map(x => `<i style="background:${loadColor(x)}"></i>`).join('')}</span><span>How full: under 50%, 70%, 85%, full, over capacity</span>`;
     if (L === 'queue') html += '<span><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="5" class="q-dot"/></svg> vehicles waiting at a bottleneck</span>';
+    if (L === 'traffic') html += `<span><svg width="30" height="8" aria-hidden="true"><rect x="2" y="3" width="2" height="2" fill="currentColor"/><rect x="12" y="3" width="2" height="2" fill="currentColor"/><rect x="22" y="3" width="2" height="2" fill="var(--queue)"/></svg> one dot is about ${DOT_VEH} vehicles, moving at the modelled speed; red where the road is over capacity. Vehicles per road come from its load with typical capacities and speeds for its class (assumed).</span>`;
     if (L === 'agents') html += `<span><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="3.5" fill="${PAL.groups.internal}"/></svg> one vehicle agent, coloured by kind of trip (below the map)</span><span><svg width="14" height="14" aria-hidden="true"><rect x="1" y="2" width="12" height="10" rx="3" fill="${PAL.busHi}"/></svg> bus, labelled with its route; a ring marks one leaving its first stop</span><span>Roads: this one simulated day</span>`;
     html += '<span><svg width="12" height="12" aria-hidden="true"><rect x="1" y="1" width="10" height="10" rx="2" class="mk-gate"/></svg> dock gate</span><span><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="5" class="mk-gw"/></svg> county gateway, vehicles per hour coming in</span>';
     html += '<span class="muted">Drag to move. Pinch, Ctrl + scroll or the buttons to zoom.</span>';
@@ -2319,6 +2323,90 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
       ${abl}<p class="foot-note">Weights, all assumed (set by us, not measured or taken from a published table): £${int(C.corridor_hour)} per congested road-hour (one road over 85% full for an hour; a weight for the risk of a road locking up, not money), £${int(C.vehicle_hour)} per vehicle-hour of delay (vehicles queuing into the next 15 minutes, plus slow running), £${int(C.held_pax_hour)} per passenger-hour held in a terminal, £${int(C.marshal_hour)} per gate-hour of marshals${C.sign_hour ? `, £${int(C.sign_hour)} per sign location-hour` : ''}. The money-only column is the weighted score less the congestion weight; it has no interval. ${C.sign_hour ? 'Check-in moves have' : 'Signs and check-in moves have'} no cost of their own. ${tr.timesteps ? `Trained on ${int(tr.days)} sampled days (${int(tr.timesteps)} steps of 15 minutes) on ${esc(tr.gpu || tr.device)}.` : ''}</p>${curve}`;
   }
 
+  /* ---------- traffic dots: every road's modelled vehicles as small moving dots ---------- */
+  // From each segment's load (demand over capacity, the half hour's value) and its road class:
+  // flow = load x capacity, speed from the model's BPR curve, vehicles = flow / speed x length.
+  // One dot per DOT_VEH vehicles, moving at that speed, half each way. The page has each road's
+  // load, not its lanes, so capacities and free speeds are typical values per class (assumed).
+  const DOT_VEH = 4;
+  const ROAD_CLS = { motorway: [3600, 105], trunk: [2600, 80], primary: [1600, 48], secondary: [1200, 48],
+    tertiary: [900, 40], unclassified: [600, 32] };  // vehicles an hour, km/h
+  let segPoly = null, tDots = [], tKey = '', tAnim = null, tLast = 0;
+  function parseSegments() {
+    segPoly = SEGS.map(s => s.d.split('M').filter(Boolean).map(part => {
+      const n = part.replace(/l/g, ' ').trim().split(/[\s,]+/).map(Number);
+      const xs = [n[0]], ys = [n[1]];
+      for (let k = 2; k + 1 < n.length; k += 2) { xs.push(xs[xs.length - 1] + n[k]); ys.push(ys[ys.length - 1] + n[k + 1]); }
+      const cum = [0];
+      for (let k = 1; k < xs.length; k++) cum.push(cum[k - 1] + Math.hypot(xs[k] - xs[k - 1], ys[k] - ys[k - 1]));
+      return { xs, ys, cum, len: cum[cum.length - 1] };
+    }).filter(pl => pl.len > 0));
+  }
+  function segTraffic(d, i, h) {
+    const x = segLevel(d, i, h) * 0.05, [cap, vff] = ROAD_CLS[SEGS[i].c] || ROAD_CLS.unclassified;
+    const kmh = vff / (1 + 0.15 * Math.min(x, 1.5) ** 4);
+    const km = segPoly[i].reduce((t, pl) => t + pl.len, 0) / 1000;
+    return { x, mps: kmh / 3.6, veh: x * cap / kmh * km };
+  }
+  function layoutDots() {
+    const d = day(); if (!d || d.beyond) { tDots = []; return; }
+    if (!segPoly) parseSegments();
+    const h = Math.floor(state.bin / 2), key = `${d.date}|${h}|${state.scenario}`;
+    if (key === tKey) return;
+    tKey = key;
+    const old = new Map();
+    for (const t of tDots) { if (!old.has(t.i)) old.set(t.i, []); old.get(t.i).push(t); }
+    tDots = [];
+    for (let i = 0; i < SEGS.length; i++) {
+      if (!segPoly[i].length) continue;
+      const tr = segTraffic(d, i, h), want = tr.veh / DOT_VEH;
+      const n = Math.floor(want) + (Math.random() < want % 1 ? 1 : 0);
+      const keep = (old.get(i) || []).slice(0, n);
+      keep.forEach(t => { t.mps = tr.mps; t.x = tr.x; });
+      for (let k = keep.length; k < n; k++) {
+        const p = Math.floor(Math.random() * segPoly[i].length), pl = segPoly[i][p];
+        keep.push({ i, p, u: Math.random() * pl.len, dir: Math.random() < 0.5 ? 1 : -1, mps: tr.mps, x: tr.x });
+      }
+      tDots.push(...keep);
+    }
+  }
+  function dotAt(t) {
+    const pl = segPoly[t.i][t.p], c = pl.cum;
+    let lo = 0, hi = c.length - 1;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (c[mid] <= t.u) lo = mid; else hi = mid; }
+    const f = c[hi] > c[lo] ? (t.u - c[lo]) / (c[hi] - c[lo]) : 0;
+    return screen(pl.xs[lo] + f * (pl.xs[hi] - pl.xs[lo]), pl.ys[lo] + f * (pl.ys[hi] - pl.ys[lo]));
+  }
+  function drawTraffic(now) {
+    if (state.layer !== 'traffic') return;
+    layoutDots();
+    const [w, h] = sizeCanvas();
+    cx2.clearRect(0, 0, w, h);
+    // simulated seconds per real second: the vehicle player's speed when playing, else a gentle drift
+    const sim = vehAnim ? +$('#veh-speed').value * 60 : 20, dt = tLast ? Math.min(0.1, (now - tLast) / 1000) : 0;
+    tLast = now;
+    const r = Math.max(1.6, Math.min(3, 1.3 + 0.5 * Math.log2(Math.max(1, T.k))));
+    cx2.globalAlpha = 0.85;
+    for (const t of tDots) {
+      if (!REDUCED) {
+        const len = segPoly[t.i][t.p].len;
+        t.u = ((t.u + t.dir * t.mps * dt * sim) % len + len) % len;
+      }
+      const [x, y] = dotAt(t);
+      if (x < -4 || y < -4 || x > w + 4 || y > h + 4) continue;
+      cx2.fillStyle = t.x > 1 ? PAL.queue : t.x > 0.85 ? PAL.warn : PAL.dot;
+      cx2.fillRect(x - r / 2, y - r / 2, r, r);
+    }
+    cx2.globalAlpha = 1;
+    $('#map-hud').hidden = true;
+    tAnim = REDUCED ? null : requestAnimationFrame(drawTraffic);
+  }
+  function startTraffic() { if (!tAnim) { tLast = 0; tAnim = requestAnimationFrame(drawTraffic); } }
+  function stopTraffic() { if (tAnim) cancelAnimationFrame(tAnim); tAnim = null; }
+  document.querySelectorAll('[data-layer]').forEach(b => b.addEventListener('click', () => {
+    if (state.layer === 'traffic') startTraffic(); else stopTraffic();
+  }));
+
   const hhmm = m => { const r = Math.round(m); return `${pad(Math.floor(r / 60))}:${pad(r % 60)}`; };
   function stopVehicles() { if (vehAnim) cancelAnimationFrame(vehAnim); vehAnim = null; $('#veh-play').textContent = 'Play vehicles'; if (!state.playing) $('#play').textContent = 'Play the day'; }
   $('#veh-play').addEventListener('click', () => {
@@ -2599,9 +2687,17 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
       <div class="viz-legend">${pols.map(p => `<span><i class="f-${p}"></i>${esc(shortPol(p))}</span>`).join('')}<span><i class="zero-sw"></i>Do nothing (dashed line)</span></div></div>`];
     const tiles = [];
     if (tr.timesteps) tiles.push([`${kfmt(tr.timesteps)} steps`, `${int(tr.days)} simulated days of training${tr.seconds ? `, ${Math.round(tr.seconds / 60)} min` : ''}${tr.gpu || tr.device ? ` on ${esc(tr.gpu || tr.device)}` : ''}`]);
-    if (SUM.ppo) tiles.push([VFMT.cost(SUM.ppo.cost.diff), `PPO's weighted cost score per day against doing nothing, assumed weights (95%: ${VFMT.cost(SUM.ppo.cost.diff_lo)} to ${VFMT.cost(SUM.ppo.cost.diff_hi)}); lower on ${Math.round(SUM.ppo.better_days * 100)}% of ${SUM.ppo.n} days`]);
-    if (SUM.ppo) tiles.push([VFMT.cost(moneyDiff(SUM, 'ppo')), `PPO's money-only cost per day against doing nothing: delay, held passengers, marshals and signs at the assumed rates, without the congestion weight`]);
-    Object.entries(S.head_to_head || {}).forEach(([k, h]) => tiles.push([VFMT.cost(h.mean), `PPO's weighted score minus the ${esc(shortPol(k).toLowerCase())}'s per day (95%: ${VFMT.cost(h.lo)} to ${VFMT.cost(h.hi)}); PPO cheaper on ${Math.round(h.ppo_cheaper * 100)}% of all ${h.n} test days`]));
+    // headline in plain words: what PPO avoids and what it costs, not signed differences
+    if (SUM.ppo) {
+      const ch = SUM.ppo.corridor_hours, money = moneyDiff(SUM, 'ppo'), sc = SUM.ppo.cost;
+      tiles.push([`${fmt1(Math.abs(ch.diff))} h`, `Congested road-hours PPO ${ch.diff <= 0 ? 'avoids' : 'adds'} per day against doing nothing (95%: ${fmt1(Math.abs(ch.diff_hi))} to ${fmt1(Math.abs(ch.diff_lo))})`]);
+      tiles.push([`£${int(Math.abs(money))}`, money > 0
+        ? 'Extra spend per day on marshals and signs, net of the delay it saves (money only, assumed rates)'
+        : 'Money saved per day: delay saved, net of marshals and signs (money only, assumed rates)']);
+      if (ch.diff < 0 && money > 0) tiles.push([`£${int(money / Math.abs(ch.diff))}`, 'What each congested road-hour avoided costs; worth it if the council values one above this']);
+      tiles.push([`£${int(Math.abs(sc.diff))}`, `Weighted score ${sc.diff <= 0 ? 'better' : 'worse'} per day, assumed weights incl. £${int(PPO.costs.corridor_hour)} per congested road-hour (not money; better on ${Math.round(SUM.ppo.better_days * 100)}% of ${SUM.ppo.n} days)`]);
+    }
+    Object.entries(S.head_to_head || {}).forEach(([k, h]) => tiles.push([`£${int(Math.abs(h.mean))}`, `PPO's weighted score ${h.mean <= 0 ? 'better' : 'worse'} than the ${esc(shortPol(k).toLowerCase())}'s per day (95%: £${int(Math.min(Math.abs(h.lo), Math.abs(h.hi)))} to £${int(Math.max(Math.abs(h.lo), Math.abs(h.hi)))}); PPO better on ${Math.round(h.ppo_cheaper * 100)}% of all ${h.n} test days`]));
     if (tiles.length) parts.push(`<div class="viz-tiles">${tiles.map(([b, t]) => `<div class="viz-tile"><span class="big">${b}</span><span class="foot-note">${t}</span></div>`).join('')}</div>`);
     const span = (m, v) => (m === 'cost' ? `£${int(v)}` : fmt1(v));
     const metrics = ['cost', 'corridor_hours', 'vehicle_hours', 'marshal_hours'].filter(m => SUM.ppo && SUM.ppo[m]);
