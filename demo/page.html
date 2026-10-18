@@ -1058,6 +1058,18 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
     if (!addedCache.has(d.date)) addedCache.set(d.date, Object.fromEntries(Object.keys(d.p85).map(id => [id, d.p85[id].map((v, b) => Math.max(0, v - d.bg85[id][b]))])));
     return addedCache.get(d.date);
   }
+  // the ships' vehicle trips as a share of all trips starting that day, and in the hour the ships are busiest
+  function shipShare(d) {
+    const m = d.mix; if (!m || !m.cruise) return null;
+    const all = new Array(N_BINS).fill(0), sum = a => a.reduce((s, v) => s + v, 0);
+    Object.values(m).forEach(v => v.forEach((x, b) => { all[b] += x; }));
+    const tot = sum(all), cr = sum(m.cruise);
+    if (!tot || !cr) return null;
+    let best = -1, at = 0;
+    for (let b = 0; b + 4 <= N_BINS; b++) { const s = sum(m.cruise.slice(b, b + 4)); if (s > best) { best = s; at = b; } }
+    return { day: cr / tot, peak: best / Math.max(1, sum(all.slice(at, at + 4))), at };
+  }
+  const pctS = x => x < 0.1 ? `${(x * 100).toFixed(1)}%` : `${Math.round(x * 100)}%`;
   function scenP85(d, key) { if (key === 'bg') return d.bg85; if (key === 'cruise') return added(d); if (key !== 'base' && d.whatif[key]) return d.whatif[key].p85; return d.p85; }
   function scenScore(d, key) { if (key === 'bg') return d.bg_score; if (key === 'cruise') return uplift(d); if (key !== 'base' && d.whatif[key]) return d.whatif[key].score; return d.score; }
   function scenLabel(d, key) {
@@ -2490,11 +2502,13 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
     const verdict = !n ? 'No cruise ships today. The map and timetable show everyday traffic only.'
       : `<span class="sev lv-${lv.key}">${lv.label}</span>${n} ${n === 1 ? 'ship' : 'ships'} turning around. The ships add about <b>${fmt1(uplift(d))}</b> hours of congested road${d.range ? ` (likely ${upRange(d)})` : ''}.${hit && hit.v >= 20 ? ` They hit hardest around <b>${binTime(hit.b)}</b> on ${esc(hit.c.name)}, where they raise the chance of congestion by ${hit.v} points.` : ''}`;
     const tileHeat = lv.key === 'severe' ? ' hot' : lv.key === 'high' ? ' warm' : '';
+    const share = n ? shipShare(d) : null;
+    const shareLine = share ? `<span class="s" title="Vehicle trips to and from the terminals against every trip starting in the area that day (lorries as car-equivalents); busiest hour from ${binTime(share.at).slice(0, 5)}">${pctS(share.day)} of the day's trips · ${pctS(share.peak)} in their busiest hour · modelled</span>` : '';
     head.innerHTML = `<div class="head-row"><h2>${esc(longDate(d.date))}</h2>${n ? `<span class="sev lv-${lv.key}">${lv.label}</span>` : ''}
         <div class="head-more"><p class="verdict">${verdict}</p><p class="trust"><span class="src">Limits</span> ${trustLine()}</p>
         <p>Congested = over 85% of capacity, summed over ${DATA.corridors.length} main roads. Likely range: 8 days in 10.</p></div></div>
       <div class="tiles">
-        <div class="tile"><span class="k">Ships</span><span class="v"><b>${n}</b></span><span class="s">${schedSrc()} VTS schedule</span></div>
+        <div class="tile"><span class="k">Ships</span><span class="v"><b>${n}</b></span><span class="s">${schedSrc()} VTS schedule</span>${shareLine}</div>
         <div class="tile${tileHeat}"><span class="k">Ships add</span><span class="v"><b>${fmt1(uplift(d))}</b><small>h</small></span><span class="s">${d.range ? `likely ${upRange(d)} · ` : ''}congested road-hours · modelled</span></div>
         ${hit && hit.v >= 20 ? `<div class="tile"><span class="k">Worst moment</span><span class="v">${binTime(hit.b).slice(0, 5)}</span><span class="s">${esc(hit.c.name)} · +${hit.v} pts</span></div>` : ''}
         <div class="tile"><span class="k">All traffic</span><span class="v"><b>${fmt1(d.range ? d.range.score[1] : d.score)}</b><small>h</small></span><span class="s"><b>${fmt1(d.range ? d.range.bg[1] : d.bg_score)}</b>h without ships · modelled</span></div>
