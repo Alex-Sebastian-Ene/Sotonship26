@@ -42,11 +42,16 @@ POLICIES = ["nothing", "rule", "advisor", "ppo"]
 LABELS = {"nothing": "Do nothing", "rule": "Rule (signs and marshals at 85%)",
           "advisor": "Ship-timing advisor", "ppo": "PPO"}
 METRICS = ["corridor_hours", "vehicle_hours", "queue_hours", "held_pax_hours", "marshal_hours",
-           "sign_hours", "cost"]
+           "sign_hours", "cost", "excess_load_hours", "corridor_hours_75", "corridor_hours_95",
+           "corridor_hours_100"]
 METRIC_LABELS = {"corridor_hours": "Corridor-hours above 85%", "vehicle_hours": "Delay (vehicle-hours)",
                  "queue_hours": "of which queuing (vehicle-hours)",
                  "held_pax_hours": "Passenger-hours held", "marshal_hours": "Marshal gate-hours",
-                 "sign_hours": "Sign location-hours", "cost": "Cost (pounds)"}
+                 "sign_hours": "Sign location-hours", "cost": "Cost (pounds)",
+                 "excess_load_hours": "Excess load over 85% (corridor-hours)",
+                 "corridor_hours_75": "Corridor-hours above 75%",
+                 "corridor_hours_95": "Corridor-hours above 95%",
+                 "corridor_hours_100": "Corridor-hours above 100%"}
 OWNERS = {"meter": "The port (ABP) and the cruise line", "checkin": "The cruise line and the port",
           "signs": "Council traffic team", "marshals": "The port (ABP), with the council"}
 

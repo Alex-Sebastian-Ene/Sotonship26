@@ -381,7 +381,7 @@ def sample_day(ctx: sd.Ctx, task: dict, rng: np.random.Generator,
     major_w = np.array([sum(m.length[e] for e in segs[i]["edges"]) for i in major], float)
     major_w /= major_w.sum()
 
-    wet = bool(rng.random() < sd.P_WET.get(d.month, 0.5))
+    wet = bool(rng.random() < sd.p_wet(d))
     cap = cap0 * (sd.WET_CAPACITY if wet else 1.0)
     events = []
     if rng.random() < sd.INCIDENT_P:
@@ -392,13 +392,20 @@ def sample_day(ctx: sd.Ctx, task: dict, rng: np.random.Generator,
     mult = sd.day_multipliers(d, wet)
     mult["freight"] = mult.get("freight", 1.0) * task.get("freight_f", 1.0)
     parts, groups = background_by_purpose(m, dtype, rng, term=term, spread=spread, mult=mult)
-    Dbg = parts_matrix(m, parts)
+    pre = sd.local_pre(m, dtype, d)
+    Dw: dict[int, np.ndarray] = {}
+    for key, (bins, odw) in parts.items():  # peak spreading, as the forecast does
+        w = tm.purpose_window(key)
+        Dw[w] = Dw.get(w, 0.0) + np.outer(bins, odw)
+    # ppo_gpu passes a placeholder for shares0 (it routes on the GPU); spreading needs real ones
+    sh = shares0 if np.ndim(shares0) == 3 and len(shares0) == N_BINS else base_shares(ctx, task)
+    Dbg, spread_f = tm.spread_peaks(m, Dw, cap, sh, pre)
     Dm = tm.match_demand(m, sd.kickoff_hours(kick), rng) if kick else np.zeros_like(Dbg)
     # no calls draws nothing, as forecast() skips sample_cruise then
     veh = cruise_vehicles(ctx, task["calls"], rng, params, task.get("cruise"))
     return SampledDay(task=task, date=d, dtype=dtype, params=params, wet=wet, cap=cap,
                       events=events, noise=noise, parts=parts, groups=groups, Dbg=Dbg, Dm=Dm,
-                      veh=veh, pre=m.pre.get(dtype), shares0=shares0)
+                      veh=veh, pre=pre, shares0=shares0, extra={"spread": spread_f})
 
 
 # --- allocation one bin at a time ------------------------------------------------------------

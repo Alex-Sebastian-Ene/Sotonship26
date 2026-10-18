@@ -141,3 +141,45 @@ real); port freight was added after the over-prediction already existed (+58% on
   only on the links from there on. Done in SOT-30 (`docs/bottleneck-queues.md`).
 - A33 Millbrook Road West (-38%) and The Avenue (-25%) are under; the Itchen Bridge (no toll in
   the model) is over.
+
+## 18 Oct: zones from the census, motorway gateways from the next count
+
+Written Sun 18 Oct 2026 in Alex-Sebastian's session, branch `seb/demand-census-motorways`, after
+the SUMO check kept jamming at the zone access roads on the west and north edges (Totton, Nursling,
+Calmore, Hedge End). No count was being double counted; the surplus came from how two data sources
+became trips.
+
+- **Motorway counts became local trips.** Every gateway sent `1 - THROUGH_SHARE` (40%) of what
+  its DfT count leaves after census commuters and visitors to the area's zones, nearest first. The
+  three motorway gateways supplied 112,000 of the 152,000 other county trips a day, and the M27 at
+  both ends 64,000 of them. Consecutive motorway counts mostly see the same vehicles, so only the
+  drop from a gateway's count to the next count inside can be traffic leaving for the area
+  (`MOTORWAY_NEXT`): M27 west of junction 2 80,096 -> 102,592 between 2 and 3 (more join than
+  leave), M27 8-9 114,876 -> 7-8 114,831, M3 13-14 140,751 -> 72,424 on the link to the M27 (49%
+  leave at junction 14 for the A33 and A335). The drop is net, a lower bound on what leaves.
+  Other county trips 152,298 -> 89,064 a day; through traffic 114,224 -> 145,842.
+- **Zone homes and jobs were land-use area.** Large, thinly built places drew more trips than
+  their people make (Chilworth 11,500 trips a day within the area). Each zone now gets Census 2021
+  residents aged 16+ and workplace counts (ODWP01EW, 53 MSOAs in the area: 345,819 residents,
+  101,865 workplace jobs, lockdown-era), placed within each MSOA by its land use
+  (`census_zone_weights`). Land use outside the area no longer counts.
+
+DfT fit, local build of the context (the full Iridis rebuild is job 1895914):
+
+| Count point | Before (32fe052) | After |
+| --- | --- | --- |
+| M271, A35 to junction 1 (est.) | +24% | +1% |
+| A33 Redbridge Road | -8% | -21% |
+| A35 Redbridge Causeway | +40% | +22% |
+| A33 Millbrook Road West (est.) | -37% | -36% |
+| A33 The Avenue (est.) | -27% | +7% |
+| Itchen Bridge (est., check) | +53% | +27% |
+| Northam Bridge (est., check) | -38% | -30% |
+| A335 Thomas Lewis Way | +34% | +17% |
+| M27 3-4 / 4-5 / 7-8 | -7% / +13% / +7% | -6% / +26% / +3% |
+| M3 13-14 | -7% | +7% |
+| Log error (fitted points) | 0.221 | 0.183 |
+
+Trips within the area are rescaled 1.36 -> 0.84 to the council counts, and county traffic 1.00 ->
+1.08. Worse: M27 4-5 (the motorway pairs are seeded equally, so too much M27 west traffic
+continues east past the M3) and A33 Redbridge Road.
