@@ -186,7 +186,8 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 .l-light .spr, .l-anchor .spr, .l-wheel .spr, .l-spray .spr { display: block; width: 100%; }
 .l-anchor { position: absolute; left: 3vw; bottom: 4%; width: 11vmin; z-index: 4; }
 .l-wheel { position: absolute; right: 5vw; bottom: 4%; width: 12vmin; z-index: 4; }
-.l-ship { position: absolute; left: 66%; bottom: 18%; width: min(40vmin, 360px); transform: translateX(-50%); z-index: 2; transition: transform 1.3s cubic-bezier(.5, 0, .7, .4); }
+/* the ship scales with the screen height like the waves, so it floats at the same depth on every screen */
+.l-ship { position: absolute; left: 66%; bottom: 18%; width: 40vmin; transform: translateX(-50%); z-index: 2; transition: transform 1.3s cubic-bezier(.5, 0, .7, .4); }
 .l-spray { position: absolute; width: 30%; left: -14%; bottom: 4%; transform: scaleX(-1); }
 .l-spray.s2 { width: 22%; left: auto; right: -6%; bottom: 2%; transform: none; }
 .l-rock-spray { position: absolute; right: 30%; bottom: -12%; width: 38%; }
@@ -225,7 +226,7 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 /* portrait and narrow screens: words on top, the ship below them on the horizon */
 @media (max-width: 820px), (max-aspect-ratio: 1/1) {
   .l-card { place-self: start start; margin: 28px 0 0 4vw; max-width: 92vw; }
-  .l-ship { left: 46%; width: min(46vmin, 300px); bottom: 19%; }
+  .l-ship { left: 46%; width: 46vmin; bottom: 19%; }
   .l-sun { left: 46%; }
   .l-light { width: 30vmin; right: 2vw; bottom: 33%; }
 }
