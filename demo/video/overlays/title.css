@@ -1,0 +1,16 @@
+/* Title / end card. Transparent canvas so it keys over footage, or sits full-frame. */
+.card.title{
+  position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center;
+  gap:18px; padding:9% 10%; font-family:"Space Grotesk","Segoe UI",sans-serif;
+  background:transparent; color:#E4F0FA;
+}
+.card.title .kicker{
+  font:700 1.1rem/1 "IBM Plex Mono",monospace; letter-spacing:.14em; text-transform:uppercase;
+  color:#4CC9F0;
+}
+.card.title h1{ margin:0; font-size:5.2rem; line-height:1.02; letter-spacing:-.02em; max-width:18ch; }
+.card.title .line{ margin:0; font-size:2rem; line-height:1.3; color:#8DA6BE; max-width:34ch; }
+.card.title .team{
+  margin-top:8px; font:700 1.4rem "IBM Plex Mono",monospace; color:#E4F0FA;
+  border-top:2px solid #1E3A57; padding-top:16px; width:max-content;
+}
