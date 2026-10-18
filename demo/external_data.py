@@ -207,6 +207,44 @@ def commute_flows(log=print) -> dict:
     return data
 
 
+def msoa_totals(log=print) -> dict:
+    """Census 2021 residents aged 16 and over and workplace counts for every MSOA whose
+    population-weighted centroid lies in the study area (ODWP01EW): where trips start and end.
+
+    Residents are every ODWP01EW row of the home MSOA (in work or not); jobs are people who travel
+    to a workplace in the MSOA (indicator 3, not working mainly at or from home)."""
+    out = CENSUS / "msoa_totals.json"
+    if out.exists():
+        return json.loads(out.read_text(encoding="utf-8"))
+    fetch(log)
+    x0, y1, W, H, t = frame_origin()
+    xy = {}
+    for off in range(0, 8000, 2000):
+        for f in json.loads((CENSUS / f"msoa_pwc_{off}.json").read_text())["features"]:
+            e, n = t.transform(f["geometry"]["x"], f["geometry"]["y"])
+            xy[f["attributes"]["MSOA21CD"]] = (round(e - x0), round(y1 - n))
+    inside = {c for c, (x, y) in xy.items() if 0 <= x <= W and 0 <= y <= H}
+    residents: dict[str, int] = {}
+    jobs: dict[str, int] = {}
+    with zipfile.ZipFile(CENSUS / "odwp01ew.zip") as z:
+        f = io.TextIOWrapper(z.open("ODWP01EW_MSOA.csv"), encoding="utf-8-sig")
+        r = csv.reader(f)
+        next(r)
+        for home, _, work, _, kind, _, count in r:
+            if home in inside:
+                residents[home] = residents.get(home, 0) + int(count)
+            if kind == "3" and work in inside:
+                jobs[work] = jobs.get(work, 0) + int(count)
+    rows = [{"msoa": c, "x": xy[c][0], "y": xy[c][1], "residents": residents.get(c, 0),
+             "jobs": jobs.get(c, 0)} for c in sorted(inside)]
+    data = {"source": CENSUS_SOURCE, "collected": collected(CENSUS / "odwp01ew.zip"),
+            "rows": rows}
+    out.write_text(json.dumps(data), encoding="utf-8")
+    log(f"census: {len(rows)} MSOAs in the study area, {sum(residents.values())} residents aged "
+        f"16+, {sum(jobs.values())} workplace jobs -> {out}")
+    return data
+
+
 def collected(path: Path) -> str:
     return date.fromtimestamp(path.stat().st_mtime).isoformat()
 

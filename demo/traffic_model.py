@@ -3,8 +3,9 @@
 Structure comes from geography (OpenStreetMap, via osm_base.py):
 
 * roads, junctions, one-way streets, lanes and speed limits;
-* zones: OSM place points (suburbs, towns). Each zone's homes, jobs and shops come from the area of
-  residential, commercial/retail/industrial/port and retail land use nearest to it;
+* zones: OSM place points (suburbs, towns). Each zone's homes and jobs are Census 2021 residents
+  aged 16+ and workplace counts (ODWP01EW, per MSOA), placed within each MSOA by the residential
+  and commercial/industrial/port land use nearest the zone; its shops are retail land use;
 * county gateways: where motorways, trunk and A roads cross the edge of the study area.
 
 Commuters come in from the rest of the county and go home again, and residents commute out: Census
@@ -121,9 +122,19 @@ DAY_WEIGHTS = (5 / 7, 1 / 7, 1 / 7)  # weekday, Saturday, Sunday in an average d
 GATEWAY_COUNT_M = 3500.0
 GATEWAY_COUNT_DEPTH_M = 1000.0
 THROUGH_SHARE = 0.6
+# Motorway gateways instead take their split from the next DfT count inside the area (2025):
+# consecutive counts on a motorway mostly see the same vehicles, so only the drop between the
+# gateway's count and the next one can be traffic leaving for the area's zones; the rest stays on
+# the motorways (through traffic). M27 west of junction 2 80,096 -> 102,592 between 2 and 3 (more
+# join than leave), M27 8-9 114,876 -> 7-8 114,831 (almost none leave), M3 13-14 140,751 -> 72,424
+# on the link to the M27 at junction 4 (49% leave at junction 14 for the A33 and A335). The drop is
+# net: traffic that leaves and is replaced at the same junction is not seen, so it is a lower
+# bound. Before 18 Oct 2026 every gateway sent (1 - THROUGH_SHARE) of its count to the zones,
+# 64,000 trips a day from the M27 alone that never leave the motorway.
+MOTORWAY_NEXT = {"M27 west": (46037,), "M27 east": (38083,), "M3 north": (28018,)}
 OTHER_T_S = 1800.0  # other county trips: zone weight falls by e for every 30 free-flow minutes
 # Trips these give on an average day (both directions); build() recomputes them and warns.
-CORDON_DAILY = {"through": 114224, "other": 152298}
+CORDON_DAILY = {"through": 145842, "other": 89064}
 CORDON_DAYS = (1.0, 0.8, 0.7)  # assumed weekday, Saturday, Sunday ratio
 
 # Port freight (SOT-24): lorries between the county gateways and the port gates, in car-equivalents
@@ -486,6 +497,54 @@ def repair_motorways(g, size, log=print) -> set:
     return cut
 
 
+# OSM land use per square metre as a jobs weight; it only places each MSOA's census jobs within it
+JOB_LAND = {"commercial": 1.0, "industrial": 0.6, "port": 0.4, "campus": 1.2, "airport": 0.3}
+ZONE_REACH_M = 3000.0  # land use further than this from every zone point belongs to no zone
+
+
+def census_zone_weights(zones, samples, size, msoas: list[dict], log=print) -> None:
+    """Homes and jobs per zone from Census 2021 (ODWP01EW, external_data.msoa_totals).
+
+    Each MSOA's residents aged 16+ (homes) and its workplace count (jobs) are shared over the
+    residential land use (homes) or job land use (jobs, JOB_LAND weights) nearest its
+    population-weighted centroid inside the study area: OSM land use only says where within the
+    MSOA people live and work, the census says how many. Each piece then goes to its nearest zone
+    point (within ZONE_REACH_M). Land use outside the area is left out, since that traffic comes
+    in through the gateway counts, and an MSOA without land use of a kind gives its count to its
+    nearest zone. Before 18 Oct 2026 homes and jobs were the land-use areas themselves, which gave
+    large, thinly built places (Chilworth, Nursling) far more trips than their people make."""
+    W, H = size
+    mxy = np.array([(r["x"], r["y"]) for r in msoas], float)
+    count = np.array([[r["residents"], r["jobs"]] for r in msoas], float)
+    mtree, ztree = cKDTree(mxy), cKDTree([z.xy for z in zones])
+    pieces = []  # (zone, MSOA, 0 homes or 1 jobs, land-use weight)
+    for kind, x, y, area in samples:
+        k = 0 if kind == "residential" else 1 if kind in JOB_LAND else None
+        if k is None or not (0 <= x <= W and 0 <= y <= H):
+            continue
+        d, zi = ztree.query((x, y))
+        if d > ZONE_REACH_M:
+            continue
+        pieces.append((zi, int(mtree.query((x, y))[1]), k,
+                       area if k == 0 else JOB_LAND[kind] * area))
+    land = np.zeros_like(count)
+    for _, mi, k, w in pieces:
+        land[mi, k] += w
+    for z in zones:
+        z.homes = z.jobs = 0.0
+    for zi, mi, k, w in pieces:
+        if k == 0:
+            zones[zi].homes += count[mi, 0] * w / land[mi, 0]
+        else:
+            zones[zi].jobs += count[mi, 1] * w / land[mi, 1]
+    for mi in np.flatnonzero((land == 0).any(axis=1)):
+        z = zones[int(ztree.query(mxy[mi])[1])]
+        z.homes += count[mi, 0] if land[mi, 0] == 0 else 0.0
+        z.jobs += count[mi, 1] if land[mi, 1] == 0 else 0.0
+    log(f"zones: homes and jobs from Census 2021 ({len(msoas)} MSOAs, {count[:, 0].sum():.0f} "
+        f"residents 16+, {count[:, 1].sum():.0f} workplace jobs), placed by OSM land use")
+
+
 def build(net_path: Path, gates: dict[str, tuple[int, int]], log=print,
           port_gates: dict[str, tuple[int, int]] | None = None) -> Model:
     with open(net_path, "rb") as f:
@@ -531,24 +590,13 @@ def build(net_path: Path, gates: dict[str, tuple[int, int]], log=print,
     tree = cKDTree([z.xy for z in zones])
     for kind, x, y, area in net["samples"]:
         d, i = tree.query((x, y))
-        if d > 3000:
+        if d > ZONE_REACH_M:
             continue
-        z = zones[i]
-        if kind == "residential":
-            z.homes += area
-        elif kind == "commercial":
-            z.jobs += area
-            z.retail += area
-        elif kind == "industrial":
-            z.jobs += 0.6 * area
-        elif kind == "port":
-            z.jobs += 0.4 * area
-        elif kind == "campus":
-            z.jobs += 1.2 * area
-        elif kind == "airport":
-            z.jobs += 0.3 * area
+        if kind == "commercial":
+            zones[i].retail += area
         elif kind == "school":
-            z.schools += area
+            zones[i].schools += area
+    census_zone_weights(zones, net["samples"], (W, H), ext.msoa_totals(log)["rows"], log)
     total = sum(z.homes + z.jobs for z in zones)
     zones = [z for z in zones if z.homes + z.jobs > 0.002 * total]
     log(f"zones: {len(zones)} (from {len(places)} OSM places)")
@@ -901,7 +949,8 @@ def cordon_od(centroids, Z, G_, gw_class, census: dict, cordon: list[dict], attr
     one gateway per count point, and gateways without one get neither. What the count leaves after
     census commuters and county visitors crossing there (average day, before calibration) is split:
 
-    * THROUGH_SHARE is through traffic: gateway pairs more than 6 km apart are seeded 1, or 0.15
+    * THROUGH_SHARE is through traffic (at the motorway gateways in MOTORWAY_NEXT, what stays on
+      the motorway past the next count): gateway pairs more than 6 km apart are seeded 1, or 0.15
       unless both ends are motorway or trunk, then balanced to each gateway's through crossings
       by iterative proportional fitting;
     * the rest is other trips, half in and half out, to zones by ``attract`` times
@@ -942,9 +991,22 @@ def cordon_od(centroids, Z, G_, gw_class, census: dict, cordon: list[dict], attr
         w * f for w, f in zip(DAY_WEIGHTS, FREIGHT_DAYS, strict=True))
     crossing += port_lorries * hgv_share
     rest = np.zeros(len(G_))
+    other = np.zeros(len(G_))
+    by_id = {c["count_point"]: c for c in cordon}
+    local_share = {}
     for gi, c in count.items():
         rest[gi] = max(c["aadf"] - crossing[gi], 0.0)
-    target, other = THROUGH_SHARE * rest, (1 - THROUGH_SHARE) * rest
+        nxt = MOTORWAY_NEXT.get(centroids[G_[gi]].name)
+        if nxt and all(k in by_id for k in nxt):
+            share = max(0.0, 1.0 - sum(by_id[k]["aadf"] for k in nxt) / c["aadf"])
+            local_share[gi] = share
+            other[gi] = min(rest[gi], max(share * c["aadf"] - crossing[gi], 0.0))
+        else:
+            if nxt:
+                log(f"cordon: next count after {centroids[G_[gi]].name} missing, "
+                    f"using THROUGH_SHARE")
+            other[gi] = (1 - THROUGH_SHARE) * rest[gi]
+    target = rest - other
 
     gxy = np.array([centroids[g].xy for g in G_], float)
     far = np.hypot(*(gxy[:, None, :] - gxy[None, :, :]).transpose(2, 0, 1)) > 6000
@@ -982,6 +1044,8 @@ def cordon_od(centroids, Z, G_, gw_class, census: dict, cordon: list[dict], attr
         if c:
             row.update(count_point=c["count_point"], year=c["year"], method=c["method"],
                        aadf=c["aadf"])
+        if gi in local_share:
+            row["leaves_motorway"] = round(local_share[gi], 3)
         summary.append(row)
         log(f"  {centroids[g].name:14s} DfT "
             + (f"{c['aadf']:7d} ({c['count_point']}, {c['year']} {c['method'].lower()})" if c
