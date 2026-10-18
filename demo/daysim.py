@@ -392,13 +392,18 @@ def sample_day(ctx: sd.Ctx, task: dict, rng: np.random.Generator,
     mult = sd.day_multipliers(d, wet)
     mult["freight"] = mult.get("freight", 1.0) * task.get("freight_f", 1.0)
     parts, groups = background_by_purpose(m, dtype, rng, term=term, spread=spread, mult=mult)
-    Dbg = parts_matrix(m, parts)
+    pre = sd.local_pre(m, dtype, d)
+    Dw: dict[int, np.ndarray] = {}
+    for key, (bins, odw) in parts.items():  # peak spreading, as the forecast does
+        w = tm.purpose_window(key)
+        Dw[w] = Dw.get(w, 0.0) + np.outer(bins, odw)
+    Dbg, spread_f = tm.spread_peaks(m, Dw, cap, shares0, pre)
     Dm = tm.match_demand(m, sd.kickoff_hours(kick), rng) if kick else np.zeros_like(Dbg)
     # no calls draws nothing, as forecast() skips sample_cruise then
     veh = cruise_vehicles(ctx, task["calls"], rng, params, task.get("cruise"))
     return SampledDay(task=task, date=d, dtype=dtype, params=params, wet=wet, cap=cap,
                       events=events, noise=noise, parts=parts, groups=groups, Dbg=Dbg, Dm=Dm,
-                      veh=veh, pre=sd.local_pre(m, dtype, d), shares0=shares0)
+                      veh=veh, pre=pre, shares0=shares0, extra={"spread": spread_f})
 
 
 # --- allocation one bin at a time ------------------------------------------------------------

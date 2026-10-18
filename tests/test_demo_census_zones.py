@@ -61,3 +61,24 @@ def test_wet_day_chance_uses_the_forecast_then_climatology(monkeypatch):
     wet = sd.day_multipliers(date(2026, 10, 21), True)
     assert dry["internal"] == pytest.approx(sd.DRY_DEMAND)
     assert wet["internal"] == pytest.approx(sd.WET_DEMAND)
+
+
+def test_peak_spreading_moves_what_cannot_fit_and_keeps_totals():
+    from types import SimpleNamespace
+
+    import numpy as np
+    import scipy.sparse as sp
+
+    # one OD pair on one route over one link of 100 veh/h; its other two routes are unused
+    A = sp.csr_matrix(([1.0], ([0], [0])), shape=(1, tm.ROUTES))
+    m = SimpleNamespace(n_od=1, A=A, AT=A.T.tocsr())
+    shares = np.zeros((tm.N_BINS, 1, tm.ROUTES))
+    shares[:, 0, 0] = 1.0
+    D = np.zeros((tm.N_BINS, 1))
+    D[10, 0] = 50.0  # 200 veh/h for a 15-minute bin: twice what fits
+    out, f = tm.spread_peaks(m, {1: D, 0: D.copy()}, np.array([100.0]), shares)
+    assert out.sum() == pytest.approx(100.0)  # nothing lost
+    # the commuter-like half spreads to the bins either side, never further; the school run stays
+    assert out[10, 0] < 100.0 and out[9, 0] > 0 and out[11, 0] > 0
+    assert out[[8, 12], 0].sum() == 0
+    assert f[1][10, 0] < 1.0 and f[0][10, 0] == 1.0

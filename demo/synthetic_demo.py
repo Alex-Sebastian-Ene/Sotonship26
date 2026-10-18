@@ -631,7 +631,9 @@ def forecast(task: dict) -> dict:
         noise = rng.lognormal(-PERCEPTION_SD**2 / 2, PERCEPTION_SD, len(m.t0))
         mult = day_multipliers(d, wet)
         mult["freight"] = mult.get("freight", 1.0) * task.get("freight_f", 1.0)
-        Dbg, groups = tm.background(m, dtype, rng, term=term, spread=spread, mult=mult)
+        Dw, groups = tm.background(m, dtype, rng, term=term, spread=spread, mult=mult,
+                                   by_window=True)
+        Dbg, _ = tm.spread_peaks(m, Dw, cap, sh0, pre)  # trips that cannot fit re-time
         Dm = tm.match_demand(m, kickoff_hours(kick), rng) if kick else np.zeros_like(Dbg)
         Dc = sample_cruise(ctx, calls, rng, params, shifts, task.get("cruise")) if calls else np.zeros_like(Dbg)
         probe = task.get("probe") if paired and calls else None  # edges for the M271 fit

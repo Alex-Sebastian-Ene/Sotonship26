@@ -1072,13 +1072,16 @@ def ar1(rng: np.random.Generator, n: int, sd: float, rho: float) -> np.ndarray:
 
 
 def background(m: Model, dtype: int, rng: np.random.Generator | None = None, term: bool = True,
-               spread: float = 1.0, mult: dict | None = None):
+               spread: float = 1.0, mult: dict | None = None, by_window: bool = False):
     """Vehicles per bin for each OD pair, and per chart group, for one day type.
 
     With ``rng`` the day is noisy in correlated ways (see the module docstring); ``spread`` widens
     the noise for dates further ahead, and ``mult`` scales chosen purposes (season, weather).
+    ``by_window`` returns the matrix split by how far its trips can move in time
+    ({purpose_window: matrix}, for spread_peaks) instead of one matrix.
     """
     D = np.zeros((N_BINS, m.n_od))
+    Dw: dict[int, np.ndarray] = {}
     groups = {}
     od_mult = 1.0
     day = 1.0
@@ -1104,9 +1107,84 @@ def background(m: Model, dtype: int, rng: np.random.Generator | None = None, ter
         if rng is not None:
             total *= rng.lognormal(0.0, NOISE["purpose"] * spread)
             prof = prof * ar1(rng, N_BINS, NOISE["bin"] * spread, NOISE["rho"]) * shared
-        D += np.outer(prof * total, m.purpose_od[key] * od_mult)
+        part = np.outer(prof * total, m.purpose_od[key] * od_mult)
+        if by_window:
+            w = purpose_window(key)
+            Dw[w] = Dw[w] + part if w in Dw else part
+        else:
+            D += part
         groups[group] = groups.get(group, 0) + prof * total
-    return D, groups
+    return (Dw if by_window else D), groups
+
+
+# Peak spreading (the team's rule, 18 Oct 2026): when a trip's routes are over capacity in its
+# 15 minutes, part of the trips that cannot get through set off earlier or later instead, as drivers
+# do, rather than all queuing. Commuters, freight and trips within the area move up to one bin
+# (15 minutes); visitors, other county trips and through traffic up to four (an hour); the school
+# run keeps its times. Assumed values.
+SPREAD_BINS = {"county": 1, "outbound": 1, "internal": 1, "freight": 1, "school": 0,
+               "visitors": 4, "through": 4}
+SPREAD_RESPONSE = 1.0  # share of the trips that do not fit through the bottleneck that re-time
+_GROUP = {k: g for k, g, *_ in PURPOSES}
+
+
+def purpose_window(name: str) -> int:
+    """Bins a purpose (or chart group) may move by under peak spreading."""
+    return SPREAD_BINS.get(name, SPREAD_BINS.get(_GROUP.get(name, ""), 0))
+
+
+def od_pressure(m: Model, D: np.ndarray, cap: np.ndarray, shares: np.ndarray, pre=None) -> np.ndarray:
+    """Per bin and OD pair: demand over capacity at the worst link of its routes, weighted by the
+    route shares, with every trip of the bin on the network (no queues carried over)."""
+    AT = m.AT
+    empty = np.diff(AT.indptr) == 0
+    starts = np.minimum(AT.indptr[:-1], max(len(AT.indices) - 1, 0))
+    out = np.zeros((N_BINS, m.n_od))
+    for b in range(N_BINS):
+        f = ((D[b] * 4.0)[:, None] * shares[b]).reshape(-1)
+        v = m.A @ f + (pre[b] if pre is not None else 0.0)
+        x = v / cap
+        worst = np.maximum.reduceat(x[AT.indices], starts) if len(AT.indices) else np.zeros(len(starts))
+        worst[empty] = 0.0
+        out[b] = (shares[b] * worst.reshape(m.n_od, ROUTES)).sum(axis=1)
+    return out
+
+
+def spread_peaks(m: Model, Dw: dict[int, np.ndarray], cap: np.ndarray, shares: np.ndarray,
+                 pre=None) -> tuple[np.ndarray, dict[int, np.ndarray]]:
+    """Peak spreading over demand split by how far it may move ({bins: matrix}).
+
+    Rounds of one-bin moves: each round recomputes the pressure (od_pressure) with the trips moved
+    so far, and where a bin and OD pair is above 1, SPREAD_RESPONSE of the share that does not fit
+    (1 - 1/pressure) moves one bin earlier or later, to whichever neighbour is less pressed (both,
+    split evenly, if both are). Demand with window w takes part in the first w rounds only, so no
+    trip moves further than its window. Totals per OD pair are kept. Returns the spread total
+    matrix and, per window, the factor each bin and OD pair was scaled by (for callers that keep
+    purposes apart; a bin that had none of a window's trips cannot show any it gained)."""
+    out = {w: D.copy() for w, D in Dw.items()}
+    for r in range(1, max(Dw, default=0) + 1):
+        x = od_pressure(m, sum(out.values()), cap, shares, pre)
+        excess = np.clip(1.0 - 1.0 / np.maximum(x, 1e-9), 0.0, None) * SPREAD_RESPONSE
+        if not (excess > 1e-6).any():
+            break
+        earlier = np.full_like(x, np.inf)
+        earlier[1:] = x[:-1]  # pressure one bin earlier
+        later = np.full_like(x, np.inf)
+        later[:-1] = x[1:]
+        to_e, to_l = (earlier < x).astype(float), (later < x).astype(float)
+        n = to_e + to_l
+        for w, D in out.items():
+            if w < r:
+                continue
+            moved = D * excess * (n > 0)
+            e = np.divide(moved * to_e, n, out=np.zeros_like(D), where=n > 0)
+            lt = np.divide(moved * to_l, n, out=np.zeros_like(D), where=n > 0)
+            new = D - moved
+            new[:-1] += e[1:]
+            new[1:] += lt[:-1]
+            out[w] = new
+    factors = {w: np.divide(out[w], Dw[w], out=np.ones_like(Dw[w]), where=Dw[w] > 0) for w in Dw}
+    return sum(out.values()), factors
 
 
 def match_demand(m: Model, kickoff_h: float, rng: np.random.Generator | None = None):

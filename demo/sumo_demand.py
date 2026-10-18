@@ -621,6 +621,8 @@ def main(argv=None) -> None:
     trips = []
     for key, (bins, odw) in day.parts.items():
         Dk = np.outer(bins, odw)
+        if "spread" in day.extra:  # peak spreading, as the model's own day
+            Dk = Dk * day.extra["spread"][tm.purpose_window(key)]
         lorry = key in getattr(tm, "FREIGHT_KEYS", set())
         trips += od_trips(m, ps, pe, trng, Dk / tm.HGV_PCU if lorry else Dk, key,
                           "hgv" if lorry else "car", args.scale)
