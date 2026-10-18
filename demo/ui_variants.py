@@ -701,6 +701,13 @@ _CREST = "M0 50 " + " ".join("q 75 -44 150 0 t 150 0" for _ in range(8))
 _DROPS = "".join(f'<i class="sp-drop" style="--x:{x}%;--s:{sz}px;--dx:{dx}px;--d:{d}s"></i>'
                  for x, sz, dx, d in ((8, 14, -30, .05), (19, 10, 20, .12), (31, 16, -14, 0), (44, 11, 26, .09), (56, 15, -22, .03),
                                       (67, 10, 18, .14), (78, 16, -26, .06), (90, 12, 22, .1)))
+# (x %, y %, size px, throw x px, throw y vmin, delay s, foam or teal)
+_BURST = [(6, 34, 30, -40, -14, .02, 1), (14, 58, 20, -24, -10, .1, 0), (22, 26, 36, -18, -18, .05, 1), (30, 48, 24, 10, -12, .14, 1),
+          (38, 18, 18, -12, -9, .08, 0), (44, 40, 40, 6, -20, 0, 1), (52, 62, 22, 22, -11, .12, 1), (58, 24, 28, 30, -16, .04, 1),
+          (66, 46, 34, 18, -19, .09, 0), (73, 20, 22, 40, -12, .03, 1), (80, 54, 30, 26, -15, .13, 1), (87, 30, 38, 44, -18, .06, 1),
+          (94, 50, 20, 30, -10, .11, 0), (10, 74, 26, -30, -13, .16, 1), (48, 80, 30, -8, -15, .18, 1), (84, 76, 24, 20, -12, .15, 1)]
+_BURST_HTML = "".join(f'<i class="sp-foam{"" if foam else " t"}" style="left:{x}%;top:{y}%;--s:{sz}px;--dx:{dx}px;--dy:{dy}vmin;--d:{d}s"></i>'
+                      for x, y, sz, dx, dy, d, foam in _BURST)
 SPLASH = f"""<div id="splash" aria-hidden="true"><style>
 #splash {{ position: fixed; inset: 0; z-index: 400; overflow: hidden; background: linear-gradient(#FFE9C7 0%, #FFD7B0 46%, #FFC9A8 62%, #A9D9D3 62.2%, #7CC3BE 100%);
   animation: sp-safety .6s 25s forwards; }}
@@ -722,6 +729,15 @@ SPLASH = f"""<div id="splash" aria-hidden="true"><style>
 #splash.crash .sp-wall {{ transform: translateY(-72%); }}
 #splash.crash .sp-drop {{ animation: sp-spray .7s var(--d) cubic-bezier(.2, .6, .4, 1) both; }}
 @keyframes sp-spray {{ 0% {{ opacity: 0; transform: translate(0, 0) scale(.4); }} 25% {{ opacity: 1; }} 100% {{ opacity: 0; transform: translate(var(--dx), -16vmin) scale(1); }} }}
+/* as the wave covers the screen it bursts into foam, which flies up and falls away while the water drains */
+#splash .sp-burst {{ position: absolute; inset: 0; pointer-events: none; }}
+#splash .sp-foam {{ position: absolute; width: var(--s); height: var(--s); margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2); border-radius: 50%;
+  background: #FFF8EC; border: 3px solid #1D2B45; opacity: 0; }}
+#splash .sp-foam.t {{ background: #7CC3BE; }}
+#splash.crash .sp-foam {{ animation: sp-burst 1.25s calc(.42s + var(--d)) cubic-bezier(.15, .7, .45, 1) both; }}
+@keyframes sp-burst {{ 0% {{ opacity: 0; transform: translate(0, 4vmin) scale(.2); }} 12% {{ opacity: 1; }}
+  45% {{ opacity: 1; transform: translate(calc(var(--dx) * .7), var(--dy)) scale(1); }}
+  100% {{ opacity: 0; transform: translate(var(--dx), calc(var(--dy) + 30vmin)) scale(.7); }} }}
 #splash.drain {{ background: transparent; pointer-events: none; }}
 #splash.drain .sp-sea, #splash.drain .sp-word {{ visibility: hidden; }}
 #splash.drain .sp-wall {{ transform: translateY(8%); transition: transform .9s cubic-bezier(.35, .1, .55, 1); }}
@@ -730,6 +746,7 @@ SPLASH = f"""<div id="splash" aria-hidden="true"><style>
 <svg class="sp-sea" viewBox="0 0 2400 300" preserveAspectRatio="none"><path class="sp-a" d="{_wave(70, 30)}"/><path class="sp-b" d="{_wave(140, 24)}"/><path class="sp-c" d="{_wave(210, 18)}"/></svg>
 <p class="sp-word">Setting sail<i></i><i></i><i></i></p>
 <div class="sp-wall">{_DROPS}<svg class="sp-crest" viewBox="0 0 2400 100" preserveAspectRatio="none"><path d="{_CREST} V100 H0Z" fill="#3E9E9C"/><path d="{_CREST}" fill="none" stroke="#FFF8EC" stroke-width="7" vector-effect="non-scaling-stroke"/></svg></div>
+<div class="sp-burst">{_BURST_HTML}</div>
 </div>
 """
 SPLASH_JS = r"""
@@ -741,7 +758,7 @@ SPLASH_JS = r"""
       if (REDUCED) { sp.remove(); return; }
       sp.classList.add('crash');
       setTimeout(() => sp.classList.add('drain'), 680);
-      setTimeout(() => sp.remove(), 1700);
+      setTimeout(() => sp.remove(), 1950);
     };
     const fonts = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
     Promise.race([fonts, new Promise(r => setTimeout(r, 1500))]).then(() => setTimeout(out, 60));
