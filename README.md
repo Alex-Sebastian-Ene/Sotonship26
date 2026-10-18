@@ -30,15 +30,15 @@ officer's approval.
 
 ```mermaid
 flowchart LR
-    ships["🚢 <b>Ship schedule</b><br/>port's public list"]
-    events["📅 <b>Calendar</b><br/>matches · terms · roadworks"]
-    base["🛣️ <b>Everyday traffic</b><br/>roads · Census · freight"]
+    ships["<b>Ship schedule</b><br/>port's public list"]
+    events["<b>Calendar</b><br/>matches · terms · roadworks"]
+    base["<b>Everyday traffic</b><br/>roads · Census · freight"]
 
-    model["🧮 <b>Traffic model</b><br/>real roads · 15-min steps<br/>with and without ships"]
-    obs[("📊 Observed counts<br/>WebTRIS · DfT")]
-    fc(["🎯 <b>Forecast</b><br/>odds of congestion<br/>10 / 50 / 90%"])
-    ai["🤖 <b>Learned plan</b><br/>marshals · signs<br/>roadworks holds"]
-    officer(["✅ <b>Officer decides</b><br/>approve or reject"])
+    model["<b>Traffic model</b><br/>real roads · 15-min steps<br/>with and without ships"]
+    obs[("Observed counts<br/>WebTRIS · DfT")]
+    fc(["<b>Forecast</b><br/>odds of congestion<br/>10 / 50 / 90%"])
+    ai["<b>Learned plan</b><br/>marshals · signs<br/>roadworks holds"]
+    officer(["<b>Officer decides</b><br/>approve or reject"])
 
     ships & events & base --> model --> fc --> ai --> officer
     obs -. "fit + backtest" .-> model
