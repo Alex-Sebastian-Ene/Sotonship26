@@ -1,5 +1,5 @@
 /* Big-number lower-third, bottom-left. One template, many instances via params
-   (88% scale, −5.0 road-hours/day, £29k anchor, 6.6% skill...). Always carries a source line. */
+   (88% scale, 5.0 road-hours/day avoided, £29k anchor, 6.6% skill...). Always carries a source line. */
 .lower-third.stat{
   position:absolute; left:5%; bottom:7%; display:flex; align-items:center; gap:26px;
   padding:22px 34px; border-radius:20px; background:rgba(7,19,33,.86);
