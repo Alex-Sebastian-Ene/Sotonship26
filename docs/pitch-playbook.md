@@ -3,7 +3,7 @@
 Team-facing. How we demo and pitch the cruise-day traffic forecast, who to whom, and the
 video plan. Hard lock **Sun 18 Oct 13:00** (code freeze 11:00, submit by 12:30).
 
-A styled single-page version of this is published as a Claude artifact; this markdown copy
+A styled single-page version of this is published as a web page; this markdown copy
 is the shareable source of truth (everyone with the repo can read it).
 
 ## 1. What we built, in one breath
