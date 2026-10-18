@@ -592,6 +592,20 @@ body[data-view="timeline"] #tl-card > summary, body[data-view="timeline"] #gates
 .acts.clamped.filtering > .act:nth-child(n+5) { display: grid; }
 /* plan bar: running total of what is arranged, filters, multi-select */
 .plan-bar { display: grid; gap: 10px; }
+/* what each kind of option is likely to do (from the learned plan's with-and-without runs) */
+.lever-fx { display: grid; gap: 10px; }
+.lever-fx[hidden] { display: none; }
+.lfx-head { display: grid; gap: 2px; }
+.lfx-head h4 { margin: 0; font-family: var(--font-display); font-size: var(--step-0); }
+.lfx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 10px; }
+.lfx { display: grid; gap: 3px; align-content: start; padding: 10px 14px; border-radius: 12px; background: var(--sunk); }
+.lfx.good { background: color-mix(in srgb, #1A9E6E 18%, var(--sunk)); }
+:root[data-theme="steam"] .lfx { border: 2px solid #1D2B45; }
+.lfx .k { font-size: .72rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.lfx .v { font-family: var(--font-data); font-variant-numeric: tabular-nums; font-weight: 750; font-size: 1.35rem; line-height: 1.15; }
+.lfx .v small { font-size: .75rem; color: var(--muted); font-weight: 600; }
+.lfx .s { font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.lfx .a { font-size: .75rem; color: var(--warn-ink); }
 .plan-sum { display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px; }
 .ps { display: grid; gap: 1px; align-content: center; padding: 8px 14px; border-radius: 12px; background: var(--sunk); min-width: 110px; transition: background .25s, transform .25s; }
 .ps .k { font-size: .7rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
@@ -1012,6 +1026,7 @@ body.ai-adv .simple-only { display: none !important; }
 
     <div class="block" id="row-actions">
       <div class="block-head"><h3>What to do</h3><p class="foot-note">Suggestions only: the duty officer decides. Tick when arranged, cross when not needed.</p></div>
+      <div class="lever-fx" id="lever-fx" hidden></div>
       <div class="plan-bar" id="plan-bar">
         <div class="plan-sum" id="plan-sum" aria-live="polite"></div>
         <div class="plan-tools">
@@ -2197,6 +2212,44 @@ body.ai-adv .simple-only { display: none !important; }
     try { return JSON.parse(t); } catch (err) { console.warn('extra data unreadable', err); return null; }
   })();
   const AG = EXTRA && EXTRA.agents, PPO = EXTRA && EXTRA.ppo;
+  // What each kind of option is likely to do: the learned plan run with and without each lever on the same
+  // simulated days (train_ppo.py ablation). Hours are time with roads above 85% of capacity. The range is a
+  // rough 95% one that treats the two runs as independent, so it is wider than the paired difference's.
+  (function leverFx() {
+    const host = $('#lever-fx'), AB = PPO && PPO.ablation && PPO.ablation.rows;
+    if (!host || !AB || !AB.ppo) return;
+    const C = PPO.costs || {}, L = PPO.levers || {}, P = AB.ppo;
+    const mean = (r, m) => (r[m] ? r[m].mean : 0), se = (r, m) => (r[m] ? r[m].se : 0);
+    const eff = k => {
+      const r = AB[k]; if (!r) return null;
+      const d = m => mean(P, m) - mean(r, m);
+      return { road: -d('corridor_hours'), pm: 1.96 * Math.hypot(se(P, 'corridor_hours'), se(r, 'corridor_hours')), delay: d('vehicle_hours'),
+        gate: d('marshal_hours'), sign: d('sign_hours'), held: d('held_pax_hours'), score: -(mean(P, 'cost') - mean(r, 'cost')) };
+    };
+    const k1 = v => `£${(Math.abs(v) / 1000).toFixed(1)}k`, mins = h => Math.round(h * 60);
+    const delayTxt = v => `delay ${Math.abs(v) < 0.5 ? '' : v >= 0 ? '+' : '−'}${int(Math.abs(v))} vehicle-hours${Math.abs(v) < 60 ? ' (no real change)' : ''}`;
+    const scoreTxt = v => Math.abs(v) < 100 ? 'no change in weighted score' : `${k1(v)} of weighted score${v < 0 ? ' lost' : ''}`;
+    const mRate = C.marshal_hour || 120;
+    const tiles = [
+      { k: 'ppo_no_marshals', name: 'Marshals at the gates', use: e => `uses ${fmt1(e.gate)} gate-hours a day (${k1(e.gate * mRate)} at £${mRate})`,
+        per: e => (e.gate > 0.5 ? `about ${mins(e.road / e.gate)} min less per gate-hour` : ''), note: `assumes marshals add ${Math.round(((L.marshal_cap || 1.25) - 1) * 100)}% to a gate's capacity` },
+      { k: 'ppo_no_signs', name: 'Sign messages', use: e => `uses ${fmt1(e.sign)} sign-hours a day`,
+        per: e => (e.sign > 0.5 ? `about ${mins(e.road / e.sign)} min less per sign-hour` : ''), note: `assumes drivers see signed roads as ${Math.round(((L.sign_factor || 1.3) - 1) * 100)}% slower when they choose a route` },
+      { k: 'ppo_no_checkin', name: 'Check-in times', use: () => 'opens check-in up to an hour earlier or 30 minutes later', per: () => '', note: '' },
+      { k: 'ppo_no_meter', name: 'Paced disembarkation', use: e => `holds ${fmt1(e.held)} passenger-hours a day in the terminals`, per: () => '', note: '' },
+    ].map(t => ({ ...t, e: eff(t.k) })).filter(t => t.e);
+    const rule = AB.marshal_rule, made = String(PPO.ablation.made || PPO.made || '').replace('T', ' ');
+    host.innerHTML = `<div class="lfx-head"><h4>What each option is likely to do</h4>
+      <p class="foot-note">Simulated, not measured: the learned plan run with and without each kind of option on the same ${P.n} sampled cruise days (${esc(made)}). Hours are time a day with roads above 85% of capacity; ± is a rough 95% range. Averages over days, not a promise for this one.</p></div>
+      <div class="lfx-grid">${tiles.map(({ name, e, use, per, note }) => `<div class="lfx${e.road >= 0.2 ? ' good' : ''}">
+        <span class="k">${esc(name)}</span>
+        <span class="v">${e.road >= 0.05 ? '−' + fmt1(e.road) : '≈ 0'}<small> h a day near the limit</small></span>
+        <span class="s">${e.road >= 0.05 ? `± ${fmt1(e.pm)} · ` : ''}${esc(use(e))}${per(e) ? ' · ' + esc(per(e)) : ''}</span>
+        <span class="s">${esc(delayTxt(e.delay))} · ${esc(scoreTxt(e.score))}</span>
+        ${note ? `<span class="a">${esc(note)}</span>` : ''}</div>`).join('')}</div>
+      ${rule ? `<p class="foot-note">For scale, a marshals-only rule without the AI takes ${fmt1(-mean(rule, 'corridor_hours'))} h a day off with ${fmt1(mean(rule, 'marshal_hours'))} gate-hours: fewer hours saved, about ${mins(-mean(rule, 'corridor_hours') / Math.max(0.1, mean(rule, 'marshal_hours')))} min per gate-hour.</p>` : ''}`;
+    host.hidden = false;
+  })();
   const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_', B64I = {};
   [...B64].forEach((c, i) => { B64I[c] = i; });
   function dec(s) {
