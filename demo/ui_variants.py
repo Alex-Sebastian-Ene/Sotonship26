@@ -187,13 +187,20 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 .l-anchor { position: absolute; left: 3vw; bottom: 4%; width: 11vmin; z-index: 4; }
 .l-wheel { position: absolute; right: 5vw; bottom: 4%; width: 12vmin; z-index: 4; }
 /* the ship scales with the screen height like the waves, so it floats at the same depth on every screen */
-.l-ship { position: absolute; left: 66%; bottom: 18%; width: 40vmin; transform: translateX(-50%); z-index: 2; transition: transform 1.3s cubic-bezier(.5, 0, .7, .4); }
-/* the landing ship's own water is the colour of the front wave, with no foam line, so where a trough of the
-   big waves passes under the hull it shows more of the same sea */
-.l-ship .ship-svg .wv path:first-child { fill: #7CC3BE; }
-.l-ship .ship-svg .wv path:last-child { stroke: none; }
-.l-spray { position: absolute; width: 30%; left: -14%; bottom: 4%; transform: scaleX(-1); }
-.l-spray.s2 { width: 22%; left: auto; right: -6%; bottom: 2%; transform: none; }
+/* the ship is placed by its waterline, just above the crests of the first big wave (24.5% up) on every screen */
+.landing { --sw: 40vmin; --wl: 25.5%; }  /* the ship's width and its waterline's height */
+.l-ship { position: absolute; left: 66%; bottom: calc(var(--wl) - var(--sw) * .1283); width: var(--sw); transform: translateX(-50%); z-index: 2; transition: transform 1.3s cubic-bezier(.5, 0, .7, .4); }
+/* the ship sits in a sea that runs the whole width of the screen, in front of its hull and behind the big
+   waves. Its surface is the waterline, y 363 of the ship's 600 by 440 drawing (77 / 600 of its width up), and it
+   is the colour of the sea behind it (the landing's gradient from 74.5% down), so it only shows on the hull.
+   The ship rolls less than the small ones in the story bar, so the bottom of its hull stays under the ripples. */
+.l-sea { position: absolute; left: 0; bottom: 0; width: 200%; height: var(--wl); background: linear-gradient(#9AD2CC, #7CC3BE); z-index: 2;
+  pointer-events: none; animation: wave 18s linear infinite; }
+.l-sea svg { position: absolute; left: 0; bottom: calc(100% - 1.2vmin); width: 100%; height: 2.4vmin; fill: #9AD2CC; }
+.l-ship .ship-svg .rock { animation-name: rock-calm; }
+@keyframes rock-calm { 0%, 100% { transform: rotate(-1deg) translateY(0); } 50% { transform: rotate(1deg) translateY(-5px); } }
+.l-spray { position: absolute; width: 30%; left: -14%; bottom: 14%; transform: scaleX(-1); }
+.l-spray.s2 { width: 22%; left: auto; right: -6%; bottom: 13%; transform: none; }
 .l-rock-spray { position: absolute; right: 30%; bottom: -12%; width: 38%; }
 .l-rock-spray .spr { display: block; width: 100%; --dur: 1.3s; }
 .landing.sail .l-ship { transform: translateX(70vw); }
@@ -230,7 +237,7 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 /* portrait and narrow screens: words on top, the ship below them on the horizon */
 @media (max-width: 820px), (max-aspect-ratio: 1/1) {
   .l-card { place-self: start start; margin: 28px 0 0 4vw; max-width: 92vw; }
-  .l-ship { left: 46%; width: 46vmin; bottom: 19%; }
+  .landing { --sw: 46vmin; } .l-ship { left: 46%; }
   .l-sun { left: 46%; }
   .l-light { width: 30vmin; right: 2vw; bottom: 33%; }
 }
@@ -240,9 +247,9 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
   .l-kicker, .l-sub { display: none; }
   .l-ticket { padding: 3px 12px 5px; } .l-ticket b { font-size: 1.2rem; }
   .l-go { font-size: 1.1rem; padding: 6px 20px 6px 8px; } .l-go .spr { width: 30px; }
-  .l-ship { left: 72%; width: 30vmax; bottom: 16%; } .l-sun { left: 72%; } .l-light { width: 24vmin; right: 1vw; }
+  .landing { --sw: 30vmax; } .l-ship { left: 72%; } .l-sun { left: 72%; } .l-light { width: 24vmin; right: 1vw; }
 }
-@media (max-width: 640px) { .l-light { width: 34vmin; right: 0; bottom: 34%; } .l-ship { left: 42%; bottom: 22%; }
+@media (max-width: 640px) { .l-light { width: 34vmin; right: 0; bottom: 34%; } .l-ship { left: 42%; }
   .l-card { margin: 68px 0 0; max-width: 100%; gap: 12px; } .l-tickets { gap: 8px; flex-wrap: nowrap; }
   .l-ticket { padding: 4px 11px 6px; } .l-ticket b { font-size: 1.3rem; } .l-ticket span { font-size: .72rem; white-space: nowrap; }
   .storybar { grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px 10px; } .story-q { grid-column: 1 / -1; } .voyage { width: auto; margin-right: 22px; }
@@ -258,8 +265,7 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
   const puffSet = cls => [259, 381].map((x, f) => Array.from({ length: 8 }, (_, i) => `<circle class="puff2 ${cls}" cx="${x}" cy="62" r="26" style="animation-delay:${-(i * 0.22 + f * 0.11).toFixed(2)}s"/>`).join('')).join('');
   const puffs = puffSet('pu-o') + puffSet('pu-i');
   const range = (a, b, st) => Array.from({ length: Math.floor((b - a) / st) + 1 }, (_, i) => a + i * st);
-  const WATER_FADE = id => id !== 'land' ? '' : `<linearGradient id="wvg-${id}" gradientUnits="userSpaceOnUse" x1="30" x2="570"><stop offset="0" stop-color="#000"/><stop offset=".08" stop-color="#fff"/><stop offset=".92" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient><mask id="wvm-${id}" maskUnits="userSpaceOnUse" x="-40" y="360" width="680" height="100"><rect x="-40" y="360" width="680" height="100" fill="url(#wvg-${id})"/></mask>`;
-  const SHIP_SVG = id => `<svg class="ship-svg" viewBox="0 0 600 440" aria-hidden="true"><defs><clipPath id="hc-${id}"><path d="${HULL}"/></clipPath>${WATER_FADE(id)}</defs>
+  const SHIP_SVG = id => `<svg class="ship-svg" viewBox="0 0 600 440" aria-hidden="true"><defs><clipPath id="hc-${id}"><path d="${HULL}"/></clipPath></defs>
     <g class="rock" stroke="${NAVY}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">
       <g stroke="none">${puffs}</g>
       <line x1="160" y1="214" x2="160" y2="98"/><line x1="146" y1="118" x2="174" y2="118"/><circle cx="160" cy="92" r="7" fill="${NAVY}"/>
@@ -273,8 +279,8 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
       <path d="${HULL}" fill="none"/>
       ${range(150, 530, 40).map(x => `<circle cx="${x}" cy="298" r="9" fill="${CREAM}" stroke-width="5"/>`).join('')}
       <g stroke-width="5" fill="none"><circle cx="96" cy="282" r="5"/><path d="M96 287 V318 M84 297 H108 M80 306 Q96 330 112 306"/></g>
-      <g class="wv"${id === 'land' ? ` mask="url(#wvm-${id})"` : ''}><path d="M30 404 ${range(0, 10, 1).map(() => 'q27 -20 54 0').join(' ')} V440 H30 Z" fill="#3E9E9C"/>
-      <path d="M30 404 ${range(0, 10, 1).map(() => 'q27 -20 54 0').join(' ')}" fill="none" stroke="#FFF8EC" stroke-width="6"/></g>
+      ${id === 'land' ? '' /* the landing ship sits in the full-width sea (.l-sea) */ : `<g class="wv"><path d="M30 404 ${range(0, 10, 1).map(() => 'q27 -20 54 0').join(' ')} V440 H30 Z" fill="#3E9E9C"/>
+      <path d="M30 404 ${range(0, 10, 1).map(() => 'q27 -20 54 0').join(' ')}" fill="none" stroke="#FFF8EC" stroke-width="6"/></g>`}
     </g></svg>`;
   const STEPS = [
     { q: 'When are the hard days?', ico: 'lighthouse', show: [calSec] },
@@ -381,6 +387,7 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
     <span class="l-gull g1" aria-hidden="true"><span class="gl"><span class="gl2"><span class="spr spr-gull"></span></span></span></span><span class="l-gull g2" aria-hidden="true"><span class="gl b"><span class="gl2"><span class="spr spr-gull"></span></span></span></span>
     <span class="l-light" aria-hidden="true"><span class="spr spr-lighthouse"></span><span class="l-rock-spray"><span class="spr spr-spray"></span></span></span>
     <div class="l-ship" aria-hidden="true">${SHIP_SVG('land')}<span class="l-spray"><span class="spr spr-spray"></span></span><span class="l-spray s2"><span class="spr spr-spray"></span></span></div>
+    <div class="l-sea" aria-hidden="true"><svg viewBox="0 0 2400 40" preserveAspectRatio="none"><path d="${wave(20, 8)}"/></svg></div>
     <button type="button" class="l-sound hint" id="l-sound" aria-pressed="false" aria-label="Sound"><svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="on" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="off" d="M16 9.5l5 5M21 9.5l-5 5"/></svg><span id="l-sound-t">Sound on</span></button>
     <svg class="l-waves" viewBox="0 0 2400 300" preserveAspectRatio="none" aria-hidden="true"><path class="w1" d="${wave(70, 30)}"/><path class="w2" d="${wave(140, 24)}"/><path class="w3" d="${wave(210, 18)}"/></svg>
     <span class="l-anchor" aria-hidden="true"><span class="spr spr-anchor"></span></span><span class="l-wheel" aria-hidden="true"><span class="spr spr-wheel"></span></span>
