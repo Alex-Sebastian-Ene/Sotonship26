@@ -1,0 +1,16 @@
+/* Big-number lower-third, bottom-left. One template, many instances via params
+   (88% scale, £10.7k saving, £29k anchor, 6.6% skill...). Always carries a source line. */
+.lower-third.stat{
+  position:absolute; left:5%; bottom:7%; display:flex; align-items:center; gap:26px;
+  padding:22px 34px; border-radius:20px; background:rgba(7,19,33,.86);
+  border:1px solid #1E3A57; backdrop-filter:blur(6px);
+  font-family:"Space Grotesk","Segoe UI",sans-serif; color:#E4F0FA; max-width:62%;
+}
+.lower-third.stat .num{
+  font-size:5rem; line-height:.9; font-weight:700; color:#4CC9F0; letter-spacing:-.02em;
+  white-space:nowrap;
+}
+.lower-third.stat .label{ font-size:1.9rem; line-height:1.15; font-weight:600; }
+.lower-third.stat .src{
+  margin-top:8px; font:600 1rem "IBM Plex Mono",monospace; color:#8DA6BE; letter-spacing:.02em;
+}
