@@ -72,11 +72,17 @@ body[data-variant="focus"] .map-box { height: max(420px, calc(100vh - 360px)) !i
 
 # 2 ---------------------------------------------------------------- Story: a landing page, then five guided steps
 VARIANTS["story"] = ("""
-.storybar { position: sticky; top: 58px; z-index: 35; display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 10px 14px; padding: 10px max(16px, env(safe-area-inset-left, 0px));
+.storybar { position: sticky; top: 58px; z-index: 35; display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto auto; align-items: center; gap: 10px 14px; padding: 10px max(16px, env(safe-area-inset-left, 0px));
   background: color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
 .story-q { display: flex; align-items: center; gap: 12px; min-width: 0; white-space: nowrap; font-family: var(--font-display); font-size: clamp(1.3rem, 2.6vw, 2rem); font-weight: 750; }
 #story-q { overflow: hidden; text-overflow: ellipsis; }
 .storybar .v-btn { min-width: 88px; }
+/* time of day, on every step that shows a day: the same 15-minute slots as the map's slider */
+.story-time { display: none; align-items: center; gap: 10px; padding: 4px 6px 4px 14px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--surface); }
+body[data-view="step1"] .story-time, body[data-view="step2"] .story-time, body[data-view="step3"] .story-time { display: inline-flex; }
+.story-time b { font-family: var(--font-data); font-size: 1rem; min-width: 5ch; }
+.story-time input { width: 170px; accent-color: var(--accent); }
+:root[data-theme="steam"] .story-time { border: 2px solid #1D2B45; box-shadow: 3px 3px 0 #1D2B45; }
 .story-q .spr { height: 46px; width: auto; flex: none; }
 .story-ico { display: inline-flex; animation: stk-pop .45s cubic-bezier(.2, 1.6, .4, 1) both; }
 .story-n { font-family: var(--font-data); color: var(--accent); }
@@ -182,7 +188,7 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 .l-ship { position: absolute; left: 66%; bottom: 18%; width: min(40vmin, 360px); transform: translateX(-50%); z-index: 2; transition: transform 1.3s cubic-bezier(.5, 0, .7, .4); }
 .l-spray { position: absolute; width: 30%; left: -14%; bottom: 4%; transform: scaleX(-1); }
 .l-spray.s2 { width: 22%; left: auto; right: -6%; bottom: 2%; transform: none; }
-.l-rock-spray { position: absolute; right: 13vmin; bottom: 28%; width: 12vmin; z-index: 1; }
+.l-rock-spray { position: absolute; right: 30%; bottom: -12%; width: 38%; }
 .l-rock-spray .spr { display: block; width: 100%; --dur: 1.3s; }
 .landing.sail .l-ship { transform: translateX(70vw); }
 .l-waves { position: absolute; left: 0; bottom: 0; width: 200%; height: 30%; z-index: 3; pointer-events: none; }
@@ -191,7 +197,7 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 @keyframes wave { to { transform: translateX(-50%); } }
 .l-sun { left: 66%; }
 /* the words sit in the sky on the left; the ship sails the right half */
-.l-card { position: relative; z-index: 5; display: grid; justify-items: start; gap: 14px; text-align: left; padding: 0 16px; place-self: center start; margin: -14vh 0 0 6vw; max-width: min(660px, 52vw); }
+.l-card { position: relative; z-index: 5; display: grid; justify-items: start; gap: 14px; text-align: left; padding: 0 16px; place-self: center start; margin: -22vh 0 0 3.5vw; max-width: min(660px, 52vw); }
 .l-kicker { font-weight: 600; letter-spacing: .12em; text-transform: uppercase; font-size: .85rem; }
 .l-plate { position: relative; padding: 14px 38px 16px; border-radius: 18px; background: #1D2B45; color: #FFF6E2; box-shadow: 0 0 0 4px #FFF6E2, 0 0 0 7px #1D2B45, 8px 10px 0 7px rgba(29, 43, 69, .3); }
 .l-plate::before, .l-plate::after { content: ''; position: absolute; top: 50%; width: 9px; height: 9px; margin-top: -4.5px; border-radius: 50%; background: #F2B84B; }
@@ -217,22 +223,26 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 @keyframes hint { 50% { transform: scale(1.08); } }
 /* portrait and narrow screens: words on top, the ship below them on the horizon */
 @media (max-width: 820px), (max-aspect-ratio: 1/1) {
-  .l-card { place-self: start center; margin: 72px 0 0; justify-items: center; text-align: center; max-width: none; }
-  .l-ship { left: 50%; width: min(46vmin, 300px); bottom: 21%; }
-  .l-sun { left: 50%; }
-  .l-light { width: 26vmin; right: -4vw; }
-  .l-tickets { justify-content: center; }
+  .l-card { place-self: start start; margin: 28px 0 0 4vw; max-width: 92vw; }
+  .l-ship { left: 46%; width: min(46vmin, 300px); bottom: 19%; }
+  .l-sun { left: 46%; }
+  .l-light { width: 30vmin; right: 2vw; bottom: 33%; }
 }
 /* short landscape screens (a phone on its side): a compact card, the ship pushed right */
 @media (max-height: 520px) and (min-aspect-ratio: 1/1) {
-  .l-card { margin: 0 0 0 4vw; gap: 8px; place-self: center start; justify-items: start; text-align: left; max-width: 58vw; }
+  .l-card { margin: -6vh 0 0 3vw; gap: 8px; place-self: center start; justify-items: start; text-align: left; max-width: 58vw; }
   .l-kicker, .l-sub { display: none; }
   .l-ticket { padding: 3px 12px 5px; } .l-ticket b { font-size: 1.2rem; }
   .l-go { font-size: 1.1rem; padding: 6px 20px 6px 8px; } .l-go .spr { width: 30px; }
-  .l-ship { left: 79%; width: 30vmax; bottom: 16%; } .l-sun { left: 79%; } .l-light { display: none; } .l-rock-spray { display: none; }
+  .l-ship { left: 72%; width: 30vmax; bottom: 16%; } .l-sun { left: 72%; } .l-light { width: 24vmin; right: 1vw; }
 }
-@media (max-width: 640px) { .l-light { display: none; } .l-rock-spray { display: none; }
+@media (max-width: 640px) { .l-light { width: 34vmin; right: 0; bottom: 34%; } .l-ship { left: 42%; bottom: 22%; }
+  .l-card { margin: 68px 0 0; max-width: 100%; gap: 12px; } .l-tickets { gap: 8px; flex-wrap: nowrap; }
+  .l-ticket { padding: 4px 11px 6px; } .l-ticket b { font-size: 1.3rem; } .l-ticket span { font-size: .72rem; white-space: nowrap; }
   .storybar { grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px 10px; } .story-q { grid-column: 1 / -1; } .voyage { width: auto; margin-right: 22px; }
+  .story-time { grid-column: 1; min-width: 0; } .story-time input { flex: 1; width: auto; min-width: 0; }
+  body[data-view="step1"] .voyage, body[data-view="step2"] .voyage, body[data-view="step3"] .voyage { display: none; }
+  .story-q { font-size: 1.15rem; gap: 8px; white-space: normal; } .story-q .spr { height: 34px; } #story-q { overflow: visible; text-overflow: clip; }
   .storybar .v-btn { padding: 6px 12px; min-height: 36px; min-width: 64px; } }
 @media (prefers-reduced-motion: reduce) { .landing *, .voy-ship, .deco-gull { animation: none !important; transition: none !important; } .landing { transition: none; } }
 """, r"""
@@ -245,8 +255,8 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
   const SHIP_SVG = id => `<svg class="ship-svg" viewBox="0 0 600 440" aria-hidden="true"><defs><clipPath id="hc-${id}"><path d="${HULL}"/></clipPath></defs>
     <g class="rock" stroke="${NAVY}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">
       <g stroke="none">${puffs}</g>
-      <line x1="160" y1="170" x2="160" y2="98"/><line x1="146" y1="118" x2="174" y2="118"/><circle cx="160" cy="92" r="7" fill="${NAVY}"/>
-      <line x1="528" y1="216" x2="528" y2="150"/><path d="M528 152 L580 165 L528 180 Z" fill="${RED}"/>
+      <line x1="160" y1="214" x2="160" y2="98"/><line x1="146" y1="118" x2="174" y2="118"/><circle cx="160" cy="92" r="7" fill="${NAVY}"/>
+      <line x1="528" y1="262" x2="528" y2="150"/><path d="M528 152 L580 165 L528 180 Z" fill="${RED}"/>
       ${[228, 350].map(x => `<path d="M${x} 72 L${x + 62} 72 L${x + 56} 172 L${x + 6} 172 Z" fill="${RED}"/><path d="M${x} 72 L${x + 62} 72 L${x + 61} 92 L${x + 1} 92 Z" fill="${NAVY}"/><line x1="${x + 4}" y1="128" x2="${x + 58}" y2="128" stroke="${CREAM}" stroke-width="6"/>`).join('')}
       <rect x="170" y="168" width="290" height="50" rx="9" fill="${CREAM}"/>
       ${range(192, 436, 34).map(x => `<rect x="${x}" y="184" width="18" height="16" rx="4" fill="${NAVY}" stroke="none"/>`).join('')}
@@ -273,6 +283,7 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
   STEPS.forEach((st, i) => st.show.forEach(s => { const el = typeof s === 'string' ? $(s) : s; el.dataset.views = (el.dataset.views === 'none' ? '' : el.dataset.views + ' ') + 'step' + i; }));
   const bar = document.createElement('div'); bar.className = 'storybar';
   bar.innerHTML = `<span class="story-q"><span class="story-ico" id="story-stk" aria-hidden="true"></span><span class="story-n" id="story-n"></span><span id="story-q"></span><span id="story-src"></span></span>
+    <label class="story-time" title="Time of day: moves the map, the roads and the day line"><b id="st-clock"></b><input type="range" id="st-slider" min="0" max="${N_BINS - 1}" step="1" aria-label="Time of day"></label>
     <div class="voyage" id="voyage" role="tablist" aria-label="Steps"><span class="voy-sea"></span>
       ${STEPS.map((s, i) => `<button class="voy-port" role="tab" data-step="${i}" style="--x:${i / (STEPS.length - 1)}" aria-label="Step ${i + 1}: ${esc(s.q)}" title="${esc(s.q)}"></button>`).join('')}
       <span class="voy-ship" aria-hidden="true">${SHIP_SVG('bar')}</span></div>
@@ -298,6 +309,14 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
     scrollHint();
   }
   $('#story-back').addEventListener('click', () => showStep(step - 1));
+  // the bar's time slider and every other way of changing the time (map slider, day line, Play) stay in step
+  const stSlider = $('#st-slider'), stClock = $('#st-clock');
+  const syncTime = () => { stSlider.value = state.bin; stClock.textContent = binTime(state.bin).slice(0, 5); };
+  const setBin0 = setBin;
+  setBin = (b, keepMinute) => { setBin0(b, keepMinute); syncTime(); };
+  stSlider.addEventListener('input', () => setBin(+stSlider.value));
+  new MutationObserver(syncTime).observe($('#clock'), { childList: true, characterData: true, subtree: true });   // a new day moves the time without setBin
+  syncTime();
 
   /* scroll through: past the end of a step, keep scrolling (wheel, trackpad, swipe, Page Down) to reach the
      next one, and past the top to go back. A bar fills as you pull, so a stray flick never turns the page. */
@@ -353,7 +372,7 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
   const wave = (y, a) => `M0 ${y} ` + Array.from({ length: 12 }, () => `q 50 ${-a} 100 0 t 100 0`).join(' ') + ' V300 H0Z';
   land.innerHTML = `<div class="l-sun"></div><div class="l-cloud c1"></div><div class="l-cloud c2"></div><div class="l-cloud c3"></div>
     <span class="l-gull g1" aria-hidden="true"><span class="gl"><span class="gl2"><span class="spr spr-gull"></span></span></span></span><span class="l-gull g2" aria-hidden="true"><span class="gl b"><span class="gl2"><span class="spr spr-gull"></span></span></span></span>
-    <span class="l-light" aria-hidden="true"><span class="spr spr-lighthouse"></span></span><span class="l-rock-spray" aria-hidden="true"><span class="spr spr-spray"></span></span>
+    <span class="l-light" aria-hidden="true"><span class="spr spr-lighthouse"></span><span class="l-rock-spray"><span class="spr spr-spray"></span></span></span>
     <div class="l-ship" aria-hidden="true">${SHIP_SVG('land')}<span class="l-spray"><span class="spr spr-spray"></span></span><span class="l-spray s2"><span class="spr spr-spray"></span></span></div>
     <button type="button" class="l-sound hint" id="l-sound" aria-pressed="false" aria-label="Sound"><svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="on" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="off" d="M16 9.5l5 5M21 9.5l-5 5"/></svg><span id="l-sound-t">Sound on</span></button>
     <svg class="l-waves" viewBox="0 0 2400 300" preserveAspectRatio="none" aria-hidden="true"><path class="w1" d="${wave(70, 30)}"/><path class="w2" d="${wave(140, 24)}"/><path class="w3" d="${wave(210, 18)}"/></svg>
