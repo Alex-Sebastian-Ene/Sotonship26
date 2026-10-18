@@ -60,6 +60,23 @@ def test_curve_chunks_training_days():
     assert "marshal_hours" in cv[0] and "sign_hours" not in cv[0]
 
 
+def test_curve_has_no_short_last_point():
+    # 133 days in 10 points: fixed chunks of 13 would leave a 3-day last point
+    rows = [{"cost": 0.0, "nothing_cost": 100.0 if i < 130 else 1000.0, "steps": i + 1}
+            for i in range(133)]
+    cv = ps.curve(rows, points=10)
+    sizes = [b["days"] - a for a, b in zip([0] + [c["days"] for c in cv], cv, strict=False)]
+    assert len(cv) == 10 and cv[-1]["days"] == 133
+    assert max(sizes) - min(sizes) <= 1
+    assert cv[-1]["mean"] < 500  # the 3 unusual days are averaged with 10 others, not alone
+
+
+def test_curve_with_fewer_days_than_points():
+    rows = [{"cost": 1.0, "nothing_cost": 2.0, "steps": i} for i in range(3)]
+    assert [c["days"] for c in ps.curve(rows, points=10)] == [1, 2, 3]
+    assert ps.curve([], points=10) == []
+
+
 def test_bundle_skips_missing_parts():
     ppo = {"summary": {"all": {"ppo": {"n": 6, "better_days": 1.0,
                                        **{m: {"diff": -1.0, "diff_lo": -2.0, "diff_hi": 0.0}

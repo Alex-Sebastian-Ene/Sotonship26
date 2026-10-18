@@ -40,13 +40,16 @@ def _ci(d: np.ndarray, rng: np.random.Generator, boot: int = 2000) -> tuple[floa
 
 def curve(rows: list[dict], points: int = CURVE_POINTS) -> list[dict]:
     """Training days in ``points`` chunks: saving against doing nothing (mean, 10th and 90th
-    percentile) and the levers used per day, so the page shows what PPO learned to do."""
-    step = max(1, len(rows) // points)
+    percentile) and the levers used per day, so the page shows what PPO learned to do.
+
+    The chunks differ in size by at most one day. Cutting fixed-size chunks would leave the
+    remainder as a last point of a few days, and its mean would jump about."""
+    bounds = np.linspace(0, len(rows), min(points, len(rows)) + 1).round().astype(int)
     out = []
-    for i in range(0, len(rows), step):
-        ch = rows[i:i + step]
+    for a, b in zip(bounds[:-1], bounds[1:], strict=True):
+        ch = rows[a:b]
         save = np.array([float(r["nothing_cost"]) - float(r["cost"]) for r in ch])
-        c = {"days": i + len(ch), "steps": int(float(ch[-1]["steps"])),
+        c = {"days": int(b), "steps": int(float(ch[-1]["steps"])),
              "minutes": round(float(ch[-1].get("seconds") or 0) / 60, 1),
              "mean": float(save.mean()), "p10": float(np.percentile(save, 10)),
              "p90": float(np.percentile(save, 90))}
