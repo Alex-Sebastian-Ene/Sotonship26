@@ -36,8 +36,12 @@ OVERLAYS=(
 
 build_one() {
   local name="$1" tmpl="$2" params="$3"
-  local css="$OV/$tmpl.css"
   [ -f "$OV/$tmpl.html" ] || { echo "missing $OV/$tmpl.html" >&2; return 1; }
+
+  # --css is optional in the CLI; only pass it when a matching stylesheet exists.
+  # (e.g. the `end` overlay has no end.css, so an unconditional --css fails ENOENT.)
+  local css_args=()
+  [ -f "$OV/$tmpl.css" ] && css_args=(--css "$OV/$tmpl.css")
 
   # Create a 1920x1080 project; capture its project + frame ids.
   local json pid fid
@@ -45,9 +49,15 @@ build_one() {
   pid="$(echo "$json" | python3 -c 'import sys,json;print(json.load(sys.stdin)["project"]["id"])')"
   fid="$(echo "$json" | python3 -c 'import sys,json;print(json.load(sys.stdin)["project"]["frames"][0]["id"])')"
 
+  # A non-device Boby project defaults the frame background to solid white, which
+  # paints over the card's own `background:transparent`. Clear it so the export
+  # keeps its alpha channel (color-type 6 RGBA) instead of rendering opaque white.
+  creative apply --project "$pid" \
+    --command '{"label":"transparent bg","commands":[{"op":"element.setBackground","frameId":"'"$fid"'","background":{"type":"none"}}]}'
+
   # Lay the overlay into the frame, filling it; copy comes from the params file.
   creative code set --project "$pid" --frame "$fid" \
-    --html "$OV/$tmpl.html" --css "$css" --params "$OV/$params" --fill --name "$name"
+    --html "$OV/$tmpl.html" "${css_args[@]}" --params "$OV/$params" --fill --name "$name"
 
   # Export a transparent PNG (Remotion renders alpha where the canvas is transparent).
   creative export --project "$pid" --frame "$fid" --format png --out "$OUT/$name.png"
