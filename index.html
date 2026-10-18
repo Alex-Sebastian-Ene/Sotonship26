@@ -628,7 +628,8 @@ details.how[open] { display: grid; gap: 10px; }
 .ps.bump { transform: scale(1.05); }
 .ps-ring { display: flex; align-items: center; gap: 10px; }
 .ps-ring > span:last-child { display: grid; }
-.ring { width: 44px; height: 44px; border-radius: 50%; flex: none; background: conic-gradient(#1A9E6E 0 var(--a), #C8462D 0 calc(var(--a) + var(--d)), var(--line) 0); -webkit-mask: radial-gradient(circle 14px, transparent 98%, #000); mask: radial-gradient(circle 14px, transparent 98%, #000); transition: background .3s; }
+/* scoped to the plan totals: a bare .ring also matched the charts' dots (circle.ring) and its mask hid them */
+.ps-ring > .ring { width: 44px; height: 44px; border-radius: 50%; flex: none; background: conic-gradient(#1A9E6E 0 var(--a), #C8462D 0 calc(var(--a) + var(--d)), var(--line) 0); -webkit-mask: radial-gradient(circle 14px, transparent 98%, #000); mask: radial-gradient(circle 14px, transparent 98%, #000); transition: background .3s; }
 .plan-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .plan-tools .seg-ctl button { min-width: 40px; }
 .kind-chips { display: flex; flex-wrap: wrap; gap: 6px; }
