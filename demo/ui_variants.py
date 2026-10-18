@@ -83,6 +83,9 @@ body[data-view="step1"] .story-time, body[data-view="step2"] .story-time, body[d
 .story-time b { font-family: var(--font-data); font-size: 1rem; min-width: 5ch; }
 .story-time input { width: 170px; accent-color: var(--accent); }
 :root[data-theme="steam"] .story-time { border: 2px solid #1D2B45; box-shadow: 3px 3px 0 #1D2B45; }
+/* medium screens: a shorter slider, and on the day steps the step track gives way so the question still fits */
+@media (max-width: 1280px) { .story-time input { width: 120px; } }
+@media (max-width: 1100px) { body[data-view="step1"] .voyage, body[data-view="step2"] .voyage, body[data-view="step3"] .voyage { display: none; } }
 .story-q .spr { height: 46px; width: auto; flex: none; }
 .story-ico { display: inline-flex; animation: stk-pop .45s cubic-bezier(.2, 1.6, .4, 1) both; }
 .story-n { font-family: var(--font-data); color: var(--accent); }
@@ -239,6 +242,9 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 .l-sound.hint { animation: hint 1.6s ease-in-out infinite; }
 @keyframes hint { 50% { transform: scale(1.08); } }
 /* portrait and narrow screens: words on top, the ship below them on the horizon */
+/* tall landscape screens (1440p and up): the words grow with the ship, which scales with the screen height */
+@media (min-height: 950px) and (min-aspect-ratio: 1/1) { .l-card { zoom: 1.2; } }
+@media (min-height: 1200px) and (min-aspect-ratio: 1/1) { .l-card { zoom: 1.4; } }
 @media (max-width: 820px), (max-aspect-ratio: 1/1) {
   .l-card { place-self: start start; margin: 28px 0 0 4vw; max-width: 92vw; }
   .landing { --sw: 46vmin; } .l-ship { left: 46%; }
