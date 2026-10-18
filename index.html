@@ -818,8 +818,10 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
 .l-wheel { position: absolute; right: 5vw; bottom: 4%; width: 12vmin; z-index: 4; }
 /* the ship scales with the screen height like the waves, so it floats at the same depth on every screen */
 .l-ship { position: absolute; left: 66%; bottom: 18%; width: 40vmin; transform: translateX(-50%); z-index: 2; transition: transform 1.3s cubic-bezier(.5, 0, .7, .4); }
-.l-ship .ship-svg { display: block; clip-path: inset(-60% -30% 16.8% -30%); }  /* waterline at y 366 of 440 (the negative insets leave room for the steam): the wave troughs that pass
-   under the ship show sea, not the bottom of the hull */
+/* the landing ship's own water is the colour of the front wave, with no foam line, so where a trough of the
+   big waves passes under the hull it shows more of the same sea */
+.l-ship .ship-svg .wv path:first-child { fill: #7CC3BE; }
+.l-ship .ship-svg .wv path:last-child { stroke: none; }
 .l-spray { position: absolute; width: 30%; left: -14%; bottom: 4%; transform: scaleX(-1); }
 .l-spray.s2 { width: 22%; left: auto; right: -6%; bottom: 2%; transform: none; }
 .l-rock-spray { position: absolute; right: 30%; bottom: -12%; width: 38%; }
@@ -3156,7 +3158,8 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
   const puffSet = cls => [259, 381].map((x, f) => Array.from({ length: 8 }, (_, i) => `<circle class="puff2 ${cls}" cx="${x}" cy="62" r="26" style="animation-delay:${-(i * 0.22 + f * 0.11).toFixed(2)}s"/>`).join('')).join('');
   const puffs = puffSet('pu-o') + puffSet('pu-i');
   const range = (a, b, st) => Array.from({ length: Math.floor((b - a) / st) + 1 }, (_, i) => a + i * st);
-  const SHIP_SVG = id => `<svg class="ship-svg" viewBox="0 0 600 440" aria-hidden="true"><defs><clipPath id="hc-${id}"><path d="${HULL}"/></clipPath></defs>
+  const WATER_FADE = id => id !== 'land' ? '' : `<linearGradient id="wvg-${id}" gradientUnits="userSpaceOnUse" x1="30" x2="570"><stop offset="0" stop-color="#000"/><stop offset=".08" stop-color="#fff"/><stop offset=".92" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient><mask id="wvm-${id}" maskUnits="userSpaceOnUse" x="-40" y="360" width="680" height="100"><rect x="-40" y="360" width="680" height="100" fill="url(#wvg-${id})"/></mask>`;
+  const SHIP_SVG = id => `<svg class="ship-svg" viewBox="0 0 600 440" aria-hidden="true"><defs><clipPath id="hc-${id}"><path d="${HULL}"/></clipPath>${WATER_FADE(id)}</defs>
     <g class="rock" stroke="${NAVY}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">
       <g stroke="none">${puffs}</g>
       <line x1="160" y1="214" x2="160" y2="98"/><line x1="146" y1="118" x2="174" y2="118"/><circle cx="160" cy="92" r="7" fill="${NAVY}"/>
@@ -3170,7 +3173,7 @@ body[data-variant="story"][data-view="step3"] .time-row { display: none !importa
       <path d="${HULL}" fill="none"/>
       ${range(150, 530, 40).map(x => `<circle cx="${x}" cy="298" r="9" fill="${CREAM}" stroke-width="5"/>`).join('')}
       <g stroke-width="5" fill="none"><circle cx="96" cy="282" r="5"/><path d="M96 287 V318 M84 297 H108 M80 306 Q96 330 112 306"/></g>
-      <g class="wv"><path d="M30 404 ${range(0, 10, 1).map(() => 'q27 -20 54 0').join(' ')} V440 H30 Z" fill="#3E9E9C"/>
+      <g class="wv"${id === 'land' ? ` mask="url(#wvm-${id})"` : ''}><path d="M30 404 ${range(0, 10, 1).map(() => 'q27 -20 54 0').join(' ')} V440 H30 Z" fill="#3E9E9C"/>
       <path d="M30 404 ${range(0, 10, 1).map(() => 'q27 -20 54 0').join(' ')}" fill="none" stroke="#FFF8EC" stroke-width="6"/></g>
     </g></svg>`;
   const STEPS = [
