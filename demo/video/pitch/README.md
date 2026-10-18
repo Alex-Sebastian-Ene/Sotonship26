@@ -5,6 +5,9 @@ with a real-time demo of the live page in the middle, then the AI against its ba
 case, the data and a second city. **Download:** the `pitch-video` release on GitHub. The MP4 is kept
 out of git.
 
+> **The submitted video is narrated by Keanu.** The synthetic narration below belongs to this draft only.
+> The team may reuse some of its animated scenes.
+
 ## Structure
 
 | Scene | Content | Sources shown on screen |
