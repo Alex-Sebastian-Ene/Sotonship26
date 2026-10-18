@@ -1,16 +1,21 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,750&family=IBM+Plex+Mono:wght@400;600;700&display=swap');
 /* Big-number lower-third, bottom-left. One template, many instances via params
-   (88% scale, 3.1 road-hours/day avoided, £29k anchor, 6.6% skill...). Always carries a source line. */
+   (88% scale, 3.1 road-hours/day avoided, £29k anchor, +6.6% skill...). Always
+   carries a source line. Light card = the product UI surface.
+   The big number colours from the optional `accent` param (navy by default; the
+   congestion "road-hours avoided" stat passes a heat-ramp red). */
 .lower-third.stat{
-  position:absolute; left:5%; bottom:7%; display:flex; align-items:center; gap:26px;
-  padding:22px 34px; border-radius:20px; background:rgba(7,19,33,.86);
-  border:1px solid #1E3A57; backdrop-filter:blur(6px);
-  font-family:"Space Grotesk","Segoe UI",sans-serif; color:#E4F0FA; max-width:62%;
+  position:absolute; left:5%; bottom:7%; display:flex; align-items:center; gap:28px;
+  padding:24px 36px; border-radius:20px; background:rgba(255,255,255,.92);
+  border:1px solid #D5DCE4; box-shadow:0 10px 30px rgba(21,32,43,.14); backdrop-filter:blur(6px);
+  font-family:Arial,"Helvetica Neue",Helvetica,sans-serif; color:#15202B; max-width:62%;
 }
 .lower-third.stat .num{
-  font-size:5rem; line-height:.9; font-weight:700; color:#4CC9F0; letter-spacing:-.02em;
+  font-family:"Fraunces",Georgia,serif; font-weight:750;
+  font-size:5.2rem; line-height:.9; color:var(--p-accent, #1F57A4); letter-spacing:-.01em;
   white-space:nowrap;
 }
-.lower-third.stat .label{ font-size:1.9rem; line-height:1.15; font-weight:600; }
+.lower-third.stat .label{ font-size:1.9rem; line-height:1.15; font-weight:600; color:#15202B; }
 .lower-third.stat .src{
-  margin-top:8px; font:600 1rem "IBM Plex Mono",monospace; color:#8DA6BE; letter-spacing:.02em;
+  margin-top:10px; font:400 1rem "IBM Plex Mono",Consolas,monospace; color:#566273; letter-spacing:.01em;
 }

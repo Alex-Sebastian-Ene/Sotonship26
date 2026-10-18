@@ -89,11 +89,14 @@ def lighthouse(n=32):
     """The drawn beam is cut off and replaced by one that sweeps round the lantern."""
     base = load("lighthouse")
     a = np.array(base)
-    a[:57, 77:] = 0                                              # the original beam
+    # the original beam leaves the lantern's right side: rebuild the top of the tower (rows above 57)
+    # as a mirror of its left half about the centre line, x 58, which also drops the beam
+    a[:57, 59:117] = a[:57, 57::-1]
+    a[:57, 117:] = 0
     base = Image.fromarray(a)
     L = 96
     base = pad(base, L, 0, L, 0)
-    cx, cy = L + 62, 33
+    cx, cy = L + 58, 34                                          # the lamp, at the centre of the lantern
     frames = []
     for i in range(n):
         th = 2 * math.pi * i / n
@@ -109,7 +112,7 @@ def lighthouse(n=32):
             d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(255, 236, 160, int(200 * (sn - 0.5) * 2)))
         fr.alpha_composite(base)
         if sn > 0.5:
-            r = 7 * (sn - 0.5) * 2 + 4
+            r = 4 * (sn - 0.5) * 2 + 3
             ImageDraw.Draw(fr).ellipse([cx - r, cy - r, cx + r, cy + r], fill=(255, 245, 200, 255))
         frames.append(fr)
     return frames, 3.2
