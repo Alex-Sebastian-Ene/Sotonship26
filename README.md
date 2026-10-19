@@ -26,6 +26,10 @@ simulated held-out days it avoids about 3 congested road-hours a day for roughly
 staff time, and a no-cost ship-timing advisor saves about £7,100 a day. Every suggestion needs an
 officer's approval.
 
+## Current Deployment
+
+You can check out the live demo here: https://sotonyard.keanuc.net/
+
 ## How it works
 
 ```mermaid
