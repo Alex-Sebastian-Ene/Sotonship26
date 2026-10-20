@@ -5,7 +5,11 @@ Headless Chromium per-frame screenshot. dockgate.html is deterministic:
 ?f=N seeks frame N (0..239). 1920x1080, transparent background.
 Frames land in demo/video/out/frames/ (git-ignored).
 """
-import subprocess, os, sys, time
+
+import os
+import subprocess
+import sys
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 HTML = "file://" + os.path.join(HERE, "dockgate.html")
@@ -18,17 +22,25 @@ CHROME = os.environ.get("CHROME_BIN", "chromium-browser")
 TOTAL = 240
 t0 = time.time()
 for n in range(TOTAL):
-    dst = os.path.join(FRAMES, "frame_%04d.png" % n)
+    dst = os.path.join(FRAMES, f"frame_{n:04d}.png")
     cmd = [
-        CHROME, "--headless=new", "--disable-gpu", "--no-sandbox",
-        "--hide-scrollbars", "--force-device-scale-factor=1",
-        "--default-background-color=00000000", "--window-size=1920,1080",
-        "--virtual-time-budget=2200", "--user-data-dir=" + PROFILE,
-        "--screenshot=" + dst, HTML + "?f=%d" % n,
+        CHROME,
+        "--headless=new",
+        "--disable-gpu",
+        "--no-sandbox",
+        "--hide-scrollbars",
+        "--force-device-scale-factor=1",
+        "--default-background-color=00000000",
+        "--window-size=1920,1080",
+        "--virtual-time-budget=2200",
+        "--user-data-dir=" + PROFILE,
+        "--screenshot=" + dst,
+        HTML + f"?f={n}",
     ]
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
     if not os.path.exists(dst):
-        print("FAILED frame", n); sys.exit(1)
+        print("FAILED frame", n)
+        sys.exit(1)
     if n % 20 == 0:
-        print("frame %d/%d  %.1fs" % (n, TOTAL, time.time() - t0), flush=True)
-print("DONE %d frames -> %s  (%.1fs)" % (TOTAL, FRAMES, time.time() - t0))
+        print(f"frame {n}/{TOTAL}  {time.time() - t0:.1f}s", flush=True)
+print(f"DONE {TOTAL} frames -> {FRAMES}  ({time.time() - t0:.1f}s)")
